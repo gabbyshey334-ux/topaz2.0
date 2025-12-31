@@ -1,0 +1,7 @@
+{
+  "buildCommand": "cd topaz-scoring && npm install && npm run build",
+  "outputDirectory": "topaz-scoring/dist",
+  "framework": "vite",
+  "installCommand": "cd topaz-scoring && npm install"
+}
+
