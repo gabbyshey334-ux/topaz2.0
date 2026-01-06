@@ -1,41 +1,134 @@
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
+import { getCompetition } from '../supabase/competitions';
+import { getCompetitionCategories } from '../supabase/categories';
+import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
+import { getCompetitionEntries } from '../supabase/entries';
 
 function JudgeSelection() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const competitionData = location.state || {};
-  const { competitionName, judgeCount = 3, dancers = [] } = competitionData;
-
-  useEffect(() => {
-    if (!competitionName) {
-      navigate('/setup');
-    }
-  }, [competitionName, navigate]);
+  const { competitionId } = location.state || {};
 
   // Ready-made image paths
   const logoPath = '/logo.png';
   const leftImagePath = '/left-dancer.png';
   const rightImagePath = '/right-dancer.png';
 
+  // State
+  const [competition, setCompetition] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [ageDivisions, setAgeDivisions] = useState([]);
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Redirect if no competitionId
+  useEffect(() => {
+    if (!competitionId) {
+      toast.error('No competition selected');
+      navigate('/setup');
+    }
+  }, [competitionId, navigate]);
+
+  // Load data from Supabase
+  useEffect(() => {
+    const loadData = async () => {
+      if (!competitionId) return;
+
+      try {
+        setLoading(true);
+        console.log('Loading competition data:', competitionId);
+
+        // Load all data in parallel
+        const [compResult, catsResult, divsResult, entriesResult] = await Promise.all([
+          getCompetition(competitionId),
+          getCompetitionCategories(competitionId),
+          getCompetitionAgeDivisions(competitionId),
+          getCompetitionEntries(competitionId)
+        ]);
+
+        if (!compResult.success) {
+          throw new Error(compResult.error);
+        }
+
+        setCompetition(compResult.data);
+        setCategories(catsResult.success ? catsResult.data : []);
+        setAgeDivisions(divsResult.success ? divsResult.data : []);
+        setEntries(entriesResult.success ? entriesResult.data : []);
+
+        console.log('✅ Data loaded:', {
+          competition: compResult.data,
+          categories: catsResult.data?.length,
+          ageDivisions: divsResult.data?.length,
+          entries: entriesResult.data?.length
+        });
+
+        setLoading(false);
+      } catch (error) {
+        console.error('❌ Error loading competition data:', error);
+        toast.error(`Failed to load competition: ${error.message}`);
+        setLoading(false);
+        // Navigate back after showing error
+        setTimeout(() => navigate('/setup'), 2000);
+      }
+    };
+
+    loadData();
+  }, [competitionId, navigate]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <Layout overlayOpacity="bg-white/80">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-teal-500 border-t-transparent mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">Loading competition...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Handle judge selection
   const handleJudgeSelect = (judgeNumber) => {
     navigate('/scoring', {
       state: {
-        ...competitionData,
-        selectedJudge: judgeNumber
+        competitionId,
+        judgeNumber,
+        competition,
+        categories,
+        ageDivisions,
+        entries
       }
     });
   };
 
+  // Handle admin view
   const handleAdminView = () => {
     navigate('/results', {
       state: {
-        ...competitionData,
-        isAdmin: true
+        competitionId,
+        isAdmin: true,
+        competition,
+        categories,
+        ageDivisions,
+        entries
       }
     });
+  };
+
+  // Get entry count for a category
+  const getCategoryEntryCount = (categoryId) => {
+    return entries.filter(e => e.category_id === categoryId).length;
+  };
+
+  // Get entry count for an age division
+  const getAgeDivisionEntryCount = (divisionId) => {
+    return entries.filter(e => e.age_division_id === divisionId).length;
   };
 
   return (
@@ -44,7 +137,7 @@ function JudgeSelection() {
         {/* Header - Integrated with full branding logos */}
         <div className="flex items-center justify-between mb-10 max-w-5xl mx-auto w-full">
           <button 
-            onClick={() => navigate('/setup', { state: competitionData })}
+            onClick={() => navigate('/setup')}
             className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px] z-20"
           >
             ← <span className="hidden sm:inline ml-1">Back</span>
@@ -102,17 +195,57 @@ function JudgeSelection() {
         </div>
 
         <div className="max-w-4xl mx-auto text-center w-full">
+          {/* Competition Info */}
           <div className="mb-8">
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-2 px-4">Judge Selection</h1>
-            <p className="text-lg sm:text-xl text-teal-600 font-semibold px-4 line-clamp-2">{competitionName}</p>
-            <p className="text-sm sm:text-base text-gray-600 mt-2 px-4">{dancers.length} dancers • {judgeCount} judges</p>
+            <p className="text-lg sm:text-xl text-teal-600 font-semibold px-4 line-clamp-2">
+              {competition?.name}
+            </p>
+            <p className="text-sm sm:text-base text-gray-600 mt-2 px-4">
+              {entries.length} total {entries.length === 1 ? 'entry' : 'entries'} • {competition?.judges_count} {competition?.judges_count === 1 ? 'judge' : 'judges'}
+            </p>
           </div>
+
+          {/* Category Breakdown */}
+          {categories.length > 0 && (
+            <div className="mb-6 px-4">
+              <p className="text-gray-700 text-sm sm:text-base">
+                {categories.map((cat, index) => {
+                  const catEntries = getCategoryEntryCount(cat.id);
+                  return (
+                    <span key={cat.id}>
+                      {catEntries} {cat.name}
+                      {index < categories.length - 1 && ' • '}
+                    </span>
+                  );
+                })}
+              </p>
+            </div>
+          )}
+
+          {/* Age Division Breakdown */}
+          {ageDivisions.length > 0 && (
+            <div className="mb-6 px-4">
+              <p className="text-gray-700 text-sm sm:text-base">
+                <span className="font-semibold">Age Divisions: </span>
+                {ageDivisions.map((div, index) => {
+                  const divEntries = getAgeDivisionEntryCount(div.id);
+                  return (
+                    <span key={div.id}>
+                      {divEntries} {div.name}
+                      {index < ageDivisions.length - 1 && ' • '}
+                    </span>
+                  );
+                })}
+              </p>
+            </div>
+          )}
 
           <h2 className="text-xl sm:text-2xl text-gray-700 mb-6 sm:mb-8">Who will be scoring?</h2>
 
-          {/* Grid - 1 col for tiny screens, 2 for mobile/small tablet, 3 for iPad/Desktop */}
+          {/* Judge Buttons Grid - 1 col for tiny screens, 2 for mobile/small tablet, 3 for iPad/Desktop */}
           <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8 px-4">
-            {Array.from({ length: judgeCount }, (_, i) => i + 1).map((judgeNum) => (
+            {Array.from({ length: competition?.judges_count || 3 }, (_, i) => i + 1).map((judgeNum) => (
               <button
                 key={judgeNum}
                 onClick={() => handleJudgeSelect(judgeNum)}
@@ -144,7 +277,7 @@ function JudgeSelection() {
           </div>
 
           {/* Guidelines Section - Optimized for small screens */}
-          <div className="mt-8 sm:mt-12 mb-8 bg-white/60 backdrop-blur-sm rounded-xl p-4 sm:p-6 max-w-2xl mx-auto border-2 border-teal-200 mx-4">
+          <div className="mt-8 sm:mt-12 mb-8 bg-white/60 backdrop-blur-sm rounded-xl p-4 sm:p-6 max-w-2xl mx-auto border-2 border-teal-200">
             <p className="text-teal-800 text-sm sm:text-base text-left">
               <span className="inline-block mr-1">👉</span> <strong>Judges:</strong> Select your judge number to begin scoring.
             </p>

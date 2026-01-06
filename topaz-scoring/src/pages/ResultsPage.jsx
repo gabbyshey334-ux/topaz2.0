@@ -1,363 +1,660 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import { LazyLoadImage } from 'react-lazy-load-image-component';
+import 'react-lazy-load-image-component/src/effects/blur.css';
 import Layout from '../components/Layout';
+import LoadingSpinner from '../components/LoadingSpinner';
+import RankBadge from '../components/RankBadge';
+import CategoryBadge from '../components/CategoryBadge';
+import EmptyState from '../components/EmptyState';
+import { getCompetition } from '../supabase/competitions';
+import { getCompetitionCategories } from '../supabase/categories';
+import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
+import { getCompetitionEntries } from '../supabase/entries';
+import { getCompetitionScores } from '../supabase/scores';
+import { subscribeToScores, unsubscribeFromChannel } from '../supabase/realtime';
+import { generateScoreSheet } from '../utils/pdfGenerator';
+import { exportResultsToExcel } from '../utils/excelExport';
 
 function ResultsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  
-  const competitionData = location.state || {};
-  const { 
-    competitionName, 
-    competitionDate,
-    venue,
-    dancers = [], 
-    judgeCount = 3
-  } = competitionData;
+  const { competitionId } = location.state || {};
 
-  // Ready-made image paths for branding
-  const logoPath = '/logo.png';
-  const leftImagePath = '/left-dancer.png';
-  const rightImagePath = '/right-dancer.png';
+  // State - Data
+  const [competition, setCompetition] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [ageDivisions, setAgeDivisions] = useState([]);
+  const [entries, setEntries] = useState([]);
+  const [scores, setScores] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // State for all judges' scores and selected dancer detail
-  const [allJudgesScores, setAllJudgesScores] = useState({});
-  const [selectedDancer, setSelectedDancer] = useState(null);
-  const [rankings, setRankings] = useState([]);
+  // State - Filters
+  const [selectedFilter, setSelectedFilter] = useState('overall');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedAgeDivision, setSelectedAgeDivision] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Load all judges' scores from localStorage
+  // State - UI
+  const [expandedEntries, setExpandedEntries] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const ENTRIES_PER_PAGE = 20;
+
+  // Redirect if no competitionId
   useEffect(() => {
-    if (!competitionName) {
+    if (!competitionId) {
+      toast.error('No competition selected');
       navigate('/');
-      return;
     }
+  }, [competitionId, navigate]);
 
-    const scoresData = {};
-    for (let judgeNum = 1; judgeNum <= judgeCount; judgeNum++) {
-      const savedScores = localStorage.getItem(`scores_judge${judgeNum}_${competitionName}`);
-      if (savedScores) {
-        scoresData[judgeNum] = JSON.parse(savedScores);
-      }
-    }
-    setAllJudgesScores(scoresData);
-  }, [competitionName, judgeCount, navigate]);
-
-  // Calculate rankings
+  // Load all data from Supabase
   useEffect(() => {
-    if (dancers.length === 0 || Object.keys(allJudgesScores).length === 0) {
-      return;
-    }
+    const loadAllData = async () => {
+      if (!competitionId) return;
 
-    const dancerResults = dancers.map(dancer => {
-      const judgeScores = [];
-      let totalScore = 0;
-      let judgesWhoScored = 0;
+      try {
+        setLoading(true);
+        console.log('Loading competition results data...');
 
-      // Get scores from each judge
-      for (let judgeNum = 1; judgeNum <= judgeCount; judgeNum++) {
-        if (allJudgesScores[judgeNum] && allJudgesScores[judgeNum][dancer.id]) {
-          const score = allJudgesScores[judgeNum][dancer.id];
-          if (score.total > 0) {
-            judgeScores.push({
-              judgeNum,
-              total: score.total,
-              technique: score.technique,
-              creativity: score.creativity,
-              presentation: score.presentation,
-              appearance: score.appearance
-            });
-            totalScore += score.total;
-            judgesWhoScored++;
-          }
+        // Load all data in parallel
+        const [compResult, catsResult, divsResult, entriesResult, scoresResult] = await Promise.all([
+          getCompetition(competitionId),
+          getCompetitionCategories(competitionId),
+          getCompetitionAgeDivisions(competitionId),
+          getCompetitionEntries(competitionId),
+          getCompetitionScores(competitionId)
+        ]);
+
+        if (!compResult.success) throw new Error(compResult.error);
+
+        setCompetition(compResult.data);
+        setCategories(catsResult.success ? catsResult.data : []);
+        setAgeDivisions(divsResult.success ? divsResult.data : []);
+        setEntries(entriesResult.success ? entriesResult.data : []);
+        setScores(scoresResult.success ? scoresResult.data : []);
+
+        console.log('✅ Results data loaded:', {
+          competition: compResult.data,
+          categories: catsResult.data?.length,
+          ageDivisions: divsResult.data?.length,
+          entries: entriesResult.data?.length,
+          scores: scoresResult.data?.length
+        });
+
+        setLoading(false);
+      } catch (error) {
+        console.error('❌ Error loading results:', error);
+        toast.error(`Failed to load results: ${error.message}`);
+        setLoading(false);
+      }
+    };
+
+    loadAllData();
+  }, [competitionId]);
+
+  // Subscribe to real-time score updates
+  useEffect(() => {
+    if (!competitionId) return;
+
+    console.log('📡 Setting up real-time score updates...');
+
+    const channel = subscribeToScores(competitionId, async (payload) => {
+      console.log('📡 Score update received:', payload);
+      
+      // Reload scores
+      try {
+        const scoresResult = await getCompetitionScores(competitionId);
+        if (scoresResult.success) {
+          setScores(scoresResult.data);
+          toast.info('Scores updated!', { autoClose: 2000 });
         }
+      } catch (error) {
+        console.error('Error reloading scores:', error);
+      }
+    });
+
+    // Cleanup on unmount
+    return () => {
+      console.log('📡 Cleaning up real-time subscription');
+      unsubscribeFromChannel(channel);
+    };
+  }, [competitionId]);
+
+  // Calculate results with rankings
+  const rankedResults = useMemo(() => {
+    if (entries.length === 0 || scores.length === 0) return [];
+
+    // Calculate average score for each entry
+    const entriesWithAverages = entries.map(entry => {
+      const entryScores = scores.filter(s => s.entry_id === entry.id);
+      
+      if (entryScores.length === 0) {
+        return { ...entry, averageScore: 0, judgeCount: 0, hasScores: false };
       }
 
-      const averageScore = judgesWhoScored > 0 ? totalScore / judgesWhoScored : 0;
-
+      const avgScore = entryScores.reduce((sum, s) => sum + s.total_score, 0) / entryScores.length;
+      
       return {
-        ...dancer,
-        judgeScores,
-        averageScore,
-        totalScore,
-        judgesWhoScored
+        ...entry,
+        averageScore: parseFloat(avgScore.toFixed(2)),
+        judgeCount: entryScores.length,
+        hasScores: true
       };
     });
 
-    // Sort by average score (descending)
-    const sorted = dancerResults.sort((a, b) => b.averageScore - a.averageScore);
+    // Filter out entries without scores
+    const scoredEntries = entriesWithAverages.filter(e => e.hasScores);
 
-    // Assign ranks (handle ties)
+    // Sort by average score (highest first)
+    scoredEntries.sort((a, b) => {
+      if (b.averageScore !== a.averageScore) {
+        return b.averageScore - a.averageScore;
+      }
+      // If tied, sort alphabetically
+      return a.competitor_name.localeCompare(b.competitor_name);
+    });
+
+    // Assign ranks and detect ties
     let currentRank = 1;
-    sorted.forEach((dancer, index) => {
-      if (index > 0 && dancer.averageScore === sorted[index - 1].averageScore) {
-        dancer.rank = sorted[index - 1].rank; // Same rank for ties
+    scoredEntries.forEach((entry, index) => {
+      if (index > 0 && entry.averageScore === scoredEntries[index - 1].averageScore) {
+        // Same score as previous = same rank (tie)
+        entry.rank = scoredEntries[index - 1].rank;
+        entry.isTied = true;
+        scoredEntries[index - 1].isTied = true;
       } else {
-        dancer.rank = currentRank;
+        entry.rank = currentRank;
+        entry.isTied = false;
       }
       currentRank++;
     });
 
-    setRankings(sorted);
-  }, [dancers, allJudgesScores, judgeCount]);
+    return scoredEntries;
+  }, [entries, scores]);
 
-  // Handle print
-  const handlePrint = () => {
+  // Apply filters
+  const filteredResults = useMemo(() => {
+    let filtered = [...rankedResults];
+
+    // Filter by category
+    if (selectedFilter === 'category' && selectedCategory) {
+      filtered = filtered.filter(e => e.category_id === selectedCategory);
+    }
+
+    // Filter by age division
+    if (selectedFilter === 'age' && selectedAgeDivision) {
+      filtered = filtered.filter(e => e.age_division_id === selectedAgeDivision);
+    }
+
+    // Filter by medal program
+    if (selectedFilter === 'medal') {
+      filtered = filtered.filter(e => 
+        e.dance_type && e.dance_type.includes('Medal: true')
+      );
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(e => 
+        e.competitor_name.toLowerCase().includes(query) ||
+        e.entry_number.toString().includes(query)
+      );
+    }
+
+    // Re-rank filtered results
+    filtered.forEach((entry, index) => {
+      entry.filteredRank = index + 1;
+    });
+
+    return filtered;
+  }, [rankedResults, selectedFilter, selectedCategory, selectedAgeDivision, searchQuery]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedFilter, selectedCategory, selectedAgeDivision, searchQuery]);
+
+  // Paginate results
+  const paginatedResults = useMemo(() => {
+    const startIndex = (currentPage - 1) * ENTRIES_PER_PAGE;
+    const endIndex = startIndex + ENTRIES_PER_PAGE;
+    return filteredResults.slice(startIndex, endIndex);
+  }, [filteredResults, currentPage, ENTRIES_PER_PAGE]);
+
+  const totalPages = Math.ceil(filteredResults.length / ENTRIES_PER_PAGE);
+
+  // Helper functions
+  const toggleExpand = (entryId) => {
+    setExpandedEntries(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(entryId)) {
+        newSet.delete(entryId);
+      } else {
+        newSet.add(entryId);
+      }
+      return newSet;
+    });
+  };
+
+  const handlePrintResults = () => {
     window.print();
   };
 
-  // Handle export to PDF (basic implementation)
-  const handleExportPDF = () => {
-    alert('PDF export functionality would be implemented here using libraries like jsPDF or html2canvas');
+  const handleExportExcel = () => {
+    try {
+      const result = exportResultsToExcel(rankedResults, scores, competition, categories, ageDivisions);
+      if (result.success) {
+        toast.success(`Excel file downloaded: ${result.fileName}`);
+      } else {
+        toast.error(`Export failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export results');
+    }
   };
 
-  // Handle new competition
-  const handleNewCompetition = () => {
-    if (window.confirm('Start a new competition? This will clear all current data.')) {
-      // Clear localStorage
-      for (let judgeNum = 1; judgeNum <= judgeCount; judgeNum++) {
-        localStorage.removeItem(`scores_judge${judgeNum}_${competitionName}`);
+  const handlePrintScoreSheet = (entry) => {
+    try {
+      const entryScores = scores.filter(s => s.entry_id === entry.id);
+      const result = generateScoreSheet(entry, entryScores, competition, categories);
+      if (result.success) {
+        toast.success('Score sheet downloaded!');
+      } else {
+        toast.error(`PDF generation failed: ${result.error}`);
       }
+    } catch (error) {
+      console.error('PDF error:', error);
+      toast.error('Failed to generate score sheet');
+    }
+  };
+
+  const handleNewCompetition = () => {
+    if (window.confirm('Start a new competition? This will return to the home page.')) {
       navigate('/');
     }
   };
 
-  // Get rank display with medals for top 3
-  const getRankDisplay = (rank) => {
-    switch (rank) {
-      case 1:
-        return { display: '🥇 1st', color: 'from-yellow-400 to-yellow-600' };
-      case 2:
-        return { display: '🥈 2nd', color: 'from-gray-300 to-gray-500' };
-      case 3:
-        return { display: '🥉 3rd', color: 'from-orange-400 to-orange-600' };
-      default:
-        return { display: `${rank}th`, color: 'from-gray-200 to-gray-400' };
-    }
+  const getCategoryName = (categoryId) => {
+    const cat = categories.find(c => c.id === categoryId);
+    return cat ? cat.name : 'Unknown';
   };
 
-  if (!competitionName) {
-    return null;
+  const getAgeDivisionName = (divisionId) => {
+    const div = ageDivisions.find(d => d.id === divisionId);
+    return div ? div.name : null;
+  };
+
+  const getDivisionType = (entry) => {
+    if (!entry.dance_type) return 'Solo';
+    const match = entry.dance_type.match(/^([^|]+)/);
+    return match ? match[1].trim() : 'Solo';
+  };
+
+  const isGroup = (entry) => {
+    return entry.dance_type && entry.dance_type.includes('group');
+  };
+
+  const parseGroupMembers = (danceType) => {
+    if (!danceType) return [];
+    try {
+      const match = danceType.match(/Members: (\[.*?\])/);
+      if (match) {
+        return JSON.parse(match[1]);
+      }
+    } catch (e) {
+      console.error('Error parsing group members:', e);
+    }
+    return [];
+  };
+
+  const isMedalProgram = (entry) => {
+    return entry.dance_type && entry.dance_type.includes('Medal: true');
+  };
+
+  if (loading) {
+    return <LoadingSpinner message="Loading competition results..." />;
+  }
+
+  if (!competition) {
+    return (
+      <Layout overlayOpacity="bg-white/90">
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center">
+            <p className="text-xl text-gray-600 mb-4">Competition not found</p>
+            <button
+              onClick={() => navigate('/')}
+              className="bg-teal-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-600"
+            >
+              Return to Home
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
   }
 
   return (
-    <Layout overlayOpacity="bg-white/85">
-      <div className="flex-1 flex flex-col p-4 sm:p-6 md:p-8 max-w-6xl mx-auto w-full">
-        {/* Header with Branding */}
-        <div className="flex items-center justify-between mb-6 sm:mb-8 w-full print:hidden">
-          <button 
-            onClick={() => navigate('/judge-selection', { state: competitionData })}
-            className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px] z-20"
-          >
-            ← <span className="hidden sm:inline ml-1">Back</span>
-          </button>
-          
-          {/* Header Branding - Horizontal Three Logos */}
-          <div className="flex flex-row items-center justify-center gap-2 sm:gap-4 animate-fade-in flex-1 px-2">
-            <div className="w-8 h-10 sm:w-10 sm:h-14 flex items-center justify-center">
-              <img 
-                src={leftImagePath} 
-                alt="" 
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  const parent = e.target.parentNode;
-                  if (parent) {
-                    parent.innerHTML = '<span class="text-xl sm:text-2xl opacity-40">🩰</span>';
-                  }
-                }}
-              />
-            </div>
-            <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
-              <img 
-                src={logoPath} 
-                alt="Logo" 
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  const parent = e.target.parentNode;
-                  if (parent) {
-                    parent.innerHTML = '<span class="text-2xl sm:text-3xl opacity-40">🎭</span>';
-                  }
-                }}
-              />
-            </div>
-            <div className="w-8 h-10 sm:w-10 sm:h-14 flex items-center justify-center">
-              <img 
-                src={rightImagePath} 
-                alt="" 
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  const parent = e.target.parentNode;
-                  if (parent) {
-                    parent.innerHTML = '<span class="text-xl sm:text-2xl opacity-40">💃</span>';
-                  }
-                }}
-              />
-            </div>
+    <Layout overlayOpacity="bg-white/95">
+      <div className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full">
+        {/* HEADER */}
+        <div className="mb-8 text-center">
+          {/* Logo placeholders */}
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <span className="text-4xl">🎭</span>
+            <span className="text-5xl">💎</span>
+            <span className="text-4xl">💃</span>
           </div>
-          
-          <div className="w-16 sm:w-20"></div>
-        </div>
 
-        {/* Competition Title Section */}
-        <div className="text-center mb-8 sm:mb-10">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent mb-2">
-            {competitionName}
+            {competition.name}
           </h1>
-          <p className="text-base sm:text-lg text-gray-600 mb-1">
-            {new Date(competitionDate).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
+          
+          {competition.date && (
+            <p className="text-lg text-gray-600 mb-1">
+              {new Date(competition.date).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </p>
+          )}
+          
+          {competition.venue && (
+            <p className="text-md text-gray-500 mb-3">{competition.venue}</p>
+          )}
+          
+          <p className="text-xl font-semibold text-teal-600 mb-6">
+            Official Results & Rankings
           </p>
-          {venue && <p className="text-sm sm:text-base text-gray-500">{venue}</p>}
-          <p className="text-xl sm:text-2xl font-bold text-teal-600 mt-4">Official Results & Rankings</p>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6 print:hidden">
-          <button
-            onClick={handlePrint}
-            className="flex-1 py-3 sm:py-4 px-4 sm:px-6 bg-gradient-to-r from-blue-500 to-blue-700 text-white font-bold text-base sm:text-lg rounded-xl hover:from-blue-600 hover:to-blue-800 active:scale-95 transition-all shadow-lg min-h-[56px] flex items-center justify-center gap-2"
-          >
-            <span className="text-xl">🖨️</span>
-            <span>Print Results</span>
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="flex-1 py-3 sm:py-4 px-4 sm:px-6 bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold text-base sm:text-lg rounded-xl hover:from-purple-600 hover:to-purple-800 active:scale-95 transition-all shadow-lg min-h-[56px] flex items-center justify-center gap-2"
-          >
-            <span className="text-xl">📄</span>
-            <span>Export PDF</span>
-          </button>
-          <button
-            onClick={handleNewCompetition}
-            className="flex-1 py-3 sm:py-4 px-4 sm:px-6 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold text-base sm:text-lg rounded-xl hover:from-teal-600 hover:to-cyan-700 active:scale-95 transition-all shadow-lg min-h-[56px] flex items-center justify-center gap-2"
-          >
-            <span className="text-xl">🎭</span>
-            <span className="hidden sm:inline">New Competition</span>
-            <span className="sm:hidden">New</span>
-          </button>
-        </div>
-
-        {/* Rankings Display */}
-        {rankings.length === 0 ? (
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 text-center">
-            <p className="text-xl text-gray-600 mb-4">No scores available yet.</p>
-            <p className="text-gray-500 mb-6">Judges need to submit their scores first.</p>
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
             <button
-              onClick={() => navigate('/judge-selection', { state: competitionData })}
-              className="py-3 px-6 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600 transition-colors"
+              onClick={handlePrintResults}
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-blue-900 transition-all shadow-lg min-h-[48px] flex items-center gap-2"
             >
-              Go to Judge Selection
+              🖨️ Print Results
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-purple-900 transition-all shadow-lg min-h-[48px] flex items-center gap-2"
+            >
+              📊 Export to Excel
+            </button>
+            <button
+              onClick={handleNewCompetition}
+              className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-lg font-semibold hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg min-h-[48px] flex items-center gap-2"
+            >
+              ➕ New Competition
             </button>
           </div>
+        </div>
+
+        {/* FILTERING SYSTEM */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6">
+          <div className="flex flex-wrap gap-2 mb-4">
+            {/* Overall button */}
+            <button
+              onClick={() => {
+                setSelectedFilter('overall');
+                setSelectedCategory(null);
+                setSelectedAgeDivision(null);
+              }}
+              className={`px-4 py-2 rounded-lg font-semibold transition-colors min-h-[44px] ${
+                selectedFilter === 'overall'
+                  ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              🏆 Overall Grand Champion
+            </button>
+
+            {/* Category buttons */}
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => {
+                  setSelectedFilter('category');
+                  setSelectedCategory(cat.id);
+                  setSelectedAgeDivision(null);
+                }}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors min-h-[44px] ${
+                  selectedFilter === 'category' && selectedCategory === cat.id
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-700 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+
+            {/* Age division buttons */}
+            {ageDivisions.map(div => (
+              <button
+                key={div.id}
+                onClick={() => {
+                  setSelectedFilter('age');
+                  setSelectedAgeDivision(div.id);
+                  setSelectedCategory(null);
+                }}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors min-h-[44px] ${
+                  selectedFilter === 'age' && selectedAgeDivision === div.id
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {div.name} ({div.min_age}-{div.max_age})
+              </button>
+            ))}
+
+            {/* Medal Program button */}
+            {entries.some(e => isMedalProgram(e)) && (
+              <button
+                onClick={() => {
+                  setSelectedFilter('medal');
+                  setSelectedCategory(null);
+                  setSelectedAgeDivision(null);
+                }}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors min-h-[44px] ${
+                  selectedFilter === 'medal'
+                    ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-yellow-900'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                ⭐ Medal Program
+              </button>
+            )}
+          </div>
+
+          {/* Search Box */}
+          <div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or entry number..."
+              className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
+            />
+          </div>
+
+          <p className="text-sm text-gray-600 mt-3">
+            Showing {paginatedResults.length} of {filteredResults.length} {filteredResults.length === 1 ? 'result' : 'results'}
+            {totalPages > 1 && ` • Page ${currentPage} of ${totalPages}`}
+          </p>
+        </div>
+
+        {/* RESULTS DISPLAY */}
+        {filteredResults.length === 0 ? (
+          <EmptyState
+            icon="🔍"
+            title="No Results Found"
+            description={searchQuery ? `No results found matching "${searchQuery}"` : "No results match the selected filters. Try adjusting your filters or check back after judges have entered scores."}
+          />
         ) : (
-          <div className="space-y-4 mb-8">
-            {rankings.map((dancer, index) => {
-              const rankInfo = getRankDisplay(dancer.rank);
-              
+          <div className="space-y-4">
+            {paginatedResults.map((entry) => {
+              const entryScores = scores.filter(s => s.entry_id === entry.id);
+              const isExpanded = expandedEntries.has(entry.id);
+              const groupMembers = isGroup(entry) ? parseGroupMembers(entry.dance_type) : [];
+
               return (
-                <div 
-                  key={dancer.id}
-                  className={`bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden transition-all hover:shadow-2xl ${
-                    selectedDancer?.id === dancer.id ? 'ring-4 ring-teal-400' : ''
-                  }`}
+                <div
+                  key={entry.id}
+                  className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
                 >
-                  {/* Main Dancer Info */}
-                  <div 
-                    className="p-4 sm:p-6 cursor-pointer"
-                    onClick={() => setSelectedDancer(selectedDancer?.id === dancer.id ? null : dancer)}
-                  >
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  {/* Main Card */}
+                  <div className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row gap-4">
                       {/* Rank Badge */}
-                      <div className={`flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br ${rankInfo.color} rounded-2xl flex flex-col items-center justify-center shadow-lg`}>
-                        <span className="text-2xl sm:text-3xl font-bold text-white">{dancer.rank}</span>
-                        <span className="text-xs sm:text-sm text-white/90 font-semibold">
-                          {dancer.rank === 1 ? 'PLACE' : dancer.rank === 2 ? 'PLACE' : dancer.rank === 3 ? 'PLACE' : 'PLACE'}
-                        </span>
+                      <div className="flex-shrink-0">
+                        <RankBadge 
+                          rank={selectedFilter === 'overall' ? entry.rank : entry.filteredRank} 
+                          isTied={entry.isTied} 
+                        />
                       </div>
 
-                      {/* Dancer Details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="text-2xl sm:text-3xl font-bold text-teal-600">#{dancer.number}</span>
-                          <div className="min-w-0">
-                            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 truncate">{dancer.name}</h3>
-                            <p className="text-sm sm:text-base text-gray-600">{dancer.division}</p>
+                      {/* Photo */}
+                      <div className="flex-shrink-0">
+                        {entry.photo_url ? (
+                          <LazyLoadImage
+                            src={entry.photo_url}
+                            alt={entry.competitor_name}
+                            effect="blur"
+                            className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border-2 border-gray-300"
+                            placeholder={
+                              <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-200 rounded-lg flex items-center justify-center text-4xl animate-pulse">
+                                {isGroup(entry) ? '👥' : '💃'}
+                              </div>
+                            }
+                          />
+                        ) : (
+                          <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-200 rounded-lg flex items-center justify-center text-4xl">
+                            {isGroup(entry) ? '👥' : '💃'}
                           </div>
+                        )}
+                      </div>
+
+                      {/* Entry Info */}
+                      <div className="flex-1">
+                        <div className="mb-2">
+                          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+                            #{entry.entry_number} {entry.competitor_name}
+                          </h2>
                         </div>
+
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <CategoryBadge categoryName={getCategoryName(entry.category_id)} />
+                          {entry.age_division_id && (
+                            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                              {getAgeDivisionName(entry.age_division_id)}
+                            </span>
+                          )}
+                          <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
+                            {getDivisionType(entry)}
+                          </span>
+                          {isMedalProgram(entry) && (
+                            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
+                              ⭐ Medal
+                            </span>
+                          )}
+                        </div>
+
+                        {isGroup(entry) && groupMembers.length > 0 && (
+                          <p className="text-sm text-gray-600 mb-3">
+                            Group of {groupMembers.length} members
+                          </p>
+                        )}
 
                         {/* Judge Scores */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3 mt-4">
-                          {dancer.judgeScores.map(score => (
-                            <div key={score.judgeNum} className="bg-teal-50 rounded-lg p-2 sm:p-3 border-2 border-teal-200">
-                              <p className="text-xs font-semibold text-gray-600 mb-1">Judge {score.judgeNum}</p>
-                              <p className="text-lg sm:text-xl font-bold text-teal-600">{score.total.toFixed(1)}</p>
-                              <p className="text-xs text-gray-500">/ 100</p>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {entryScores.map(score => (
+                            <div
+                              key={score.id}
+                              className="px-3 py-1 bg-gray-100 rounded-lg text-sm"
+                            >
+                              <span className="font-semibold">Judge {score.judge_number}:</span>{' '}
+                              <span className="text-teal-600 font-bold">{score.total_score.toFixed(1)}/100</span>
                             </div>
                           ))}
-                          
-                          {/* Average Score */}
-                          <div className="bg-gradient-to-br from-cyan-500 to-teal-600 rounded-lg p-2 sm:p-3 text-white col-span-2 sm:col-span-1">
-                            <p className="text-xs font-semibold mb-1">AVERAGE</p>
-                            <p className="text-xl sm:text-2xl font-bold">{dancer.averageScore.toFixed(2)}</p>
-                            <p className="text-xs opacity-90">/ 100</p>
-                          </div>
                         </div>
 
-                        {/* Judges who scored */}
-                        <p className="text-xs sm:text-sm text-gray-500 mt-3">
-                          Scored by {dancer.judgesWhoScored} of {judgeCount} judge{judgeCount > 1 ? 's' : ''}
-                        </p>
+                        {/* Average Score */}
+                        <div className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-4 py-2 rounded-lg inline-block">
+                          <span className="font-semibold">AVERAGE: </span>
+                          <span className="text-xl font-bold">{entry.averageScore.toFixed(2)} / 100</span>
+                        </div>
                       </div>
+                    </div>
 
-                      {/* Expand Icon */}
-                      <div className="flex-shrink-0 self-center">
-                        <span className="text-2xl text-gray-400">
-                          {selectedDancer?.id === dancer.id ? '▲' : '▼'}
-                        </span>
-                      </div>
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      <button
+                        onClick={() => handlePrintScoreSheet(entry)}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors min-h-[44px]"
+                      >
+                        📄 Print Score Sheet
+                      </button>
+                      <button
+                        onClick={() => toggleExpand(entry.id)}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors min-h-[44px]"
+                      >
+                        {isExpanded ? '▲ Collapse' : '▼ View Details'}
+                      </button>
                     </div>
                   </div>
 
-                  {/* Expanded Detail View */}
-                  {selectedDancer?.id === dancer.id && (
-                    <div className="bg-gradient-to-br from-teal-50 to-cyan-50 p-4 sm:p-6 border-t-2 border-teal-200">
-                      <h4 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">Category Breakdown</h4>
+                  {/* Expanded Breakdown */}
+                  {isExpanded && (
+                    <div className="bg-gray-50 p-4 sm:p-6 border-t-2 border-gray-200">
+                      <h3 className="text-lg font-bold text-gray-800 mb-4">Detailed Score Breakdown</h3>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {dancer.judgeScores.map(score => (
-                          <div key={score.judgeNum} className="bg-white rounded-xl p-4 shadow-md">
-                            <p className="text-base sm:text-lg font-bold text-teal-600 mb-3">Judge {score.judgeNum}</p>
-                            
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-700">🎯 Technique:</span>
-                                <span className="font-bold text-gray-800">{score.technique} / 25</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-700">✨ Creativity:</span>
-                                <span className="font-bold text-gray-800">{score.creativity} / 25</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-700">🎭 Presentation:</span>
-                                <span className="font-bold text-gray-800">{score.presentation} / 25</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-700">👗 Appearance:</span>
-                                <span className="font-bold text-gray-800">{score.appearance} / 25</span>
-                              </div>
-                              <div className="flex justify-between items-center pt-2 border-t-2 border-gray-200">
-                                <span className="text-sm font-bold text-gray-700">TOTAL:</span>
-                                <span className="font-bold text-lg text-teal-600">{score.total.toFixed(1)} / 100</span>
-                              </div>
+                      {entryScores.map(score => (
+                        <div key={score.id} className="mb-6 last:mb-0">
+                          <h4 className="text-md font-bold text-teal-600 mb-3">Judge {score.judge_number}</h4>
+                          
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                            <div className="bg-white p-3 rounded-lg">
+                              <p className="text-xs text-gray-500 mb-1">Technique</p>
+                              <p className="text-lg font-bold text-gray-800">{score.technique.toFixed(1)} / 25</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg">
+                              <p className="text-xs text-gray-500 mb-1">Creativity</p>
+                              <p className="text-lg font-bold text-gray-800">{score.creativity.toFixed(1)} / 25</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg">
+                              <p className="text-xs text-gray-500 mb-1">Presentation</p>
+                              <p className="text-lg font-bold text-gray-800">{score.presentation.toFixed(1)} / 25</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg">
+                              <p className="text-xs text-gray-500 mb-1">Appearance</p>
+                              <p className="text-lg font-bold text-gray-800">{score.appearance.toFixed(1)} / 25</p>
                             </div>
                           </div>
-                        ))}
+
+                          <div className="bg-teal-100 p-3 rounded-lg mb-3">
+                            <p className="text-sm font-semibold text-teal-800">
+                              Total: <span className="text-lg">{score.total_score.toFixed(1)} / 100</span>
+                            </p>
+                          </div>
+
+                          {score.notes && (
+                            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                              <p className="text-xs font-semibold text-yellow-800 mb-1">Judge Notes:</p>
+                              <p className="text-sm text-gray-700">{score.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Overall Average */}
+                      <div className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white p-4 rounded-lg text-center">
+                        <p className="text-sm font-semibold mb-1">OVERALL AVERAGE</p>
+                        <p className="text-3xl font-bold">{entry.averageScore.toFixed(2)} / 100</p>
                       </div>
                     </div>
                   )}
@@ -367,9 +664,53 @@ function ResultsPage() {
           </div>
         )}
 
+        {/* Pagination Controls */}
+        {filteredResults.length > ENTRIES_PER_PAGE && (
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button
+              onClick={() => {
+                setCurrentPage(prev => Math.max(1, prev - 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              disabled={currentPage === 1}
+              className={`px-6 py-3 rounded-lg font-semibold min-h-[48px] transition-colors ${
+                currentPage === 1
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-teal-500 text-white hover:bg-teal-600'
+              }`}
+            >
+              ← Previous
+            </button>
+
+            <div className="text-center">
+              <p className="text-lg font-semibold text-gray-700">
+                Page {currentPage} of {totalPages}
+              </p>
+              <p className="text-sm text-gray-500">
+                Showing {paginatedResults.length} entries
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              disabled={currentPage === totalPages}
+              className={`px-6 py-3 rounded-lg font-semibold min-h-[48px] transition-colors ${
+                currentPage === totalPages
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-teal-500 text-white hover:bg-teal-600'
+              }`}
+            >
+              Next →
+            </button>
+          </div>
+        )}
+
         {/* Footer */}
-        <div className="mt-8 text-center text-xs sm:text-sm text-gray-500 pb-8 print:block print:mt-12">
-          <p className="font-semibold">TOPAZ 2.0 Scoring System © 2025</p>
+        <div className="mt-12 text-center text-sm text-gray-500 pb-8">
+          <p className="font-semibold">TOPAZ 2.0 © 2025</p>
           <p className="mt-1">Heritage Since 1972 | Official Competition Results</p>
         </div>
       </div>
@@ -378,4 +719,3 @@ function ResultsPage() {
 }
 
 export default ResultsPage;
-

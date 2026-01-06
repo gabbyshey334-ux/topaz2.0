@@ -21,3 +21,69 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Print Styles */
+@media print {
+  /* Hide navigation and action buttons */
+  button, nav, .no-print {
+    display: none !important;
+  }
+
+  /* Remove backgrounds and shadows */
+  body {
+    background: white !important;
+  }
+
+  /* Printer-friendly colors */
+  * {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+  /* Keep borders */
+  .border, .border-2, .border-4 {
+    border-color: #000 !important;
+  }
+
+  /* Expand all entries */
+  .hidden {
+    display: block !important;
+  }
+
+  /* Page breaks */
+  .page-break {
+    page-break-after: always;
+}
+
+  /* Keep structure */
+  .flex, .grid {
+    display: block !important;
+  }
+
+  /* Ensure readable font sizes */
+body {
+    font-size: 12pt;
+}
+
+h1 {
+    font-size: 24pt;
+}
+
+  h2 {
+    font-size: 18pt;
+  }
+
+  h3 {
+    font-size: 14pt;
+  }
+
+  /* Add TOPAZ header to each page */
+  @page {
+    margin: 1cm;
+    @top-center {
+      content: "TOPAZ 2.0 - Official Competition Results";
+  }
+  }
+}
