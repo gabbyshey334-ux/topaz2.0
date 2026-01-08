@@ -5,6 +5,7 @@ import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import Layout from '../components/Layout';
 import EmptyState from '../components/EmptyState';
+import AbilityBadge from '../components/AbilityBadge';
 import { createScore, getEntryScores, updateScore } from '../supabase/scores';
 import { validateScore, calculateTotal } from '../utils/calculations';
 
@@ -35,6 +36,7 @@ function ScoringInterface() {
   // State - Filters
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedAgeDivision, setSelectedAgeDivision] = useState('all');
+  const [selectedAbilityLevel, setSelectedAbilityLevel] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   // State - Scoring Form
@@ -66,7 +68,7 @@ function ScoringInterface() {
     }
   }, [competitionId, judgeNumber, allEntries, navigate]);
 
-  // Filter entries by category, age division, and search
+  // Filter entries by category, age division, ability level, and search
   useEffect(() => {
     let filtered = [...entries];
 
@@ -78,6 +80,11 @@ function ScoringInterface() {
     // Filter by age division
     if (selectedAgeDivision !== 'all') {
       filtered = filtered.filter(e => e.age_division_id === selectedAgeDivision);
+    }
+
+    // Filter by ability level
+    if (selectedAbilityLevel !== 'all') {
+      filtered = filtered.filter(e => e.ability_level === selectedAbilityLevel);
     }
 
     // Filter by search query
@@ -92,7 +99,7 @@ function ScoringInterface() {
     setFilteredEntries(filtered);
     setCurrentIndex(0);
     setCurrentEntry(filtered[0] || null);
-  }, [selectedCategory, selectedAgeDivision, searchQuery, entries]);
+  }, [selectedCategory, selectedAgeDivision, selectedAbilityLevel, searchQuery, entries]);
 
   // Auto-calculate total
   useEffect(() => {
@@ -396,7 +403,7 @@ function ScoringInterface() {
 
         {/* FILTER & PROGRESS SECTION */}
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             {/* Category Filter */}
             <div>
               <label className="block text-gray-700 font-semibold mb-2 text-sm">
@@ -436,6 +443,23 @@ function ScoringInterface() {
                 </select>
               </div>
             )}
+
+            {/* Ability Level Filter */}
+            <div>
+              <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                Filter by Ability
+              </label>
+              <select
+                value={selectedAbilityLevel}
+                onChange={(e) => setSelectedAbilityLevel(e.target.value)}
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
+              >
+                <option value="all">All Levels</option>
+                <option value="Beginning">Beginning</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+              </select>
+            </div>
           </div>
 
           {/* Search Box */}
@@ -594,6 +618,7 @@ function ScoringInterface() {
                             {getAgeDivisionName(currentEntry.age_division_id)}
                           </span>
                         )}
+                        <AbilityBadge abilityLevel={currentEntry.ability_level} size="md" />
                         <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
                           {getDivisionType(currentEntry)}
                         </span>

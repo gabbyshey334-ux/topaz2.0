@@ -72,12 +72,38 @@ export const generateScoreSheet = (entry, allScores, competition, categories) =>
       yPos += 5;
     }
     
+    // Ability Level
+    if (entry.ability_level) {
+      const abilityDescription = {
+        'Beginning': 'Beginning (Less than 2 years)',
+        'Intermediate': 'Intermediate (2-4 years)',
+        'Advanced': 'Advanced (5+ years)'
+      };
+      doc.text(`Ability Level: ${abilityDescription[entry.ability_level] || entry.ability_level}`, 18, yPos);
+      yPos += 5;
+    }
+    
     // Division type (parse from dance_type)
     if (entry.dance_type) {
       const divisionMatch = entry.dance_type.match(/^([^|]+)/);
       if (divisionMatch) {
         doc.text(`Division: ${divisionMatch[1].trim()}`, 18, yPos);
         yPos += 5;
+      }
+      
+      // Check if medal program
+      if (entry.dance_type.includes('Medal: true')) {
+        doc.text('⭐ Medal Program Entry', 18, yPos);
+        yPos += 5;
+        
+        // Show medal points and level if any
+        if (entry.medal_points > 0 || entry.current_medal_level !== 'None') {
+          const medalText = entry.current_medal_level && entry.current_medal_level !== 'None'
+            ? `Medal Status: ${entry.current_medal_level} (${entry.medal_points || 0} points)`
+            : `Season Points: ${entry.medal_points || 0}`;
+          doc.text(medalText, 18, yPos);
+          yPos += 5;
+        }
       }
     }
     

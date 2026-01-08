@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
 import PhotoUpload from '../components/PhotoUpload';
 import EmptyState from '../components/EmptyState';
+import AbilityBadge from '../components/AbilityBadge';
 import { 
   createCompetition, 
   createCategory, 
@@ -50,6 +51,7 @@ function CompetitionSetup() {
     name: '',
     categoryId: '',
     ageDivisionId: '',
+    abilityLevel: 'Beginning',
     divisionType: 'Solo',
     isMedalProgram: true,
     photoFile: null,
@@ -212,6 +214,7 @@ function CompetitionSetup() {
       name: '',
       categoryId: categories.length > 0 ? categories[0].id : '',
       ageDivisionId: ageDivisions.length > 0 ? ageDivisions[0].id : '',
+      abilityLevel: 'Beginning',
       divisionType: 'Solo',
       isMedalProgram: true,
       photoFile: null,
@@ -227,6 +230,7 @@ function CompetitionSetup() {
       name: '',
       categoryId: '',
       ageDivisionId: '',
+      abilityLevel: 'Beginning',
       divisionType: 'Solo',
       isMedalProgram: true,
       photoFile: null,
@@ -301,6 +305,11 @@ function CompetitionSetup() {
       return;
     }
 
+    if (!currentEntry.abilityLevel) {
+      toast.error('Please select an ability level');
+      return;
+    }
+
     if (currentEntry.type === 'group') {
       if (!validateGroupMembers()) {
         const divType = currentEntry.divisionType;
@@ -330,6 +339,7 @@ function CompetitionSetup() {
       categoryColor: categoryColors[category?.name] || 'bg-gray-100 text-gray-800',
       ageDivisionId: currentEntry.ageDivisionId || null,
       ageDivisionName: ageDivision?.name || null,
+      abilityLevel: currentEntry.abilityLevel,
       divisionType: currentEntry.divisionType,
       isMedalProgram: currentEntry.isMedalProgram,
       photoFile: currentEntry.photoFile,
@@ -563,6 +573,7 @@ function CompetitionSetup() {
           competitor_name: entry.name,
           category_id: categorySupabaseId,
           age_division_id: ageDivisionSupabaseId,
+          ability_level: entry.abilityLevel,
           dance_type: `${entry.divisionType} | ${entry.type} | Medal: ${entry.isMedalProgram} | Members: ${JSON.stringify(entry.groupMembers)}`,
           photo_url: photoUrl
         });
@@ -1033,6 +1044,7 @@ function CompetitionSetup() {
                               {entry.ageDivisionName}
                             </span>
                           )}
+                          <AbilityBadge abilityLevel={entry.abilityLevel} size="md" />
                           <span className="px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-800 border-2 border-gray-300">
                             {entry.divisionType}
                           </span>
@@ -1193,6 +1205,27 @@ function CompetitionSetup() {
                   </select>
                 </div>
               )}
+
+              {/* Ability Level */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
+                  Ability Level *
+                </label>
+                <select
+                  value={currentEntry.abilityLevel}
+                  onChange={(e) => setCurrentEntry({ ...currentEntry, abilityLevel: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
+                >
+                  <option value="Beginning">Beginning (Less than 2 years)</option>
+                  <option value="Intermediate">Intermediate (2-4 years)</option>
+                  <option value="Advanced">Advanced (5+ years)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {currentEntry.type === 'group' 
+                    ? '⚠️ For groups: Select the ability level of your most experienced member'
+                    : 'Select based on years of training'}
+                </p>
+              </div>
 
               {/* Division Type */}
               <div>

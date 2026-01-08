@@ -2,7 +2,7 @@ import { supabase } from './config';
 
 /**
  * Create a new entry
- * @param {Object} entryData - { competition_id, competitor_name, category_id, age_division_id, age, dance_type, photo_url }
+ * @param {Object} entryData - { competition_id, competitor_name, category_id, age_division_id, age, dance_type, ability_level, medal_points, current_medal_level, photo_url }
  * @returns {Object} - Created entry data
  */
 export const createEntry = async (entryData) => {
@@ -19,6 +19,9 @@ export const createEntry = async (entryData) => {
         age_division_id: entryData.age_division_id || null,
         age: entryData.age || null,
         dance_type: entryData.dance_type || null,
+        ability_level: entryData.ability_level || null,
+        medal_points: entryData.medal_points || 0,
+        current_medal_level: entryData.current_medal_level || 'None',
         photo_url: entryData.photo_url || null
       }])
       .select()
@@ -246,6 +249,96 @@ export const getNextEntryNumber = async (competitionId) => {
     return { success: true, data: nextNumber };
   } catch (error) {
     console.error('❌ Error getting next entry number:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Update medal points for an entry
+ * @param {string} entryId - UUID of entry
+ * @param {number} pointsToAdd - Points to add (usually 1 for 1st place)
+ * @returns {Object} - Updated entry data
+ */
+export const addMedalPoints = async (entryId, pointsToAdd = 1) => {
+  try {
+    console.log('Adding medal points:', entryId, pointsToAdd);
+    
+    // Get current entry
+    const { data: currentEntry, error: fetchError } = await supabase
+      .from('entries')
+      .select('medal_points')
+      .eq('id', entryId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const newPoints = (currentEntry.medal_points || 0) + pointsToAdd;
+    
+    // Determine medal level based on new total
+    let medalLevel = 'None';
+    if (newPoints >= 50) {
+      medalLevel = 'Gold';
+    } else if (newPoints >= 35) {
+      medalLevel = 'Silver';
+    } else if (newPoints >= 25) {
+      medalLevel = 'Bronze';
+    }
+
+    // Update entry
+    const { data, error } = await supabase
+      .from('entries')
+      .update({
+        medal_points: newPoints,
+        current_medal_level: medalLevel
+      })
+      .eq('id', entryId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    
+    console.log('✅ Medal points updated:', data);
+    return { success: true, data };
+  } catch (error) {
+    console.error('❌ Error updating medal points:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Award medal points to 1st place winners in a competition
+ * @param {string} competitionId - UUID of competition
+ * @param {Array} firstPlaceWinners - Array of entry IDs that got 1st place
+ * @returns {Object} - Results of point awards
+ */
+export const awardMedalPointsToWinners = async (competitionId, firstPlaceWinners) => {
+  try {
+    console.log('Awarding medal points to winners:', firstPlaceWinners);
+    
+    const results = {
+      success: [],
+      failed: []
+    };
+
+    for (const entryId of firstPlaceWinners) {
+      const result = await addMedalPoints(entryId, 1);
+      
+      if (result.success) {
+        results.success.push(entryId);
+      } else {
+        results.failed.push({ entryId, error: result.error });
+      }
+    }
+
+    console.log('✅ Medal points awarded:', results);
+    return { 
+      success: true, 
+      data: results,
+      totalAwarded: results.success.length,
+      totalFailed: results.failed.length
+    };
+  } catch (error) {
+    console.error('❌ Error awarding medal points:', error);
     return { success: false, error: error.message };
   }
 };

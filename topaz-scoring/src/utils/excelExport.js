@@ -21,6 +21,15 @@ export const exportResultsToExcel = (entries, allScores, competition, categories
       const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
       const ageDivisionName = ageDivision ? ageDivision.name : 'N/A';
       
+      // Get ability level info
+      const abilityLevel = entry.ability_level || 'N/A';
+      const abilityDescription = {
+        'Beginning': 'Beginning (Less than 2 years)',
+        'Intermediate': 'Intermediate (2-4 years)',
+        'Advanced': 'Advanced (5+ years)'
+      };
+      const abilityLevelFull = abilityLevel !== 'N/A' ? abilityDescription[abilityLevel] || abilityLevel : 'N/A';
+      
       // Parse entry type and division type from dance_type
       let entryType = 'Solo';
       let divisionType = 'Solo';
@@ -74,8 +83,11 @@ export const exportResultsToExcel = (entries, allScores, competition, categories
         'Category': categoryName,
         'Variety Level': varietyLevel,
         'Age Division': ageDivisionName,
+        'Ability Level': abilityLevelFull,
         'Division Type': divisionType,
-        'Medal Program': isMedalProgram
+        'Medal Program': isMedalProgram,
+        'Medal Points': isMedalProgram === 'Yes' ? (entry.medal_points || 0) : 'N/A',
+        'Medal Level': isMedalProgram === 'Yes' ? (entry.current_medal_level || 'None') : 'N/A'
       };
       
       // Add each judge's scores
@@ -111,8 +123,11 @@ export const exportResultsToExcel = (entries, allScores, competition, categories
       { wch: 20 }, // Category
       { wch: 15 }, // Variety Level
       { wch: 15 }, // Age Division
+      { wch: 30 }, // Ability Level
       { wch: 20 }, // Division Type
       { wch: 14 }, // Medal Program
+      { wch: 12 }, // Medal Points
+      { wch: 12 }, // Medal Level
     ];
     
     // Add widths for judge columns (will be dynamic based on number of judges)
