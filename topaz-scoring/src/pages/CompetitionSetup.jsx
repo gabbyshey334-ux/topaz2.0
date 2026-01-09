@@ -73,7 +73,34 @@ function CompetitionSetup() {
     'Lyrical', 'Acro', 'Musical Theater', 'Open'
   ];
 
-  const varietyOptions = ['None', 'Variety A', 'Variety B'];
+  const varietyOptions = [
+    'None', 
+    'Variety A', 
+    'Variety B', 
+    'Variety C', 
+    'Variety D', 
+    'Variety E'
+  ];
+
+  // Get variety description for dropdown
+  const getVarietyDescription = (variety) => {
+    switch (variety) {
+      case 'None':
+        return 'None (straight category)';
+      case 'Variety A':
+        return 'Variety A (Song & Dance, Character, or Combination)';
+      case 'Variety B':
+        return 'Variety B (Dance with Prop)';
+      case 'Variety C':
+        return 'Variety C (Dance with Acrobatics)';
+      case 'Variety D':
+        return 'Variety D (Dance with Acrobatics & Prop)';
+      case 'Variety E':
+        return 'Variety E (Hip Hop with Floor Work & Acrobatics)';
+      default:
+        return variety;
+    }
+  };
 
   // Category colors
   const categoryColors = {
@@ -102,9 +129,15 @@ function CompetitionSetup() {
     if (varietyLevel === 'None') {
       return catName;
     } else if (varietyLevel === 'Variety A') {
-      return `${catName} Variety A`;
+      return `${catName} Variety A - Song & Dance`;
     } else if (varietyLevel === 'Variety B') {
-      return `${catName} Variety B - with prop`;
+      return `${catName} Variety B - with Prop`;
+    } else if (varietyLevel === 'Variety C') {
+      return `${catName} Variety C - with Acrobatics`;
+    } else if (varietyLevel === 'Variety D') {
+      return `${catName} Variety D - with Acrobatics & Prop`;
+    } else if (varietyLevel === 'Variety E') {
+      return `${catName} Variety E - with Floor Work & Acrobatics`;
     }
     return catName;
   };
@@ -817,7 +850,9 @@ function CompetitionSetup() {
                     className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
                   >
                     {varietyOptions.map(variety => (
-                      <option key={variety} value={variety}>{variety}</option>
+                      <option key={variety} value={variety}>
+                        {getVarietyDescription(variety)}
+                      </option>
                     ))}
                   </select>
                 </div>
