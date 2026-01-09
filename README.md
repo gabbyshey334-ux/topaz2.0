@@ -1,7 +1,11 @@
-# TOPAZ 2.0 Comprehensive Documentation
-
-**Heritage Since 1972**  
-Complete System Documentation for Dance Competition Scoring
+<div align="center">
+  <img src="public/logo.png" alt="TOPAZ Logo" width="200"/>
+  
+  # TOPAZ 2.0 Comprehensive Documentation
+  
+  **Heritage Since 1972**  
+  Complete System Documentation for Dance Competition Scoring
+</div>
 
 ---
 
@@ -10,13 +14,17 @@ Complete System Documentation for Dance Competition Scoring
 1. [System Overview](#system-overview)
 2. [Quick Start Guide](#quick-start-guide)
 3. [Database Setup](#database-setup)
-4. [Ability Levels System](#ability-levels-system)
-5. [Medal Points Program](#medal-points-program)
-6. [Competition Workflow](#competition-workflow)
-7. [Scoring System](#scoring-system)
-8. [Results & Reports](#results--reports)
-9. [Technical Reference](#technical-reference)
-10. [Troubleshooting](#troubleshooting)
+4. [Categories System](#categories-system)
+5. [Variety Levels](#variety-levels)
+6. [Age Tracking & Auto-Assignment](#age-tracking--auto-assignment)
+7. [Ability Levels System](#ability-levels-system)
+8. [Medal Points Program](#medal-points-program)
+9. [Special Categories](#special-categories)
+10. [Competition Workflow](#competition-workflow)
+11. [Scoring System](#scoring-system)
+12. [Results & Reports](#results--reports)
+13. [Technical Reference](#technical-reference)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -27,11 +35,15 @@ TOPAZ 2.0 is a comprehensive dance competition scoring system built with React a
 ### Core Features
 
 - **Competition Management**: Create and manage multiple competitions
-- **Entry Management**: Track competitors with photos, categories, age divisions, and ability levels
+- **Entry Management**: Track competitors with photos, age, categories, age divisions, and ability levels
+- **Performing Arts Categories**: 7 categories (Tap, Jazz, Ballet, Lyrical/Contemporary, Vocal, Acting, Hip Hop)
+- **Special Categories**: 3 categories (Production, Student Choreography, Teacher/Student) - participation recognition only
+- **Variety Levels**: 5 variety options (A, B, C, D, E) for enhanced competition categorization
+- **Age Tracking**: Automatic age division assignment based on contestant age
 - **Judge Scoring**: Multi-judge scoring interface with real-time updates
 - **Ability Levels**: Three-tier system (Beginning, Intermediate, Advanced)
 - **Medal Points Program**: Cumulative point tracking for Bronze, Silver, and Gold medals
-- **Results Display**: Real-time rankings with filtering and grouping
+- **Results Display**: Real-time rankings with filtering and grouping, separate display for special categories
 - **Export Functions**: PDF score sheets and Excel reports
 - **Photo Storage**: Supabase storage integration for competitor photos
 
@@ -58,6 +70,7 @@ TOPAZ 2.0 is a comprehensive dance competition scoring system built with React a
 -- 1. ability-level-migration.sql
 -- 2. medal-points-migration.sql
 -- 3. scores-notes-migration.sql
+-- 4. special-categories-migration.sql
 ```
 
 **2. Create a New Competition**
@@ -70,9 +83,11 @@ TOPAZ 2.0 is a comprehensive dance competition scoring system built with React a
 - Fill in competitor details:
   - Entry Number (auto-incremented)
   - Competitor Name
-  - Age and Age Division
-  - Category (Solo, Duet, Trio, Small Group, Large Group, Line, Production)
-  - Dance Type
+  - **Age** (1-99, required) - Age division auto-assigned based on age!
+  - **Performing Arts Categories**: Tap, Jazz, Ballet, Lyrical/Contemporary, Vocal, Acting, Hip Hop
+  - **Special Categories**: Production, Student Choreography, Teacher/Student (participation recognition only)
+  - **Variety Level** (None, A, B, C, D, E) - optional enhancement
+  - Age Division (auto-selected or manual override)
   - **Ability Level** (Beginning, Intermediate, Advanced)
   - Optional: Upload photo
 - Click "Save Entry"
@@ -228,7 +243,195 @@ CREATE TABLE scores (
   created_at TIMESTAMP,
   updated_at TIMESTAMP
 );
+   ```
+
+---
+
+## Categories System
+
+### Overview
+
+TOPAZ 2.0 features two types of categories: **Performing Arts Categories** (eligible for high scoring awards) and **Special Categories** (participation recognition only).
+
+### Performing Arts Categories (7 Categories)
+
+These categories compete for high score awards and Overall Grand Champion:
+
+1. **Tap** - Traditional tap dance performances
+2. **Jazz** - Jazz dance styles and techniques
+3. **Ballet** - Classical ballet performances
+4. **Lyrical/Contemporary** - Combined lyrical and contemporary styles
+5. **Vocal** - Song and vocal performances
+6. **Acting** - Theatrical and dramatic performances
+7. **Hip Hop** - Hip hop dance and urban styles
+
+**Characteristics:**
+- Eligible for "Overall Grand Champion" ranking
+- Full competition rankings
+- High score awards
+- All scoring criteria apply
+
+### Special Categories (3 Categories)
+
+These categories receive participation recognition only:
+
+1. **Production** - Large-scale production numbers
+2. **Student Choreography** - Student-created choreography
+3. **Teacher/Student** - Teacher and student partnerships
+
+**Characteristics:**
+- NOT eligible for "Overall Grand Champion"
+- Separate results section
+- Participation recognition
+- Still scored normally
+- Marked with 🎭 Special Category badge
+
+### Category Display
+
+**In Results:**
+- Performing Arts categories shown first (teal styling)
+- Special categories shown in separate section (gray styling)
+- Clear visual distinction between the two types
+
+---
+
+## Variety Levels
+
+### Overview
+
+Variety levels allow categories to be enhanced with special requirements, creating more diverse competition divisions.
+
+### The Five Variety Levels
+
+#### **None** (Straight Category)
+- Standard category with no variety requirements
+- Pure dance style as intended
+- Example: "Jazz" (straight jazz dance)
+
+#### **Variety A** - Song & Dance, Character, or Combination
+- Incorporates vocal performance
+- Character portrayal
+- Combination of performing arts
+- Example: "Jazz Variety A - Song & Dance"
+
+#### **Variety B** - Dance with Prop
+- Requires use of a prop in performance
+- Prop must be integral to routine
+- Example: "Tap Variety B - with Prop"
+
+#### **Variety C** - Dance with Acrobatics
+- Incorporates acrobatic elements
+- Tumbling, aerials, or gymnastics
+- Example: "Ballet Variety C - with Acrobatics"
+
+#### **Variety D** - Dance with Acrobatics & Prop
+- Combines both acrobatics and prop use
+- Highest technical difficulty
+- Example: "Jazz Variety D - with Acrobatics & Prop"
+
+#### **Variety E** - Hip Hop with Floor Work & Acrobatics
+- Specific to Hip Hop category
+- Includes floor work and acrobatic elements
+- Breaking, power moves, etc.
+- Example: "Hip Hop Variety E - with Floor Work & Acrobatics"
+
+### How Variety Levels Work
+
+**Category Creation:**
+- Select base category (e.g., Jazz)
+- Choose variety level (None, A, B, C, D, or E)
+- System generates display name: "Jazz Variety B - with Prop"
+
+**Competitive Groups:**
+- Each variety level creates a separate competitive group
+- "Jazz" (None) competes separately from "Jazz Variety B"
+- Rankings calculated within each variety level
+
+**Display:**
+- Full variety description shown in dropdown
+- Complete name displayed throughout system
+- PDF and Excel exports include variety level
+
+---
+
+## Age Tracking & Auto-Assignment
+
+### Overview
+
+TOPAZ 2.0 automatically assigns age divisions based on contestant age, streamlining the entry process and ensuring accurate division placement.
+
+### Age Field
+
+**Required Information:**
+- Age: 1-99 (required field)
+- For solos: Dancer's current age
+- For groups: Age of oldest member
+
+**Display:**
+- Name with age: "Sarah Johnson (14)"
+- Shown in all views: setup, scoring, results, exports
+
+### Automatic Age Division Assignment
+
+**How It Works:**
+1. User enters age (e.g., 14)
+2. System checks all age divisions for competition
+3. Finds division where age falls within range
+4. Auto-selects matching division
+5. Shows confirmation: "✓ Age 14 → Teen Division (auto-selected)"
+
+**Example:**
 ```
+Age Divisions:
+- Junior (9-12)
+- Teen (13-15)
+- Senior (16-19)
+
+Enter age: 14
+Result: Teen division auto-selected ✓
+```
+
+### Manual Override
+
+**User Can Override:**
+- Auto-selected division can be changed
+- Dropdown shows all divisions
+- Recommended division marked: "(recommended)"
+- Useful for edge cases or special circumstances
+
+### Age Mismatch Handling
+
+**If age doesn't match any division:**
+- Warning shown: "⚠️ Age 25 doesn't match any division"
+- Entry can still be created
+- Competes without age division assignment
+- Useful for open categories
+
+### Visual Feedback
+
+**When Age Matches:**
+```
+✓ Age 14 → Teen Division (auto-selected)
+```
+- Green checkmark
+- Division name shown
+- Positive confirmation
+
+**When Age Doesn't Match:**
+```
+⚠️ Age 25 doesn't match any division
+```
+- Orange warning icon
+- User can proceed
+- No division required
+
+### Groups
+
+**For Group Entries:**
+- Age field labeled: "Age (Age of oldest member)"
+- Single age value stored
+- Division based on oldest member
+- Ensures appropriate competition level
 
 ---
 
@@ -539,6 +742,146 @@ Rank | Competitor      | Points This Comp | Total Points | Medal Status
 - Database constraints ensure data integrity
 - Transaction-safe point additions prevent duplication
 - Real-time updates reflect across all system views
+
+---
+
+## Special Categories
+
+### Overview
+
+Special Categories are competition divisions that receive participation recognition only and are **NOT eligible for high scoring awards**. They are designed for unique performance formats that don't fit traditional competitive judging.
+
+### The Three Special Categories
+
+#### 1. **Production**
+- Large-scale production numbers
+- Multiple performers, elaborate staging
+- Focus on theatrical presentation
+- Participation recognition only
+
+#### 2. **Student Choreography**
+- Choreographed by students
+- Showcases creative development
+- Learning and growth emphasis
+- Participation recognition only
+
+#### 3. **Teacher/Student**
+- Teacher and student performing together
+- Partnership performances
+- Special collaborative category
+- Participation recognition only
+
+### Key Rules
+
+**NOT Eligible For:**
+- ❌ Overall Grand Champion ranking
+- ❌ High score awards
+- ❌ Cross-category competition
+
+**STILL Receive:**
+- ✅ Normal scoring (all 4 criteria)
+- ✅ Judge feedback and notes
+- ✅ Individual score sheets (PDF)
+- ✅ Inclusion in Excel exports
+- ✅ Full participation recognition
+
+### Database Implementation
+
+**Auto-Detection:**
+- System automatically flags these categories
+- Database field: `is_special_category = true`
+- No manual marking needed
+
+**Category Creation:**
+- When adding "Production", "Student Choreography", or "Teacher/Student"
+- System shows warning: "⚠️ Special Category (participation recognition only)"
+- Flag automatically set
+
+### Results Display
+
+**Two Separate Sections:**
+
+**Section 1: Performing Arts Results**
+- All regular categories (Tap, Jazz, Ballet, etc.)
+- Eligible for high score awards
+- Teal/cyan gradient styling
+- "Overall Grand Champion" includes these only
+
+**Section 2: Special Categories**
+- Displayed after performing arts results
+- Header: "🎭 SPECIAL CATEGORIES"
+- Subtext: "Participation Recognition • Not Eligible for High Score Awards"
+- Gray gradient styling (visual distinction)
+- Gray border (different from regular entries)
+
+### Visual Indicators
+
+**Special Category Entries Show:**
+- 🎭 Special Category badge
+- Gray color scheme (vs. teal for performing arts)
+- "SPECIAL" badge in red on CategoryBadge
+- Clear separation in results display
+
+**Example Display:**
+```
+┌─────────────────────────────────┐
+│  PERFORMING ARTS RESULTS        │
+│  (Eligible for High Scoring)    │
+│                                 │
+│  🏆 1st - Sarah (Jazz) - 95.50  │
+│  [Teal gradient]                │
+└─────────────────────────────────┘
+
+┌─────────────────────────────────┐
+│  🎭 SPECIAL CATEGORIES          │
+│  Participation Recognition      │
+│                                 │
+│  1st - Company (Production)     │
+│  88.00 [Gray gradient] 🎭       │
+└─────────────────────────────────┘
+```
+
+### Scoring Process
+
+**Same as Regular Categories:**
+1. Judges score all 4 criteria (Technique, Creativity, Presentation, Appearance)
+2. Total score calculated (0-100)
+3. Notes can be added
+4. Scores stored in database
+
+**Difference:**
+- Results displayed in separate section
+- Not included in "Overall Grand Champion"
+- Focus on participation, not competition
+
+### Best Practices
+
+1. **Clear Communication**: Explain special category status to participants upfront
+2. **Set Expectations**: Participation recognition, not competitive ranking
+3. **Fair Judging**: Score fairly using all criteria
+4. **Recognition**: Celebrate participation and creativity
+5. **Separate Display**: Keep results sections clearly separated
+
+### Migration
+
+**For Existing Databases:**
+```sql
+-- Run: special-categories-migration.sql
+ALTER TABLE categories 
+ADD COLUMN IF NOT EXISTS is_special_category BOOLEAN DEFAULT false;
+
+UPDATE categories
+SET is_special_category = true
+WHERE name IN ('Production', 'Student Choreography', 'Teacher/Student');
+```
+
+### Technical Notes
+
+- `is_special_category` boolean flag in categories table
+- Auto-detected based on category name
+- Results filtering separates special from performing arts
+- PDF and Excel exports include special category indicator
+- No changes to scoring logic - only display logic differs
 
 ---
 
@@ -1159,15 +1502,33 @@ If you encounter issues not covered here:
 
 ### Version History
 
-**Version 2.0** (Current)
-- Added Ability Levels system
-- Implemented Medal Points program
-- Added comprehensive filtering
-- Enhanced PDF and Excel exports
-- Added MedalBadge and AbilityBadge components
-- Database schema updates
+**Version 2.0** (Current - January 2026)
+- **Categories System**: Updated to 10 categories (7 Performing Arts + 3 Special)
+  - Performing Arts: Tap, Jazz, Ballet, Lyrical/Contemporary, Vocal, Acting, Hip Hop
+  - Special Categories: Production, Student Choreography, Teacher/Student
+- **Variety Levels**: Expanded from 2 to 5 options (A, B, C, D, E)
+  - Variety A: Song & Dance, Character, or Combination
+  - Variety B: Dance with Prop
+  - Variety C: Dance with Acrobatics
+  - Variety D: Dance with Acrobatics & Prop
+  - Variety E: Hip Hop with Floor Work & Acrobatics
+- **Age Tracking**: Added automatic age division assignment
+  - Age field (1-99) required for all entries
+  - Auto-selects matching age division
+  - Manual override available
+  - Age displayed with names throughout system
+- **Special Categories Logic**: Separate display and recognition
+  - Not eligible for high scoring awards
+  - Participation recognition only
+  - Separate results section with distinct styling
+- **Ability Levels System**: Three-tier system (Beginning, Intermediate, Advanced)
+- **Medal Points Program**: Cumulative point tracking for Bronze, Silver, and Gold medals
+- **Enhanced Filtering**: Category, age division, and ability level filters
+- **PDF and Excel Exports**: Include age, variety levels, and special category indicators
+- **UI Components**: Added MedalBadge, AbilityBadge, CategoryBadge components
+- **Database Migrations**: 4 migration scripts for incremental updates
 
-**Version 1.0** (Initial)
+**Version 1.0** (Initial - 2024)
 - Core competition management
 - Entry and scoring systems
 - Basic results display
