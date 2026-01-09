@@ -59,7 +59,8 @@ export const generateScoreSheet = (entry, allScores, competition, categories) =>
     
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
-    doc.text(`Entry #${entry.entry_number} - ${entry.competitor_name}`, 18, yPos);
+    const entryName = entry.age ? `Entry #${entry.entry_number} - ${entry.competitor_name} (${entry.age})` : `Entry #${entry.entry_number} - ${entry.competitor_name}`;
+    doc.text(entryName, 18, yPos);
     yPos += 8;
     
     doc.setFontSize(10);

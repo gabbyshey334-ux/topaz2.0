@@ -607,7 +607,7 @@ function ScoringInterface() {
                     </span>
                     <div className="flex-1">
                       <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-                        {currentEntry.competitor_name}
+                        {currentEntry.competitor_name} {currentEntry.age && `(${currentEntry.age})`}
                       </h2>
                       <div className="flex flex-wrap gap-2">
                         <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold">

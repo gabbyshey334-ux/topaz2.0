@@ -79,6 +79,7 @@ export const exportResultsToExcel = (entries, allScores, competition, categories
       const row = {
         'Entry Number': entry.entry_number,
         'Name': entry.competitor_name,
+        'Age': entry.age || 'N/A',
         'Type': entryType,
         'Category': categoryName,
         'Variety Level': varietyLevel,
@@ -119,6 +120,7 @@ export const exportResultsToExcel = (entries, allScores, competition, categories
     const columnWidths = [
       { wch: 12 }, // Entry Number
       { wch: 25 }, // Name
+      { wch: 8 },  // Age
       { wch: 10 }, // Type
       { wch: 20 }, // Category
       { wch: 15 }, // Variety Level

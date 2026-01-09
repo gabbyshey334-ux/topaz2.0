@@ -2,7 +2,7 @@ import { supabase } from './config';
 
 /**
  * Create a new category
- * @param {Object} categoryData - { competition_id, name, description }
+ * @param {Object} categoryData - { competition_id, name, description, is_special_category }
  * @returns {Object} - Created category data
  */
 export const createCategory = async (categoryData) => {
@@ -14,7 +14,8 @@ export const createCategory = async (categoryData) => {
       .insert([{
         competition_id: categoryData.competition_id,
         name: categoryData.name,
-        description: categoryData.description || null
+        description: categoryData.description || null,
+        is_special_category: categoryData.is_special_category || false
       }])
       .select()
       .single();

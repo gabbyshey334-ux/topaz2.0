@@ -49,6 +49,7 @@ function CompetitionSetup() {
   const [currentEntry, setCurrentEntry] = useState({
     type: 'solo', // 'solo' or 'group'
     name: '',
+    age: '', // Contestant age
     categoryId: '',
     ageDivisionId: '',
     abilityLevel: 'Beginning',
@@ -59,6 +60,7 @@ function CompetitionSetup() {
   });
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberAge, setNewMemberAge] = useState('');
+  const [autoSelectedDivision, setAutoSelectedDivision] = useState(null);
 
   // UI State
   const [errors, setErrors] = useState({});
@@ -67,11 +69,31 @@ function CompetitionSetup() {
   // Bulk Photo Upload State
   const [isBulkUploading, setIsBulkUploading] = useState(false);
 
-  // Category options
-  const categoryOptions = [
-    'Jazz', 'Tap', 'Hip Hop', 'Ballet', 'Contemporary', 
-    'Lyrical', 'Acro', 'Musical Theater', 'Open'
+  // Category options - PERFORMING ARTS
+  const performingArtsCategories = [
+    'Tap',
+    'Jazz',
+    'Ballet',
+    'Lyrical/Contemporary',
+    'Vocal',
+    'Acting',
+    'Hip Hop'
   ];
+
+  // SPECIAL CATEGORIES - Not eligible for high scoring awards
+  const specialCategories = [
+    'Production',
+    'Student Choreography',
+    'Teacher/Student'
+  ];
+
+  // All categories combined
+  const categoryOptions = [...performingArtsCategories, ...specialCategories];
+
+  // Check if category is special (not eligible for high score awards)
+  const isSpecialCategory = (categoryName) => {
+    return specialCategories.includes(categoryName);
+  };
 
   const varietyOptions = [
     'None', 
@@ -104,15 +126,17 @@ function CompetitionSetup() {
 
   // Category colors
   const categoryColors = {
-    'Jazz': 'bg-purple-100 text-purple-800 border-purple-300',
     'Tap': 'bg-blue-100 text-blue-800 border-blue-300',
-    'Hip Hop': 'bg-orange-100 text-orange-800 border-orange-300',
+    'Jazz': 'bg-purple-100 text-purple-800 border-purple-300',
     'Ballet': 'bg-pink-100 text-pink-800 border-pink-300',
-    'Contemporary': 'bg-teal-100 text-teal-800 border-teal-300',
-    'Lyrical': 'bg-purple-100 text-purple-700 border-purple-200',
-    'Acro': 'bg-red-100 text-red-800 border-red-300',
-    'Musical Theater': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-    'Open': 'bg-gray-100 text-gray-800 border-gray-300'
+    'Lyrical/Contemporary': 'bg-teal-100 text-teal-800 border-teal-300',
+    'Vocal': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    'Acting': 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    'Hip Hop': 'bg-orange-100 text-orange-800 border-orange-300',
+    // Special categories - gray to indicate different status
+    'Production': 'bg-gray-100 text-gray-800 border-gray-400',
+    'Student Choreography': 'bg-gray-100 text-gray-800 border-gray-400',
+    'Teacher/Student': 'bg-gray-100 text-gray-800 border-gray-400'
   };
 
   // Division type options based on entry type
@@ -159,15 +183,24 @@ function CompetitionSetup() {
       return;
     }
 
+    // Check if this is a special category (not eligible for high score awards)
+    const isSpecial = isSpecialCategory(newCategoryName);
+
     const newCategory = {
       id: Date.now().toString(),
       name: newCategoryName,
       varietyLevel: newVarietyLevel,
-      displayName: displayName
+      displayName: displayName,
+      isSpecialCategory: isSpecial
     };
 
     setCategories([...categories, newCategory]);
-    toast.success(`Added: ${displayName}`);
+    
+    if (isSpecial) {
+      toast.success(`Added: ${displayName} ⚠️ Special Category (participation recognition only)`);
+    } else {
+      toast.success(`Added: ${displayName}`);
+    }
   };
 
   const handleDeleteCategory = (id) => {
@@ -261,6 +294,7 @@ function CompetitionSetup() {
     setCurrentEntry({
       type: 'solo',
       name: '',
+      age: '',
       categoryId: '',
       ageDivisionId: '',
       abilityLevel: 'Beginning',
@@ -271,6 +305,7 @@ function CompetitionSetup() {
     });
     setNewMemberName('');
     setNewMemberAge('');
+    setAutoSelectedDivision(null);
   };
 
   const handleEntryTypeChange = (type) => {
@@ -280,6 +315,34 @@ function CompetitionSetup() {
       divisionType: type === 'solo' ? 'Solo' : 'Duo/Trio',
       groupMembers: []
     });
+  };
+
+  // Handle age input with automatic age division assignment
+  const handleAgeChange = (ageValue) => {
+    const age = parseInt(ageValue);
+    setCurrentEntry({
+      ...currentEntry,
+      age: ageValue
+    });
+
+    // Auto-select age division if age is valid
+    if (age && !isNaN(age) && ageDivisions.length > 0) {
+      const matchingDivision = ageDivisions.find(div => 
+        age >= div.minAge && age <= div.maxAge
+      );
+
+      if (matchingDivision) {
+        setCurrentEntry(prev => ({
+          ...prev,
+          ageDivisionId: matchingDivision.id
+        }));
+        setAutoSelectedDivision(matchingDivision);
+      } else {
+        setAutoSelectedDivision(null);
+      }
+    } else {
+      setAutoSelectedDivision(null);
+    }
   };
 
   const handleAddGroupMember = () => {
@@ -333,6 +396,11 @@ function CompetitionSetup() {
       return;
     }
 
+    if (!currentEntry.age || currentEntry.age < 1 || currentEntry.age > 99) {
+      toast.error('Please enter a valid age (1-99)');
+      return;
+    }
+
     if (!currentEntry.categoryId) {
       toast.error('Please select a category');
       return;
@@ -341,6 +409,17 @@ function CompetitionSetup() {
     if (!currentEntry.abilityLevel) {
       toast.error('Please select an ability level');
       return;
+    }
+
+    // Warn if age doesn't match any division
+    if (ageDivisions.length > 0) {
+      const age = parseInt(currentEntry.age);
+      const hasMatchingDivision = ageDivisions.some(div => 
+        age >= div.minAge && age <= div.maxAge
+      );
+      if (!hasMatchingDivision && !currentEntry.ageDivisionId) {
+        toast.warning(`Age ${age} doesn't match any division. Entry will compete without age division.`);
+      }
     }
 
     if (currentEntry.type === 'group') {
@@ -367,6 +446,7 @@ function CompetitionSetup() {
       number: entries.length + 1,
       type: currentEntry.type,
       name: currentEntry.name.trim() || `${currentEntry.divisionType} Group`,
+      age: parseInt(currentEntry.age),
       categoryId: currentEntry.categoryId,
       categoryName: category?.displayName || '',
       categoryColor: categoryColors[category?.name] || 'bg-gray-100 text-gray-800',
@@ -539,7 +619,8 @@ function CompetitionSetup() {
         const catResult = await createCategory({
           competition_id: competitionId,
           name: cat.displayName,
-          description: `${cat.name} | ${cat.varietyLevel}`
+          description: `${cat.name} | ${cat.varietyLevel}`,
+          is_special_category: cat.isSpecialCategory || false
         });
 
         if (!catResult.success) {
@@ -604,6 +685,7 @@ function CompetitionSetup() {
           competition_id: competitionId,
           entry_number: entry.number,
           competitor_name: entry.name,
+          age: entry.age,
           category_id: categorySupabaseId,
           age_division_id: ageDivisionSupabaseId,
           ability_level: entry.abilityLevel,
@@ -834,10 +916,20 @@ function CompetitionSetup() {
                     onChange={(e) => setNewCategoryName(e.target.value)}
                     className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
                   >
-                    {categoryOptions.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
+                    <optgroup label="━━━ PERFORMING ARTS ━━━">
+                      {performingArtsCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="━━━ SPECIAL CATEGORIES ━━━">
+                      {specialCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat} (Not eligible for high score awards)</option>
+                      ))}
+                    </optgroup>
                   </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Special categories receive participation recognition only
+                  </p>
                 </div>
 
                 <div>
@@ -1054,7 +1146,7 @@ function CompetitionSetup() {
                               #{entry.number}
                             </span>
                             <span className="font-semibold text-gray-700">
-                              {entry.name}
+                              {entry.name} {entry.age && `(${entry.age})`}
                             </span>
                             {entry.isMedalProgram && (
                               <span className="text-yellow-500 text-lg" title="Medal Program">
@@ -1208,6 +1300,32 @@ function CompetitionSetup() {
                 />
               </div>
 
+              {/* Age */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
+                  Age * {currentEntry.type === 'group' && '(Age of oldest member)'}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={currentEntry.age}
+                  onChange={(e) => handleAgeChange(e.target.value)}
+                  placeholder="Enter age"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
+                />
+                {autoSelectedDivision && (
+                  <p className="text-sm text-teal-600 mt-1 font-semibold">
+                    ✓ Age {currentEntry.age} → {autoSelectedDivision.name} Division (auto-selected)
+                  </p>
+                )}
+                {currentEntry.age && ageDivisions.length > 0 && !autoSelectedDivision && (
+                  <p className="text-sm text-orange-600 mt-1">
+                    ⚠️ Age {currentEntry.age} doesn't match any division
+                  </p>
+                )}
+              </div>
+
               {/* Category */}
               <div>
                 <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
@@ -1230,7 +1348,7 @@ function CompetitionSetup() {
               {ageDivisions.length > 0 && (
                 <div>
                   <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
-                    Age Division (Optional)
+                    Age Division {autoSelectedDivision ? '(Auto-selected - can override)' : '(Optional)'}
                   </label>
                   <select
                     value={currentEntry.ageDivisionId}
@@ -1241,6 +1359,7 @@ function CompetitionSetup() {
                     {ageDivisions.map(div => (
                       <option key={div.id} value={div.id}>
                         {div.name} ({div.minAge}-{div.maxAge} years)
+                        {autoSelectedDivision && div.id === autoSelectedDivision.id ? ' (recommended)' : ''}
                       </option>
                     ))}
                   </select>

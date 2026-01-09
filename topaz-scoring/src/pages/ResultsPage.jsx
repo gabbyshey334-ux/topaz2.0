@@ -24,6 +24,12 @@ function ResultsPage() {
   const location = useLocation();
   const { competitionId } = location.state || {};
 
+  // Special Categories - Not eligible for high scoring awards
+  const specialCategoryNames = ['Production', 'Student Choreography', 'Teacher/Student'];
+  const isSpecialCategory = (categoryName) => {
+    return specialCategoryNames.some(special => categoryName.includes(special));
+  };
+
   // State - Data
   const [competition, setCompetition] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -181,9 +187,25 @@ function ResultsPage() {
     return scoredEntries;
   }, [entries, scores]);
 
+  // Separate performing arts and special categories
+  const performingArtsResults = useMemo(() => {
+    return rankedResults.filter(entry => {
+      const category = categories.find(c => c.id === entry.category_id);
+      return !category?.is_special_category;
+    });
+  }, [rankedResults, categories]);
+
+  const specialCategoryResults = useMemo(() => {
+    return rankedResults.filter(entry => {
+      const category = categories.find(c => c.id === entry.category_id);
+      return category?.is_special_category;
+    });
+  }, [rankedResults, categories]);
+
   // Apply filters
   const filteredResults = useMemo(() => {
-    let filtered = [...rankedResults];
+    // For "overall" filter, use only performing arts categories
+    let filtered = selectedFilter === 'overall' ? [...performingArtsResults] : [...rankedResults];
 
     // Filter by category
     if (selectedFilter === 'category' && selectedCategory) {
@@ -222,7 +244,7 @@ function ResultsPage() {
     });
 
     return filtered;
-  }, [rankedResults, selectedFilter, selectedCategory, selectedAgeDivision, selectedAbilityLevel, searchQuery]);
+  }, [rankedResults, performingArtsResults, selectedFilter, selectedCategory, selectedAgeDivision, selectedAbilityLevel, searchQuery]);
 
   // Reset page to 1 when filters change
   useEffect(() => {
@@ -513,11 +535,11 @@ function ResultsPage() {
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              🏆 Overall Grand Champion
+              🏆 Overall Grand Champion (Performing Arts)
             </button>
 
-            {/* Category buttons */}
-            {categories.map(cat => (
+            {/* Performing Arts Category buttons */}
+            {categories.filter(cat => !isSpecialCategory(cat.name)).map(cat => (
               <button
                 key={cat.id}
                 onClick={() => {
@@ -535,6 +557,34 @@ function ResultsPage() {
                 {cat.name}
               </button>
             ))}
+
+            {/* Special Category buttons (if any exist) */}
+            {categories.filter(cat => isSpecialCategory(cat.name)).length > 0 && (
+              <>
+                <div className="w-full h-px bg-gray-300 my-2"></div>
+                <span className="text-xs text-gray-500 font-semibold uppercase tracking-wider w-full">
+                  Special Categories (Participation Recognition Only)
+                </span>
+                {categories.filter(cat => isSpecialCategory(cat.name)).map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setSelectedFilter('category');
+                      setSelectedCategory(cat.id);
+                      setSelectedAgeDivision(null);
+                      setSelectedAbilityLevel(null);
+                    }}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-colors min-h-[44px] ${
+                      selectedFilter === 'category' && selectedCategory === cat.id
+                        ? 'bg-gradient-to-r from-gray-500 to-gray-700 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    {cat.name} ⚠️
+                  </button>
+                ))}
+              </>
+            )}
 
             {/* Age division buttons */}
             {ageDivisions.map(div => (
@@ -697,7 +747,7 @@ function ResultsPage() {
                         {/* Entry Info */}
                         <div className="flex-1">
                           <h4 className="text-lg font-bold text-gray-800">
-                            {entry.competitor_name}
+                            {entry.competitor_name} {entry.age && `(${entry.age})`}
                           </h4>
                           <div className="flex flex-wrap gap-2 mt-1">
                             <CategoryBadge categoryName={getCategoryName(entry.category_id)} />
@@ -1058,6 +1108,177 @@ function ResultsPage() {
             >
               Next →
             </button>
+          </div>
+        )}
+
+        {/* SPECIAL CATEGORIES SECTION */}
+        {specialCategoryResults.length > 0 && selectedFilter === 'overall' && (
+          <div className="mt-12">
+            <div className="bg-gradient-to-r from-gray-600 to-gray-800 text-white rounded-xl p-6 mb-6">
+              <h2 className="text-2xl sm:text-3xl font-bold text-center mb-2">
+                🎭 SPECIAL CATEGORIES
+              </h2>
+              <p className="text-center text-gray-200">
+                Participation Recognition • Not Eligible for High Score Awards
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {specialCategoryResults.map((entry) => {
+                const entryScores = scores.filter(s => s.entry_id === entry.id);
+                const isExpanded = expandedEntries.has(entry.id);
+                const groupMembers = isGroup(entry) ? parseGroupMembers(entry.dance_type) : [];
+
+                return (
+                  <div
+                    key={entry.id}
+                    className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border-2 border-gray-400"
+                  >
+                    {/* Main Card */}
+                    <div className="p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        {/* Rank Badge */}
+                        <div className="flex-shrink-0">
+                          <RankBadge rank={entry.rank} isTied={entry.isTied} />
+                        </div>
+
+                        {/* Photo */}
+                        <div className="flex-shrink-0">
+                          {entry.photo_url ? (
+                            <LazyLoadImage
+                              src={entry.photo_url}
+                              alt={entry.competitor_name}
+                              effect="blur"
+                              className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border-2 border-gray-300"
+                              placeholder={
+                                <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-200 rounded-lg flex items-center justify-center text-4xl animate-pulse">
+                                  {isGroup(entry) ? '👥' : '💃'}
+                                </div>
+                              }
+                            />
+                          ) : (
+                            <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-200 rounded-lg flex items-center justify-center text-4xl">
+                              {isGroup(entry) ? '👥' : '💃'}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Entry Info */}
+                        <div className="flex-1">
+                          <div className="mb-2">
+                            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+                              #{entry.entry_number} {entry.competitor_name} {entry.age && `(${entry.age})`}
+                            </h2>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            <CategoryBadge categoryName={getCategoryName(entry.category_id)} />
+                            {entry.age_division_id && (
+                              <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                                {getAgeDivisionName(entry.age_division_id)}
+                              </span>
+                            )}
+                            <AbilityBadge abilityLevel={entry.ability_level} size="md" />
+                            <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
+                              {getDivisionType(entry)}
+                            </span>
+                            <span className="px-3 py-1 bg-gray-500 text-white rounded-full text-sm font-semibold">
+                              🎭 Special Category
+                            </span>
+                          </div>
+
+                          {isGroup(entry) && groupMembers.length > 0 && (
+                            <p className="text-sm text-gray-600 mb-3">
+                              Group of {groupMembers.length} members
+                            </p>
+                          )}
+
+                          {/* Judge Scores */}
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {entryScores.map(score => (
+                              <div
+                                key={score.id}
+                                className="px-3 py-1 bg-gray-100 rounded-lg text-sm"
+                              >
+                                <span className="font-semibold">Judge {score.judge_number}:</span>{' '}
+                                <span className="text-teal-600 font-bold">{score.total_score.toFixed(1)}/100</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Average Score */}
+                          <div className="bg-gradient-to-r from-gray-500 to-gray-700 text-white px-4 py-2 rounded-lg inline-block">
+                            <span className="font-semibold">AVERAGE: </span>
+                            <span className="text-xl font-bold">{entry.averageScore.toFixed(2)} / 100</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        <button
+                          onClick={() => handlePrintScoreSheet(entry)}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors min-h-[44px]"
+                        >
+                          📄 Print Score Sheet
+                        </button>
+                        <button
+                          onClick={() => toggleExpand(entry.id)}
+                          className="px-4 py-2 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors min-h-[44px]"
+                        >
+                          {isExpanded ? '▲ Collapse' : '▼ View Details'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expanded Breakdown */}
+                    {isExpanded && (
+                      <div className="bg-gray-50 p-4 sm:p-6 border-t-2 border-gray-200">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4">Detailed Score Breakdown</h3>
+                        
+                        {entryScores.map(score => (
+                          <div key={score.id} className="mb-6 last:mb-0">
+                            <h4 className="text-md font-bold text-teal-600 mb-3">Judge {score.judge_number}</h4>
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                              <div className="bg-white p-3 rounded-lg">
+                                <p className="text-xs text-gray-500 mb-1">Technique</p>
+                                <p className="text-lg font-bold text-gray-800">{score.technique.toFixed(1)} / 25</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg">
+                                <p className="text-xs text-gray-500 mb-1">Creativity</p>
+                                <p className="text-lg font-bold text-gray-800">{score.creativity.toFixed(1)} / 25</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg">
+                                <p className="text-xs text-gray-500 mb-1">Presentation</p>
+                                <p className="text-lg font-bold text-gray-800">{score.presentation.toFixed(1)} / 25</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg">
+                                <p className="text-xs text-gray-500 mb-1">Appearance</p>
+                                <p className="text-lg font-bold text-gray-800">{score.appearance.toFixed(1)} / 25</p>
+                              </div>
+                            </div>
+
+                            {score.notes && (
+                              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                                <p className="text-xs text-gray-500 mb-1">Judge's Notes:</p>
+                                <p className="text-sm text-gray-700">{score.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Overall Average */}
+                        <div className="bg-gradient-to-r from-gray-500 to-gray-700 text-white p-4 rounded-lg text-center">
+                          <p className="text-sm font-semibold mb-1">OVERALL AVERAGE</p>
+                          <p className="text-3xl font-bold">{entry.averageScore.toFixed(2)} / 100</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

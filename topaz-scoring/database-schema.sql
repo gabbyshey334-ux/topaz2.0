@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS categories (
   competition_id UUID NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
+  is_special_category BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
