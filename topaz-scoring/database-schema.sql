@@ -67,7 +67,8 @@ CREATE TABLE IF NOT EXISTS scores (
   creativity DECIMAL(5,2) NOT NULL CHECK (creativity >= 0 AND creativity <= 25),
   presentation DECIMAL(5,2) NOT NULL CHECK (presentation >= 0 AND presentation <= 25),
   appearance DECIMAL(5,2) NOT NULL CHECK (appearance >= 0 AND appearance <= 25),
-  total DECIMAL(6,2) NOT NULL CHECK (total >= 0 AND total <= 100),
+  total_score DECIMAL(6,2) NOT NULL CHECK (total_score >= 0 AND total_score <= 100),
+  notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(entry_id, judge_number)

@@ -796,6 +796,12 @@ function ScoringInterface() {
             </div>
           </div>
         </div>
+
+        {/* Footer */}
+        <div className="mt-8 text-center text-sm text-gray-500 pb-8">
+          <p className="font-semibold">TOPAZ 2.0 © 2025</p>
+          <p className="mt-1">Heritage Since 1972 | Judge Scoring Interface</p>
+        </div>
       </div>
     </Layout>
   );

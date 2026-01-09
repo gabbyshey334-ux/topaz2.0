@@ -1097,6 +1097,12 @@ function CompetitionSetup() {
               {isSaving ? 'Saving...' : 'Continue to Judge Selection →'}
             </button>
           </div>
+
+          {/* Footer */}
+          <div className="mt-12 text-center text-sm text-gray-500 pb-8">
+            <p className="font-semibold">TOPAZ 2.0 © 2025</p>
+            <p className="mt-1">Heritage Since 1972 | Official Competition Setup</p>
+          </div>
         </div>
       </div>
 

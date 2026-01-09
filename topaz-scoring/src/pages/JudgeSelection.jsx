@@ -285,6 +285,12 @@ function JudgeSelection() {
               <span className="inline-block mr-1">👉</span> <strong>Admin:</strong> Use Admin View to see rankings and results.
             </p>
           </div>
+
+          {/* Footer */}
+          <div className="mt-8 text-center text-sm text-gray-500 pb-8">
+            <p className="font-semibold">TOPAZ 2.0 © 2025</p>
+            <p className="mt-1">Heritage Since 1972 | Judge Selection</p>
+          </div>
         </div>
       </div>
     </Layout>

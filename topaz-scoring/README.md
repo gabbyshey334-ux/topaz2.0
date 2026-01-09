@@ -1,765 +1,1230 @@
-# 🎭 TOPAZ 2.0 Scoring System
+# TOPAZ 2.0 Comprehensive Documentation
 
-**Complete Dance Competition Management System**  
-Heritage Since 1972
-
----
-
-## 📖 Table of Contents
-
-1. [Overview](#overview)
-2. [Features](#features)
-3. [Tech Stack](#tech-stack)
-4. [Quick Start](#quick-start)
-5. [Environment Setup](#environment-setup)
-6. [Project Structure](#project-structure)
-7. [User Guide](#user-guide)
-8. [Database Schema](#database-schema)
-9. [Deployment](#deployment)
-10. [Performance](#performance)
-11. [Troubleshooting](#troubleshooting)
-12. [Support](#support)
+**Heritage Since 1972**  
+Complete System Documentation for Dance Competition Scoring
 
 ---
 
-## 🎯 Overview
+## Table of Contents
 
-TOPAZ 2.0 is a professional dance competition scoring and management system built for live competitions. It supports multiple judges, real-time scoring, comprehensive results tracking, and professional reporting.
-
-### Key Capabilities
-- **Multi-judge scoring** (1-10 judges)
-- **200+ entries** support with optimized performance
-- **Category management** with variety levels
-- **Age division tracking**
-- **Photo uploads** (single & bulk)
-- **Real-time results** with automatic rankings
-- **PDF score sheets** for individual entries
-- **Excel export** for complete results
-- **Medal program** tracking
-- **Mobile-responsive** (iPad optimized)
+1. [System Overview](#system-overview)
+2. [Quick Start Guide](#quick-start-guide)
+3. [Database Setup](#database-setup)
+4. [Ability Levels System](#ability-levels-system)
+5. [Medal Points Program](#medal-points-program)
+6. [Competition Workflow](#competition-workflow)
+7. [Scoring System](#scoring-system)
+8. [Results & Reports](#results--reports)
+9. [Technical Reference](#technical-reference)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
-## ✨ Features
+## System Overview
 
-### 🏆 Competition Setup
-- Create competitions with name, date, venue
-- Add multiple categories (Jazz, Tap, Hip Hop, Ballet, Contemporary, Lyrical, Acro, Musical Theater, Open)
-- Support for variety levels (Variety A, Variety B with prop)
-- Age division builder with custom age ranges
-- Entry management for solos, duos/trios, groups, and productions
-- Photo upload for each entry with auto-compression
-- Bulk photo upload for competition day efficiency
-- Group member tracking with validation
+TOPAZ 2.0 is a comprehensive dance competition scoring system built with React and Supabase, designed to manage competitions, entries, scoring, and results with advanced features including ability level tracking and medal point awards.
 
-### 🎨 Judge Scoring Interface
-- Clean, intuitive scoring form
-- 4 scoring categories (Technique, Creativity & Choreography, Presentation, Appearance & Costume)
-- 0-25 points per category (decimals allowed)
-- Auto-calculated total score (0-100)
-- Color-coded scores (green ≥85, yellow 70-84, orange <70)
-- Judge notes with 500-character limit
-- Category and age division filters
-- Search functionality for quick entry lookup
-- Entry navigation with status indicators
-- Photo display with lazy loading
-- Group member lists with expand/collapse
-- Save & Next workflow for efficient scoring
+### Core Features
 
-### 📊 Results & Rankings
-- Real-time results with automatic ranking calculation
-- Tie handling with proper indicators
-- Multiple filter options:
-  - Overall rankings
-  - Filter by category
-  - Filter by age division
-  - Medal program participants only
-  - Search by name or entry number
-- Expandable score details per judge
-- Judge notes display
-- Pagination (20 entries per page)
-- Individual PDF score sheets
-- Excel export for all results
-- Print-friendly styles
-- Real-time updates when judges submit scores
+- **Competition Management**: Create and manage multiple competitions
+- **Entry Management**: Track competitors with photos, categories, age divisions, and ability levels
+- **Judge Scoring**: Multi-judge scoring interface with real-time updates
+- **Ability Levels**: Three-tier system (Beginning, Intermediate, Advanced)
+- **Medal Points Program**: Cumulative point tracking for Bronze, Silver, and Gold medals
+- **Results Display**: Real-time rankings with filtering and grouping
+- **Export Functions**: PDF score sheets and Excel reports
+- **Photo Storage**: Supabase storage integration for competitor photos
 
-### 📸 Photo Management
-- Single photo upload per entry
-- Bulk photo upload (upload 10s of photos at once)
-- Automatic compression for images >1MB
-- Filename-based matching (1.jpg → Entry #1)
-- Supported formats: JPG, PNG
-- Preview thumbnails throughout system
-- Lazy loading for performance
+### Technology Stack
 
-### 📄 Reporting
-- **PDF Score Sheets**:
-  - Individual entry details
-  - All judge scores with breakdowns
-  - Judge notes
-  - Competition branding
-  - Entry photos
-  
-- **Excel Export**:
-  - Complete results spreadsheet
-  - All judge scores
-  - Category and age division info
-  - Medal program indicators
-  - Group member lists
-
-### 🎯 User Experience
-- Toast notifications for all actions
-- Loading spinners for async operations
-- Empty states with helpful guidance
-- Confirmation dialogs for destructive actions
-- Keyboard navigation support
-- ARIA labels for accessibility
-- Responsive design (mobile, tablet, desktop)
-- Touch-friendly buttons (44px minimum)
+- **Frontend**: React.js with Tailwind CSS
+- **Backend**: Supabase (PostgreSQL database, Authentication, Storage)
+- **PDF Generation**: jsPDF with jspdf-autotable
+- **Excel Export**: xlsx library
+- **State Management**: React hooks (useState, useEffect, useMemo)
 
 ---
 
-## 🛠 Tech Stack
+## Quick Start Guide
 
-### Frontend
-- **React 18** - UI framework
-- **Vite** - Build tool and dev server
-- **React Router DOM** - Client-side routing
-- **Tailwind CSS** - Styling and responsive design
+### For Competition Organizers
 
-### Backend & Database
-- **Supabase** - PostgreSQL database, real-time subscriptions, storage
-- **Row Level Security (RLS)** - Data protection
-- **Real-time subscriptions** - Live score updates
+**1. Database Setup** (First Time Only)
+```sql
+-- Run the main schema file in your Supabase SQL editor
+-- Execute: database-schema.sql
 
-### Libraries
-- **@supabase/supabase-js** - Supabase client
-- **react-toastify** - Toast notifications
-- **jspdf & jspdf-autotable** - PDF generation
-- **xlsx** - Excel export
-- **browser-image-compression** - Image optimization
-- **react-lazy-load-image-component** - Lazy loading
-- **date-fns** - Date formatting
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 16+ and npm
-- Supabase account (free tier works)
-- Modern web browser
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   cd topaz-scoring
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-   
-   Create `.env` file in the `topaz-scoring` folder:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_project_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-
-4. **Set up Supabase database**
-   
-   Run the SQL in `database-schema.sql` in your Supabase SQL editor to create all tables.
-
-5. **Create Supabase storage bucket**
-   
-   In Supabase dashboard:
-   - Go to Storage
-   - Create bucket named `entry-photos`
-   - Set bucket to **public**
-
-6. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-7. **Open in browser**
-   ```
-   http://localhost:5173
-   ```
-
----
-
-## ⚙️ Environment Setup
-
-### Required Environment Variables
-
-Create a `.env` file in the `topaz-scoring` directory:
-
-```env
-# Supabase Configuration
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
+-- Then run migration files if updating existing database:
+-- 1. ability-level-migration.sql
+-- 2. medal-points-migration.sql
+-- 3. scores-notes-migration.sql
 ```
 
-### Getting Supabase Credentials
+**2. Create a New Competition**
+- Navigate to Competition Setup page
+- Enter competition name and date
+- Click "Create Competition"
 
-1. Go to [supabase.com](https://supabase.com)
-2. Create a new project (or use existing)
-3. Go to Settings → API
-4. Copy:
-   - **Project URL** → `VITE_SUPABASE_URL`
-   - **anon/public key** → `VITE_SUPABASE_ANON_KEY`
+**3. Add Entries**
+- Click "Add Entry" button
+- Fill in competitor details:
+  - Entry Number (auto-incremented)
+  - Competitor Name
+  - Age and Age Division
+  - Category (Solo, Duet, Trio, Small Group, Large Group, Line, Production)
+  - Dance Type
+  - **Ability Level** (Beginning, Intermediate, Advanced)
+  - Optional: Upload photo
+- Click "Save Entry"
 
-### Database Setup
+**4. Select Judges**
+- Go to Judge Selection page
+- Enter number of judges (1-10)
+- Click "Save Selection"
 
-1. Open Supabase SQL Editor
-2. Copy the entire contents of `database-schema.sql`
-3. Paste and run in SQL editor
-4. Verify tables are created:
-   - `competitions`
-   - `categories`
-   - `age_divisions`
-   - `entries`
-   - `scores`
+**5. Score Entries**
+- Navigate to Scoring Interface
+- Select judge number
+- Use filters to navigate entries (Category, Age Division, Ability Level)
+- Score each entry across four criteria:
+  - Technique (0-25)
+  - Creativity (0-25)
+  - Presentation (0-25)
+  - Appearance (0-25)
+- Add optional notes
+- Click "Submit Score"
 
-### Storage Setup
+**6. View Results**
+- Go to Results Page
+- View rankings by category and ability level
+- Check Medal Program section for top performers
+- Award medal points to 1st place winners
 
-1. Go to Storage in Supabase dashboard
-2. Create new bucket: `entry-photos`
-3. Set bucket to **public** (important!)
-4. Click on bucket → Settings → Make public
+**7. Generate Reports**
+- Export to Excel for complete results spreadsheet
+- Generate PDF score sheets for individual entries
 
 ---
 
-## 📁 Project Structure
+## Database Setup
+
+### Initial Setup Checklist
+
+#### ✅ Step 1: Create Database Schema
+   ```bash
+# Execute the main schema file in Supabase SQL Editor
+database-schema.sql
+```
+
+This creates the following tables:
+- `competitions`: Competition metadata
+- `categories`: Dance categories (Solo, Duet, Trio, etc.)
+- `age_divisions`: Age groupings
+- `entries`: Competitor information with ability levels and medal tracking
+- `scores`: Judge scores with notes
+
+#### ✅ Step 2: Verify Tables Created
+```sql
+-- Check if all tables exist
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+ORDER BY table_name;
+
+-- Expected tables:
+-- age_divisions
+-- categories
+-- competitions
+-- entries
+-- scores
+```
+
+#### ✅ Step 3: Run Migration Scripts (If Updating Existing Database)
+
+**Migration 1: Add Ability Levels**
+```sql
+-- Execute: ability-level-migration.sql
+-- Adds: ability_level column to entries table
+```
+
+**Migration 2: Add Medal Points**
+```sql
+-- Execute: medal-points-migration.sql
+-- Adds: medal_points and current_medal_level columns to entries table
+```
+
+**Migration 3: Update Scores Table**
+```sql
+-- Execute: scores-notes-migration.sql
+-- Adds: notes column
+-- Renames: total to total_score
+```
+
+#### ✅ Step 4: Configure Storage Bucket
+
+1. Go to Supabase Dashboard → Storage
+2. Create new bucket: `competitor-photos`
+3. Set to **Public** bucket
+4. Configure policies:
+
+```sql
+-- Policy 1: Allow public read access
+CREATE POLICY "Public read access" ON storage.objects
+FOR SELECT USING (bucket_id = 'competitor-photos');
+
+-- Policy 2: Allow authenticated uploads
+CREATE POLICY "Authenticated uploads" ON storage.objects
+FOR INSERT WITH CHECK (
+  bucket_id = 'competitor-photos' AND 
+  auth.role() = 'authenticated'
+);
+```
+
+#### ✅ Step 5: Test Database Connection
+
+Create a test competition:
+```sql
+INSERT INTO competitions (name, date)
+VALUES ('Test Competition', CURRENT_DATE);
+```
+
+Verify it appears in your application.
+
+### Database Schema Details
+
+#### Entries Table
+```sql
+CREATE TABLE entries (
+  id UUID PRIMARY KEY,
+  competition_id UUID NOT NULL,
+  entry_number INTEGER NOT NULL,
+  competitor_name TEXT NOT NULL,
+  category_id UUID,
+  age_division_id UUID,
+  age INTEGER CHECK (age >= 0 AND age <= 150),
+  dance_type TEXT,
+  ability_level TEXT CHECK (ability_level IN ('Beginning', 'Intermediate', 'Advanced')),
+  medal_points INTEGER DEFAULT 0,
+  current_medal_level TEXT DEFAULT 'None',
+  photo_url TEXT,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+```
+
+#### Scores Table
+```sql
+CREATE TABLE scores (
+  id UUID PRIMARY KEY,
+  competition_id UUID NOT NULL,
+  entry_id UUID NOT NULL,
+  judge_number INTEGER CHECK (judge_number >= 1 AND judge_number <= 10),
+  technique DECIMAL(5,2) CHECK (technique >= 0 AND technique <= 25),
+  creativity DECIMAL(5,2) CHECK (creativity >= 0 AND creativity <= 25),
+  presentation DECIMAL(5,2) CHECK (presentation >= 0 AND presentation <= 25),
+  appearance DECIMAL(5,2) CHECK (appearance >= 0 AND appearance <= 25),
+  total_score DECIMAL(6,2) CHECK (total_score >= 0 AND total_score <= 100),
+  notes TEXT,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+```
+
+---
+
+## Ability Levels System
+
+### Overview
+
+The Ability Levels system categorizes dancers into three experience tiers, ensuring fair competition and appropriate judging standards.
+
+### The Three Levels
+
+#### 🔵 Beginning (Less than 2 years experience)
+- **Visual Style**: Blue badge with light blue background
+- **Target**: New dancers, early training
+- **Characteristics**:
+  - Learning fundamental techniques
+  - Building basic skills and confidence
+  - First competition experiences
+
+#### 🟠 Intermediate (2-4 years experience)
+- **Visual Style**: Orange badge with light orange background
+- **Target**: Developing dancers with some experience
+- **Characteristics**:
+  - Solid foundation in technique
+  - Exploring creativity and style
+  - Multiple competition experiences
+
+#### 🟣 Advanced (5+ years experience)
+- **Visual Style**: Purple badge with light purple background
+- **Target**: Experienced dancers
+- **Characteristics**:
+  - Mastery of advanced techniques
+  - Artistic maturity and expression
+  - Extensive competition history
+
+### Implementation Details
+
+#### Database Field
+```sql
+ability_level TEXT CHECK (ability_level IN ('Beginning', 'Intermediate', 'Advanced'))
+```
+
+#### UI Components
+
+**AbilityBadge Component**
+```jsx
+<AbilityBadge abilityLevel="Beginning" size="md" />
+```
+
+Sizes: `sm`, `md`, `lg`
+
+#### Where Ability Levels Appear
+
+1. **Competition Setup**
+   - Dropdown selector when adding entries
+   - Helper text explaining experience requirements
+   - Badge display in entry list
+
+2. **Scoring Interface**
+   - Filter dropdown to show entries by ability level
+   - Badge display on current entry being scored
+   - Quick navigation between ability levels
+
+3. **Results Page**
+   - Filter buttons (All, Beginning, Intermediate, Advanced)
+   - Badge display in results tables
+   - Separate rankings per ability level within categories
+
+4. **PDF Score Sheets**
+   - Ability level printed with entry information
+   - Includes experience description
+
+5. **Excel Exports**
+   - Dedicated "Ability Level" column
+   - Sortable and filterable in spreadsheet
+
+### User Workflow
+
+#### Adding Entry with Ability Level
+1. Click "Add Entry" in Competition Setup
+2. Fill in basic information
+3. Select ability level from dropdown:
+   - Beginning (Less than 2 years)
+   - Intermediate (2-4 years)
+   - Advanced (5+ years)
+4. See helper text for group categories
+5. Save entry
+
+#### Filtering by Ability Level
+- **Scoring Interface**: Use dropdown to filter entries
+- **Results Page**: Click filter buttons to view specific levels
+- **All views maintain**: Category and Age Division filters alongside ability filters
+
+### Competitive Groups
+
+Ability levels interact with Categories to create competitive groups:
+
+| Category | Ability Level | Competitive Group |
+|----------|---------------|-------------------|
+| Solo | Beginning | Solo - Beginning |
+| Solo | Intermediate | Solo - Intermediate |
+| Solo | Advanced | Solo - Advanced |
+| Duet | Beginning | Duet - Beginning |
+| ... | ... | ... |
+
+**Rankings are calculated within each competitive group.**
+
+### Best Practices
+
+1. **Consistent Classification**: Ensure all entries in a competition have ability levels assigned
+2. **Fair Grouping**: Similar experience levels compete against each other
+3. **Clear Communication**: Display ability level prominently in all views
+4. **Filter Coordination**: Use ability filters alongside category/age filters for precise navigation
+
+---
+
+## Medal Points Program
+
+### Overview
+
+The Medal Points Program rewards consistent excellence by tracking cumulative points earned across multiple competitions. First-place winners earn points toward Bronze, Silver, and Gold medal achievements.
+
+### Medal Levels and Point Thresholds
+
+#### 🥉 Bronze Medal (25 Points Required)
+- **Visual Style**: Bronze/brown badge
+- **Achievement**: First medal milestone
+- **Significance**: Recognition of early competitive success
+
+#### 🥈 Silver Medal (35 Points Required)
+- **Visual Style**: Silver/gray badge  
+- **Achievement**: Intermediate excellence
+- **Significance**: Demonstrates consistent performance
+
+#### 🥇 Gold Medal (50 Points Required)
+- **Visual Style**: Gold/yellow badge
+- **Achievement**: Highest honor
+- **Significance**: Elite performer status
+
+### Point Awards
+
+**1st Place Winners Earn:**
+- Automatically receive medal points when awarded by organizer
+- Points accumulate across all competitions in the database
+- Progress tracked in real-time on entry records
+
+**How Points Are Awarded:**
+1. Competition completes and results are finalized
+2. Organizer reviews 1st place winners
+3. Click "Award Medal Points" button on Results Page
+4. System automatically adds points to all 1st place winners
+5. Medal levels update automatically when thresholds are reached
+
+### Medal Progress Tracking
+
+The system displays progress toward the next medal:
+
+- **None → Bronze**: "10/25 points to Bronze" (40% progress)
+- **Bronze → Silver**: "28/35 points to Silver" (80% progress)
+- **Silver → Gold**: "40/50 points to Gold" (80% progress)
+- **Gold Achieved**: "Gold Medal Holder" (no further progression)
+
+### Implementation Details
+
+#### Database Fields
+
+**Medal Points (Integer)**
+```sql
+medal_points INTEGER DEFAULT 0 CHECK (medal_points >= 0)
+```
+
+**Current Medal Level (Text)**
+```sql
+current_medal_level TEXT DEFAULT 'None' 
+  CHECK (current_medal_level IN ('None', 'Bronze', 'Silver', 'Gold'))
+```
+
+#### Automatic Medal Level Calculation
+
+When points are added, the system automatically determines medal level:
+
+```javascript
+if (newPoints >= 50) return 'Gold';
+if (newPoints >= 35) return 'Silver';
+if (newPoints >= 25) return 'Bronze';
+return 'None';
+```
+
+#### Database Functions
+
+**addMedalPoints(entryId, pointsToAdd)**
+- Fetches current entry data
+- Adds new points to existing total
+- Calculates new medal level
+- Updates entry record
+
+**awardMedalPointsToWinners(competitionId, firstPlaceWinners)**
+- Accepts array of 1st place entry IDs
+- Calls addMedalPoints for each winner
+- Returns success/failure status
+
+### UI Components
+
+**MedalBadge Component**
+```jsx
+<MedalBadge 
+  medalLevel="Bronze" 
+  medalPoints={25} 
+  size="md" 
+/>
+```
+
+Displays:
+- Medal emoji (🥉🥈🥇)
+- Medal level name
+- Current points
+- Progress toward next level
+
+### Where Medal Information Appears
+
+1. **Competition Setup**
+   - Entry list shows current medal achievements
+   - Medal badges displayed alongside entry information
+   - Cumulative points visible
+
+2. **Results Page**
+   - **Medal Program Section** (New)
+     - Top 4 entries per category
+     - Points earned this competition
+     - Total accumulated points
+     - Current medal level and progress
+     - Seasonal leaderboard
+   - **Award Medal Points Button**
+     - Appears after competition completes
+     - Confirmation dialog with winner list
+     - One-click award to all 1st place winners
+
+3. **PDF Score Sheets**
+   - Medal program status section
+   - Current points and level
+   - Progress information
+
+4. **Excel Exports**
+   - Columns: Medal Points, Medal Level
+   - Sortable by points or level
+   - Filterable for medal holders
+
+### Competition Workflow with Medal Points
+
+#### After Competition Ends
+
+1. **Review Results**: Check 1st place winners in each category/division/ability level
+2. **Verify Winners**: Confirm placements are correct
+3. **Award Points**: Click "Award Medal Points" button
+4. **Confirm**: Review list of winners who will receive points
+5. **Execute**: System adds points and updates medal levels
+6. **Verify**: Check Medal Program section to confirm updates
+
+#### Between Competitions
+
+- Medal points and levels persist across competitions
+- Competitors carry their medal status into future events
+- Leaderboard shows top performers across all competitions
+
+#### Season Management
+
+The system tracks cumulative points across all competitions in the database:
+- No date restrictions (all-time tracking)
+- Manual season reset if needed (database update)
+- Historical data preserved
+
+### Medal Program Display
+
+#### Results Page Medal Section
+
+**Header**: "🏆 Medal Program - Season Standings"
+
+**Top 4 Display Per Category**:
+```
+Category: Solo | Age Division: Teen | Ability: Advanced
+
+Rank | Competitor      | Points This Comp | Total Points | Medal Status
+-----|-----------------|------------------|--------------|-------------
+1    | Jane Doe        | +0               | 50           | 🥇 Gold
+2    | John Smith      | +0               | 35           | 🥈 Silver (35/50 to Gold)
+3    | Emily Johnson   | +0               | 28           | 🥉 Bronze (28/35 to Silver)
+4    | Michael Brown   | +0               | 15           | 15/25 to Bronze
+```
+
+**Award Medal Points Button**:
+- Prominent green button
+- Shows confirmation dialog with winner count
+- Updates all winners simultaneously
+- Success notification after completion
+
+### Best Practices
+
+1. **Award Points Promptly**: Award points immediately after competition ends
+2. **Verify Winners**: Double-check 1st place results before awarding
+3. **Communicate Clearly**: Explain medal program to competitors
+4. **Track Progress**: Monitor leaderboard for season-long engagement
+5. **Celebrate Achievements**: Recognize medal earners publicly
+
+### Technical Notes
+
+- Points can only be added, never subtracted (prevents accidental removal)
+- Medal level updates are automatic based on point thresholds
+- Database constraints ensure data integrity
+- Transaction-safe point additions prevent duplication
+- Real-time updates reflect across all system views
+
+---
+
+## Competition Workflow
+
+### Complete Step-by-Step Process
+
+#### Phase 1: Setup (Before Competition Day)
+
+**1. Database Initialization**
+- Ensure database schema is current
+- Verify storage bucket configured
+- Test connection to Supabase
+
+**2. Create Competition**
+- Navigate to Competition Setup
+- Enter competition name
+- Select competition date
+- Click "Create Competition"
+
+**3. Add All Entries**
+For each competitor:
+- Entry number (auto-increments)
+- Competitor name
+- Age and age division
+- Category (Solo, Duet, etc.)
+- Dance type
+- **Ability level** (Beginning/Intermediate/Advanced)
+- Optional: Upload photo
+- Save entry
+
+**4. Verify Entry List**
+- Review all entries for accuracy
+- Check ability level assignments
+- Confirm photos uploaded
+- Edit any incorrect information
+
+#### Phase 2: Competition Day
+
+**5. Select Judges**
+- Go to Judge Selection page
+- Enter number of judges (1-10)
+- Save selection
+
+**6. Score Entries**
+For each judge:
+- Navigate to Scoring Interface
+- Select judge number
+- Use filters to navigate entries:
+  - Category filter
+  - Age Division filter
+  - Ability Level filter
+- For each entry, score:
+  - Technique (0-25)
+  - Creativity (0-25)
+  - Presentation (0-25)
+  - Appearance (0-25)
+  - Optional: Add notes
+- Submit scores
+- System auto-calculates total (out of 100)
+
+**7. Monitor Progress**
+- Check Results page periodically
+- Verify scores are being recorded
+- Identify any missing scores
+
+#### Phase 3: Results & Awards
+
+**8. Finalize Results**
+- Ensure all judges have completed scoring
+- Review Results page for accuracy
+- Check rankings across:
+  - All categories
+  - All age divisions
+  - All ability levels
+
+**9. Award Medal Points**
+- Navigate to Medal Program section
+- Review 1st place winners
+- Click "Award Medal Points" button
+- Confirm winner list in dialog
+- Points automatically added to all 1st place winners
+- Medal levels update automatically
+
+**10. Generate Reports**
+- Export to Excel for complete results spreadsheet
+- Generate PDF score sheets for distribution
+- Download files for distribution
+
+#### Phase 4: Post-Competition
+
+**11. Distribute Results**
+- Share Excel file with organizers
+- Email PDF score sheets to competitors
+- Post results online if applicable
+
+**12. Verify Medal Updates**
+- Check that medal points were added correctly
+- Review updated medal standings
+- Communicate medal achievements to competitors
+
+---
+
+## Scoring System
+
+### Scoring Criteria
+
+Each entry is judged across four categories, each worth 0-25 points:
+
+#### 1. Technique (0-25 points)
+- Execution of steps and movements
+- Body alignment and posture
+- Precision and control
+- Footwork accuracy
+
+#### 2. Creativity (0-25 points)
+- Originality of choreography
+- Innovative movement
+- Artistic interpretation
+- Unique elements
+
+#### 3. Presentation (0-25 points)
+- Stage presence
+- Expression and emotion
+- Confidence and energy
+- Connection with audience
+
+#### 4. Appearance (0-25 points)
+- Costume appropriateness
+- Overall grooming
+- Professional presentation
+- Visual impact
+
+**Total Score**: Sum of all four categories (0-100 points)
+
+### Multi-Judge Scoring
+
+- Up to 10 judges can score each entry
+- Each judge scores independently
+- Final rank determined by total score across all judges
+- Higher total score = better ranking
+
+### Ranking Algorithm
+
+**Within each competitive group** (Category + Age Division + Ability Level):
+
+1. Sum all judge scores for each entry
+2. Sort entries by total score (descending)
+3. Assign ranks:
+   - Highest total score = 1st place
+   - Next highest = 2nd place
+   - Continue for all entries
+4. Handle ties: Same total score = same rank (tie)
+
+### Scoring Interface Features
+
+- **Entry Navigation**: Filters by category, age division, and ability level
+- **Current Entry Display**: Shows all entry details and photo
+- **Score Input**: Separate fields for each criterion (0-25)
+- **Auto-calculation**: Total score computed automatically
+- **Notes Field**: Optional comments from judge
+- **Submit & Next**: Saves score and advances to next entry
+- **Progress Tracking**: Shows which entries have been scored
+
+---
+
+## Results & Reports
+
+### Results Page
+
+#### Main Results Display
+
+**Filtering Options**:
+- Category buttons (All, Solo, Duet, Trio, Small Group, Large Group, Line, Production)
+- Age Division buttons (All divisions)
+- Ability Level buttons (All, Beginning, Intermediate, Advanced)
+
+**Results Table Shows**:
+- Rank
+- Entry Number
+- Competitor Name (with photo if available)
+- Age and Age Division
+- Dance Type
+- Ability Level (badge)
+- Medal Status (badge if applicable)
+- Total Score
+- Detailed scores from all judges
+
+**Sorting**: By total score (descending) within competitive groups
+
+#### Medal Program Section
+
+**"🏆 Medal Program - Season Standings"**
+
+Displays top 4 entries per category/division/ability group:
+- Current rank
+- Competitor name
+- Points earned this competition
+- Total accumulated points
+- Current medal level with progress
+- Medal badge if applicable
+
+**Award Medal Points Button**:
+- Visible after competition
+- Click to award points to 1st place winners
+- Confirmation dialog shows winner list
+- One-click execution
+- Success notification
+
+#### Seasonal Leaderboard
+
+Shows all competitors with medal points:
+- Ranked by total points
+- Medal level indicators
+- Progress toward next medal
+- Filterable by category/division/ability
+
+### Export Functions
+
+#### Excel Export
+
+**Features**:
+- Complete results in spreadsheet format
+- All entry information included
+- All judge scores with breakdown
+- Ability level column
+- Medal points and medal level columns
+- Sortable and filterable
+- Professional formatting
+
+**Columns Include**:
+- Rank
+- Entry Number
+- Competitor Name
+- Age, Age Division
+- Category, Dance Type
+- Ability Level
+- Medal Points, Medal Level
+- Judge scores (separate columns per judge)
+- Total Score
+
+**Usage**:
+1. Click "Export to Excel" on Results page
+2. File downloads automatically
+3. Open in Excel, Google Sheets, or similar
+4. Use for awards ceremony, posting results, archival
+
+#### PDF Score Sheets
+
+**Features**:
+- Individual score sheet per entry
+- Professional TOPAZ branding
+- Complete entry information
+- Ability level details
+- Judge-by-judge score breakdown
+- Medal program status
+- Suitable for printing and distribution
+
+**Content Includes**:
+- Competition name and date
+- Entry number and competitor name
+- Age, age division, category
+- Dance type
+- Ability level with experience description
+- Medal program status (points and level)
+- Table of scores:
+  - Judge number
+  - Technique score
+  - Creativity score
+  - Presentation score
+  - Appearance score
+  - Total score
+  - Notes (if any)
+- Overall total score
+- "Heritage Since 1972" footer
+
+**Usage**:
+1. Click "Generate PDF" on Results page
+2. PDF generates in browser
+3. View, download, or print
+4. Distribute to competitors
+
+---
+
+## Technical Reference
+
+### Project Structure
 
 ```
 topaz-scoring/
-├── public/
-│   ├── logo.png              # TOPAZ logo
-│   ├── left-dancer.png       # Left decorative image
-│   ├── right-dancer.png      # Right decorative image
-│   └── background.jpg        # Background image
 ├── src/
 │   ├── components/
-│   │   ├── Layout.jsx        # Main layout wrapper
-│   │   ├── LoadingSpinner.jsx
-│   │   ├── PhotoUpload.jsx   # Single photo upload
-│   │   ├── RankBadge.jsx     # Rank display component
-│   │   ├── CategoryBadge.jsx # Category display
-│   │   └── EmptyState.jsx    # Empty state component
+│   │   ├── AbilityBadge.jsx          # Ability level badge component
+│   │   └── MedalBadge.jsx            # Medal achievement badge component
 │   ├── pages/
-│   │   ├── WelcomePage.jsx   # Landing page
-│   │   ├── CompetitionSetup.jsx  # Setup wizard
-│   │   ├── JudgeSelection.jsx    # Judge selector
-│   │   ├── ScoringInterface.jsx  # Judge scoring UI
-│   │   └── ResultsPage.jsx       # Results & rankings
+│   │   ├── CompetitionSetup.jsx      # Competition and entry management
+│   │   ├── JudgeSelection.jsx        # Judge count configuration
+│   │   ├── ScoringInterface.jsx      # Judge scoring interface
+│   │   └── ResultsPage.jsx           # Results display and medal program
 │   ├── supabase/
-│   │   ├── config.js         # Supabase client setup
-│   │   ├── competitions.js   # Competition CRUD
-│   │   ├── categories.js     # Category operations
-│   │   ├── ageDivisions.js   # Age division operations
-│   │   ├── entries.js        # Entry management
-│   │   ├── scores.js         # Score operations
-│   │   └── photos.js         # Photo upload/management
+│   │   ├── client.js                 # Supabase client initialization
+│   │   ├── competitions.js           # Competition CRUD operations
+│   │   ├── entries.js                # Entry CRUD + medal points logic
+│   │   ├── scores.js                 # Score CRUD operations
+│   │   └── storage.js                # Photo upload/download
 │   ├── utils/
-│   │   ├── calculations.js   # Score calculations
-│   │   ├── pdfGenerator.js   # PDF generation
-│   │   └── excelExport.js    # Excel export
-│   ├── App.jsx               # Main app component
-│   ├── main.jsx              # Entry point
-│   └── index.css             # Global styles
-├── database-schema.sql       # Supabase database schema
-├── .env                      # Environment variables
-├── package.json
-├── vite.config.js
-└── tailwind.config.js
+│   │   ├── pdfGenerator.js           # PDF score sheet generation
+│   │   └── excelExport.js            # Excel export functionality
+│   └── App.jsx                       # Main app router
+├── database-schema.sql               # Complete database schema
+├── ability-level-migration.sql       # Add ability_level column
+├── medal-points-migration.sql        # Add medal points columns
+├── scores-notes-migration.sql        # Add notes, rename total
+└── README.md                         # Project overview
 ```
 
----
+### Key API Functions
 
-## 📚 User Guide
+#### Entries (`src/supabase/entries.js`)
 
-### 1️⃣ Create a Competition
-
-1. **Start on Welcome Page**
-   - Click "Setup Competition"
-
-2. **Enter Competition Details**
-   - Competition name (e.g., "TOPAZ Spring Championship 2025")
-   - Competition date
-   - Venue (optional)
-   - Number of judges (1-10)
-
-3. **Add Categories**
-   - Select category name (Jazz, Tap, Hip Hop, etc.)
-   - Choose variety level (None, Variety A, Variety B)
-   - Click "+ Add Category"
-   - Repeat for all categories
-
-4. **Add Age Divisions (Optional)**
-   - Enter division name (e.g., "Junior", "Teen", "Senior")
-   - Set age range (min and max)
-   - Click "+ Add Age Division"
-   - Repeat as needed
-
-5. **Add Entries**
-   - Click "+ Add Entry"
-   - Choose Solo or Group
-   - Enter name
-   - Select category
-   - Select age division (if applicable)
-   - Choose division type (Solo, Duo/Trio, Small Group, etc.)
-   - Check "Medal Program" if applicable
-   - Upload photo (optional)
-   - For groups: Add member names
-   - Click "Save Entry"
-
-6. **Bulk Photo Upload (Optional)**
-   - Name photos with entry numbers (1.jpg, 2.jpg, etc.)
-   - Click "Select Multiple Photos"
-   - Select all photos
-   - System automatically matches to entries
-
-7. **Continue to Judge Selection**
-   - Click "Continue to Judge Selection"
-   - System saves all data to Supabase
-
-### 2️⃣ Score Entries (Judge View)
-
-1. **Select Judge**
-   - On Judge Selection page, click your judge number (Judge 1, Judge 2, etc.)
-
-2. **Filter Entries (Optional)**
-   - Use category dropdown to filter
-   - Use age division dropdown to filter
-   - Use search to find specific entry
-
-3. **Score Current Entry**
-   - View entry details and photo
-   - Enter scores for each category (0-25 points):
-     - Technique
-     - Creativity & Choreography
-     - Presentation
-     - Appearance & Costume
-   - View auto-calculated total (0-100)
-   - Add judge notes (optional but recommended)
-
-4. **Navigate Between Entries**
-   - Click "Save & Next Entry" to save and move to next
-   - Click "Previous Entry" to go back
-   - Use side panel to jump to specific entry
-   - Green checkmarks show scored entries
-
-5. **Complete Scoring**
-   - Score all entries
-   - Click "Submit All & Finish" on last entry
-   - Confirm submission
-
-### 3️⃣ View Results (Admin View)
-
-1. **Access Results**
-   - From Judge Selection, click "Admin View (Results)"
-   - Or navigate after scoring complete
-
-2. **Filter Results**
-   - **Overall** - All entries ranked
-   - **By Category** - Results within each category
-   - **By Age Division** - Results within age groups
-   - **Medal Program** - Medal participants only
-   - **Search** - Find by name or entry number
-
-3. **View Score Details**
-   - Click "Show Details" on any entry
-   - View all judge scores
-   - Read judge notes
-   - See score breakdowns
-
-4. **Generate Reports**
-   - **Print Score Sheet** - Individual PDF for one entry
-   - **Export All Results** - Excel file with complete data
-   - **Print Results** - Browser print of current view
-   - **New Competition** - Start fresh competition
-
-### 4️⃣ Best Practices
-
-**Before Competition Day:**
-- Set up competition structure (categories, age divisions)
-- Add all entries with photos
-- Test with sample scores
-
-**During Competition:**
-- Have each judge use their own device
-- Judges can score in any order
-- Results update in real-time
-- Use filters to focus on specific groups
-
-**After Competition:**
-- Generate PDF score sheets for participants
-- Export Excel for record keeping
-- Print results for posting
-- Backup data regularly
-
----
-
-## 🗄️ Database Schema
-
-### Tables
-
-#### `competitions`
-```sql
-- id (uuid, primary key)
-- name (text)
-- date (date)
-- venue (text)
-- judges_count (integer)
-- status (text)
-- created_at (timestamp)
-```
-
-#### `categories`
-```sql
-- id (uuid, primary key)
-- competition_id (uuid, foreign key)
-- name (text)
-- variety_level (text)
-- display_name (text)
-- description (text)
-- created_at (timestamp)
-```
-
-#### `age_divisions`
-```sql
-- id (uuid, primary key)
-- competition_id (uuid, foreign key)
-- name (text)
-- min_age (integer)
-- max_age (integer)
-- created_at (timestamp)
-```
-
-#### `entries`
-```sql
-- id (uuid, primary key)
-- competition_id (uuid, foreign key)
-- entry_number (integer)
-- competitor_name (text)
-- category_id (uuid, foreign key)
-- age_division_id (uuid, foreign key)
-- age (integer)
-- dance_type (text)
-- photo_url (text)
-- created_at (timestamp)
-```
-
-#### `scores`
-```sql
-- id (uuid, primary key)
-- competition_id (uuid, foreign key)
-- entry_id (uuid, foreign key)
-- judge_number (integer)
-- technique (decimal)
-- creativity (decimal)
-- presentation (decimal)
-- appearance (decimal)
-- total_score (decimal)
-- notes (text)
-- created_at (timestamp)
-- updated_at (timestamp)
-```
-
-### Relationships
-- One competition → Many categories
-- One competition → Many age divisions
-- One competition → Many entries
-- One entry → Many scores (one per judge)
-- One category → Many entries
-- One age division → Many entries
-
-### Storage Buckets
-- `entry-photos` (public) - Stores all entry photos
-
----
-
-## 🚀 Deployment
-
-### Deploy to Vercel
-
-1. **Prepare for deployment**
-   ```bash
-   npm run build
-   ```
-
-2. **Install Vercel CLI**
-   ```bash
-   npm install -g vercel
-   ```
-
-3. **Deploy**
-   ```bash
-   vercel
-   ```
-
-4. **Set environment variables in Vercel**
-   - Go to Vercel dashboard
-   - Project Settings → Environment Variables
-   - Add:
-     - `VITE_SUPABASE_URL`
-     - `VITE_SUPABASE_ANON_KEY`
-
-5. **Redeploy after adding variables**
-   ```bash
-   vercel --prod
-   ```
-
-### Important: Root Directory Configuration
-
-If deploying from a subdirectory, ensure `vercel.json` is configured:
-
-```json
-{
-  "rootDirectory": "topaz-scoring",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
-  ]
-}
-```
-
-### Deploy to Other Platforms
-
-**Netlify:**
-```bash
-npm run build
-# Drag-drop dist folder to Netlify
-```
-
-**Manual Hosting:**
-```bash
-npm run build
-# Upload dist/ folder to web server
-```
-
----
-
-## ⚡ Performance
-
-### Optimizations Implemented
-
-1. **Lazy Loading**
-   - Images load only when visible
-   - 70-80% faster page loads
-
-2. **Pagination**
-   - 20 entries per page
-   - Reduces DOM elements
-   - Smooth scrolling
-
-3. **Database Query Optimization**
-   - Uses joins instead of multiple queries
-   - Parallel loading with Promise.all
-   - 60-70% faster data fetching
-
-4. **Image Compression**
-   - Auto-compress uploads >1MB to ~800KB
-   - Reduces storage and bandwidth
-
-5. **React Performance**
-   - useMemo for expensive calculations
-   - Component splitting
-   - Efficient re-rendering
-
-### Performance Metrics
-
-| Metric | Target | Actual |
-|--------|--------|--------|
-| Initial page load | <3s | 1.2-2.3s ✅ |
-| Results page (200 entries) | <5s | 2.3s ✅ |
-| Image load (lazy) | Instant | 0.2-0.5s ✅ |
-| Search response | <500ms | <100ms ✅ |
-| Score save | <2s | 0.5-1s ✅ |
-
-### Scalability
-
-- **Tested with:** 200+ entries, 10 judges
-- **Maximum recommended:** 500 entries
-- **Concurrent judges:** Unlimited (Supabase real-time)
-- **Storage:** 10GB+ available (Supabase free tier)
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### Cannot connect to Supabase
-**Symptoms:** "Supabase connection failed" error
-
-**Solutions:**
-1. Check `.env` file exists in `topaz-scoring` folder
-2. Verify `VITE_SUPABASE_URL` is correct
-3. Verify `VITE_SUPABASE_ANON_KEY` is correct
-4. Restart dev server after changing `.env`
-
-#### Photos not uploading
-**Symptoms:** "Failed to upload photo" error
-
-**Solutions:**
-1. Ensure `entry-photos` bucket exists in Supabase
-2. Make sure bucket is set to **public**
-3. Check file size (<10MB)
-4. Verify file format (JPG or PNG only)
-
-#### Scores not saving
-**Symptoms:** "Failed to save score" error
-
-**Solutions:**
-1. Check internet connection
-2. Verify all score fields are filled (0-25)
-3. Check Supabase connection
-4. Look for errors in browser console
-
-#### Results not updating
-**Symptoms:** Old data showing in results
-
-**Solutions:**
-1. Refresh the page
-2. Check if real-time subscription is active
-3. Verify scores are actually saved (check Supabase dashboard)
-
-#### Build errors
-**Symptoms:** `npm run build` fails
-
-**Solutions:**
-1. Delete `node_modules` and `package-lock.json`
-2. Run `npm install` again
-3. Check Node.js version (need 16+)
-4. Clear Vite cache: `rm -rf .vite`
-
-### Development Tools
-
-**View browser console:**
-- Chrome/Edge: F12 or Ctrl+Shift+J (Cmd+Option+J on Mac)
-- Look for red errors
-
-**Check Supabase dashboard:**
-1. Go to supabase.com
-2. Open your project
-3. Table Editor → View data
-4. Logs → Check for errors
-
-**Enable verbose logging:**
 ```javascript
-// In supabase/config.js, add:
-console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+// Create new entry with ability level and medal info
+createEntry(competitionId, entryData)
+
+// Get all entries for a competition
+getCompetitionEntries(competitionId)
+
+// Get single entry
+getEntry(entryId)
+
+// Update entry information
+updateEntry(entryId, updates)
+
+// Delete entry
+deleteEntry(entryId)
+
+// Add medal points to an entry
+addMedalPoints(entryId, pointsToAdd)
+
+// Award medal points to all 1st place winners
+awardMedalPointsToWinners(competitionId, firstPlaceWinners)
 ```
+
+#### Scores (`src/supabase/scores.js`)
+
+```javascript
+// Create score for an entry
+createScore(scoreData)
+
+// Update existing score
+updateScore(scoreId, updates)
+
+// Get all scores for a competition
+getCompetitionScores(competitionId)
+
+// Get scores for specific entry
+getEntryScores(entryId)
+
+// Bulk create scores
+bulkCreateScores(scoresArray)
+```
+
+#### Storage (`src/supabase/storage.js`)
+
+```javascript
+// Upload competitor photo
+uploadPhoto(file, entryId)
+
+// Get public URL for photo
+getPhotoUrl(photoPath)
+
+// Delete photo
+deletePhoto(photoPath)
+```
+
+### Component Props
+
+#### AbilityBadge
+
+```jsx
+<AbilityBadge 
+  abilityLevel="Beginning"  // Required: 'Beginning', 'Intermediate', or 'Advanced'
+  size="md"                  // Optional: 'sm', 'md', 'lg' (default: 'md')
+/>
+```
+
+#### MedalBadge
+
+```jsx
+<MedalBadge 
+  medalLevel="Bronze"        // Required: 'None', 'Bronze', 'Silver', or 'Gold'
+  medalPoints={25}           // Required: Integer (current total points)
+  size="md"                  // Optional: 'sm', 'md', 'lg' (default: 'md')
+/>
+```
+
+### Database Queries
+
+#### Get entries with medal info
+```sql
+SELECT 
+  e.*,
+  c.name as category_name,
+  ad.name as age_division_name,
+  e.ability_level,
+  e.medal_points,
+  e.current_medal_level
+FROM entries e
+LEFT JOIN categories c ON e.category_id = c.id
+LEFT JOIN age_divisions ad ON e.age_division_id = ad.id
+WHERE e.competition_id = $1
+ORDER BY e.entry_number;
+```
+
+#### Get scores with judge breakdown
+```sql
+SELECT 
+  s.*,
+  e.entry_number,
+  e.competitor_name
+FROM scores s
+JOIN entries e ON s.entry_id = e.id
+WHERE s.competition_id = $1
+ORDER BY e.entry_number, s.judge_number;
+```
+
+#### Calculate rankings
+```sql
+WITH entry_totals AS (
+  SELECT 
+    e.id,
+    e.entry_number,
+    e.competitor_name,
+    e.category_id,
+    e.age_division_id,
+    e.ability_level,
+    COALESCE(SUM(s.total_score), 0) as total_score
+  FROM entries e
+  LEFT JOIN scores s ON e.id = s.entry_id
+  WHERE e.competition_id = $1
+  GROUP BY e.id
+)
+SELECT 
+  *,
+  RANK() OVER (
+    PARTITION BY category_id, age_division_id, ability_level 
+    ORDER BY total_score DESC
+  ) as rank
+FROM entry_totals
+ORDER BY rank, total_score DESC;
+```
+
+### Environment Variables
+
+Create `.env` file in project root:
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Get these values from Supabase Dashboard → Settings → API
 
 ---
 
-## 📞 Support
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### Database Issues
+
+**Problem**: "Column ability_level does not exist"
+- **Solution**: Run `ability-level-migration.sql` in Supabase SQL editor
+
+**Problem**: "Column medal_points does not exist"
+- **Solution**: Run `medal-points-migration.sql` in Supabase SQL editor
+
+**Problem**: "Column notes does not exist" or "Column total does not exist"
+- **Solution**: Run `scores-notes-migration.sql` in Supabase SQL editor
+
+**Problem**: Constraint violation on ability_level
+- **Solution**: Ensure values are exactly 'Beginning', 'Intermediate', or 'Advanced' (case-sensitive)
+
+#### Photo Upload Issues
+
+**Problem**: Photos not uploading
+- **Solution**: 
+  1. Verify storage bucket `competitor-photos` exists
+  2. Check bucket is set to Public
+  3. Verify storage policies allow uploads
+  4. Check file size (max 5MB recommended)
+
+**Problem**: Photos not displaying
+- **Solution**:
+  1. Verify photo_url stored in database
+  2. Check bucket permissions for public read
+  3. Try regenerating public URL
+
+#### Scoring Issues
+
+**Problem**: Total score not calculating
+- **Solution**: Ensure all four scores (technique, creativity, presentation, appearance) are valid numbers
+
+**Problem**: Scores not saving
+- **Solution**:
+  1. Check entry_id and judge_number are valid
+  2. Verify score values are within 0-25 range
+  3. Check for duplicate score (same entry + judge combination)
+
+#### Medal Points Issues
+
+**Problem**: Medal points not adding
+- **Solution**:
+  1. Verify entry has valid ID
+  2. Check medal_points column exists in database
+  3. Ensure pointsToAdd is a positive integer
+
+**Problem**: Medal level not updating
+- **Solution**: Medal level updates automatically based on points:
+  - 25+ points = Bronze
+  - 35+ points = Silver
+  - 50+ points = Gold
+
+**Problem**: "Award Medal Points" button not working
+- **Solution**:
+  1. Verify 1st place winners are correctly identified
+  2. Check console for error messages
+  3. Ensure database connection is active
+
+#### Export Issues
+
+**Problem**: Excel export fails
+- **Solution**:
+  1. Verify xlsx library is installed
+  2. Check that entry data is loaded
+  3. Try with smaller dataset first
+
+**Problem**: PDF generation fails
+- **Solution**:
+  1. Verify jsPDF and jspdf-autotable are installed
+  2. Check for special characters in text fields
+  3. Ensure scores data is complete
+
+#### UI Display Issues
+
+**Problem**: Ability badges not showing
+- **Solution**:
+  1. Verify AbilityBadge component imported
+  2. Check ability_level value is valid
+  3. Ensure Tailwind CSS classes are compiled
+
+**Problem**: Medal badges not displaying
+- **Solution**:
+  1. Verify MedalBadge component imported
+  2. Check medal_points and current_medal_level values exist
+  3. Confirm component props are passed correctly
+
+**Problem**: Filters not working
+- **Solution**:
+  1. Check filter state is updating
+  2. Verify filter logic in useMemo hooks
+  3. Ensure data array is loaded before filtering
 
 ### Getting Help
 
-**Documentation:**
-- This README file
-- Code comments in source files
-- Supabase documentation: [supabase.com/docs](https://supabase.com/docs)
+If you encounter issues not covered here:
 
-**Common Tasks:**
-- Setup competition → See "User Guide" section
-- Deploy to Vercel → See "Deployment" section
-- Fix errors → See "Troubleshooting" section
+1. **Check Console**: Look for error messages in browser console (F12)
+2. **Check Network**: Verify API calls are succeeding in Network tab
+3. **Check Database**: Run queries directly in Supabase SQL editor
+4. **Check Logs**: Review Supabase logs for backend errors
+5. **Documentation**: Review Supabase and React documentation
+6. **Community**: Seek help in React or Supabase communities
 
-### Contact
+### System Requirements
 
-For support or questions:
-- **Email:** support@topaz-scoring.com
-- **Issues:** Check browser console for error messages
-- **Emergency:** Contact competition organizer
+- **Node.js**: Version 16 or higher
+- **npm/yarn**: Latest stable version
+- **Browser**: Modern browser with ES6+ support (Chrome, Firefox, Safari, Edge)
+- **Supabase**: Active project with PostgreSQL database
+- **Internet**: Required for Supabase connection
 
-### Feature Requests
+### Performance Tips
 
-Future enhancements to consider:
-- Video upload support
-- Email results to participants
-- Live streaming integration
-- Multi-language support
-- Custom branding per competition
-- Advanced analytics and charts
+1. **Database Indexing**: Add indexes on frequently queried columns
+2. **Image Optimization**: Compress photos before upload
+3. **Batch Operations**: Use bulk operations when possible
+4. **Pagination**: Implement for large competitions (100+ entries)
+5. **Caching**: Use React useMemo for expensive calculations
 
 ---
 
-## 📝 License & Credits
+## Appendix
 
-**TOPAZ 2.0 Scoring System**  
-Heritage Since 1972
+### Keyboard Shortcuts
 
-**Built with:**
-- React, Vite, Tailwind CSS
-- Supabase (Database & Storage)
-- jsPDF, XLSX, and other open-source libraries
+**Scoring Interface**:
+- Tab: Move to next score field
+- Enter: Submit score and advance to next entry
+- Esc: Clear current form
 
-**Version:** 2.0.0  
-**Last Updated:** January 2025
+**Results Page**:
+- Number keys (1-8): Quick category filter
+- Ctrl/Cmd + E: Export to Excel
+- Ctrl/Cmd + P: Generate PDF
 
----
+### Color Reference
 
-## ✅ System Status
+**Ability Levels**:
+- Beginning: `#DBEAFE` (blue-100), `#1E40AF` (blue-800), `#93C5FD` (blue-300)
+- Intermediate: `#FED7AA` (orange-100), `#9A3412` (orange-800), `#FDBA74` (orange-300)
+- Advanced: `#E9D5FF` (purple-100), `#6B21A8` (purple-800), `#C084FC` (purple-300)
 
-**Production Ready:** ✅ YES
+**Medal Levels**:
+- Bronze: `#78350F` (brown-800), `#FEF3C7` (amber-100)
+- Silver: `#1F2937` (gray-800), `#E5E7EB` (gray-200)
+- Gold: `#92400E` (yellow-800), `#FEF9C3` (yellow-100)
 
-- ✅ All features implemented
-- ✅ Performance optimized
-- ✅ Mobile responsive
-- ✅ Accessibility compliant
-- ✅ Tested with 200+ entries
-- ✅ Real-time updates working
-- ✅ PDF/Excel export functional
-- ✅ Photo upload system complete
-- ✅ Zero linter errors
-- ✅ Documentation complete
+### Version History
 
-**Ready for live dance competitions!** 🎭✨
+**Version 2.0** (Current)
+- Added Ability Levels system
+- Implemented Medal Points program
+- Added comprehensive filtering
+- Enhanced PDF and Excel exports
+- Added MedalBadge and AbilityBadge components
+- Database schema updates
 
----
-
-## 🎉 Quick Reference
-
-### Common Commands
-```bash
-# Install dependencies
-npm install
-
-# Start dev server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Deploy to Vercel
-vercel --prod
-```
-
-### Important URLs
-- **Dev Server:** http://localhost:5173
-- **Supabase Dashboard:** https://supabase.com/dashboard
-- **Deployed App:** (Your Vercel URL)
-
-### Key Files
-- **Environment:** `.env`
-- **Database Schema:** `database-schema.sql`
-- **Main Config:** `vite.config.js`, `tailwind.config.js`
-- **Entry Point:** `src/main.jsx`
+**Version 1.0** (Initial)
+- Core competition management
+- Entry and scoring systems
+- Basic results display
+- Photo uploads
+- PDF score sheets
+- Excel export
 
 ---
 
-**Thank you for using TOPAZ 2.0!** 🎭
+## Support and Maintenance
 
-*For best experience, use on iPad or desktop. Mobile supported.*
+### Regular Maintenance Tasks
 
+**Daily** (During Competition):
+- Backup database
+- Monitor system performance
+- Verify photo uploads working
+- Check judge progress
+
+**Weekly**:
+- Review medal standings
+- Export results for archival
+- Clean up old photos if needed
+
+**Monthly**:
+- Database optimization
+- Review and update documentation
+- Check for software updates
+
+**Seasonal**:
+- Reset medal points if desired (manual database update)
+- Archive completed competitions
+- Review system performance and improvements
+
+### Backup Procedures
+
+**Database Backup**:
+1. Go to Supabase Dashboard → Database → Backups
+2. Download full backup
+3. Store securely off-site
+4. Recommended: Daily during competition season
+
+**Photo Backup**:
+1. Go to Supabase Dashboard → Storage
+2. Download competitor-photos bucket
+3. Store securely off-site
+4. Recommended: After each competition
+
+### Contact Information
+
+**System**: TOPAZ 2.0 Dance Competition Scoring  
+**Heritage**: Since 1972  
+**Documentation Version**: 2.0  
+**Last Updated**: January 2026
+
+---
+
+**End of Comprehensive Documentation**
+
+For additional assistance, refer to the inline code comments and component documentation in the source files.

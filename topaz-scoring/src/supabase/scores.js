@@ -2,7 +2,7 @@ import { supabase } from './config';
 
 /**
  * Create a new score
- * @param {Object} scoreData - { competition_id, entry_id, judge_number, technique, creativity, presentation, appearance }
+ * @param {Object} scoreData - { competition_id, entry_id, judge_number, technique, creativity, presentation, appearance, notes }
  * @returns {Object} - Created score data
  */
 export const createScore = async (scoreData) => {
@@ -27,7 +27,8 @@ export const createScore = async (scoreData) => {
         creativity: parseFloat(scoreData.creativity),
         presentation: parseFloat(scoreData.presentation),
         appearance: parseFloat(scoreData.appearance),
-        total: total
+        total_score: total,
+        notes: scoreData.notes || null
       }])
       .select()
       .single();
@@ -141,7 +142,7 @@ export const getJudgeScores = async (competitionId, judgeNumber) => {
 /**
  * Update score
  * @param {string} scoreId - UUID of score
- * @param {Object} updates - Fields to update
+ * @param {Object} updates - Fields to update (including notes)
  * @returns {Object} - Updated score data
  */
 export const updateScore = async (scoreId, updates) => {
@@ -170,7 +171,7 @@ export const updateScore = async (scoreId, updates) => {
         parseFloat(updates.appearance ?? currentScore.appearance)
       );
       
-      updates.total = total;
+      updates.total_score = total;
     }
 
     const { data, error } = await supabase
@@ -243,7 +244,7 @@ export const checkExistingScore = async (entryId, judgeNumber) => {
 
 /**
  * Bulk create scores
- * @param {Array} scoresData - Array of score objects
+ * @param {Array} scoresData - Array of score objects (including notes)
  * @returns {Array} - Created scores
  */
 export const bulkCreateScores = async (scoresData) => {
@@ -253,12 +254,13 @@ export const bulkCreateScores = async (scoresData) => {
     // Calculate totals for each score
     const scoresWithTotals = scoresData.map(score => ({
       ...score,
-      total: (
+      total_score: (
         parseFloat(score.technique || 0) +
         parseFloat(score.creativity || 0) +
         parseFloat(score.presentation || 0) +
         parseFloat(score.appearance || 0)
-      )
+      ),
+      notes: score.notes || null
     }));
 
     const { data, error } = await supabase
