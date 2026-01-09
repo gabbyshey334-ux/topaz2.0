@@ -1,7 +1,11 @@
-# TOPAZ 2.0 Comprehensive Documentation
-
-**Heritage Since 1972**  
-Complete System Documentation for Dance Competition Scoring
+<div align="center">
+  <img src="public/logo.png" alt="TOPAZ Logo" width="200"/>
+  
+  # TOPAZ 2.0 Comprehensive Documentation
+  
+  **Heritage Since 1972**  
+  Complete System Documentation for Dance Competition Scoring
+</div>
 
 ---
 
