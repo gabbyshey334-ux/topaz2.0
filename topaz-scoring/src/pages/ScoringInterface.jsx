@@ -22,6 +22,15 @@ function ScoringInterface() {
     entries: allEntries = []
   } = location.state || {};
 
+  console.log('🎯 ScoringInterface render - State:', { 
+    competitionId, 
+    judgeNumber, 
+    hasCompetition: !!competition,
+    categoriesCount: categories.length,
+    ageDivisionsCount: ageDivisions.length,
+    entriesCount: allEntries.length
+  });
+
   // Logo paths
   const logoPath = '/logo.png';
   const leftImagePath = '/left-dancer.png';
@@ -59,10 +68,13 @@ function ScoringInterface() {
 
   // Redirect if no data
   useEffect(() => {
+    console.log('🔍 ScoringInterface mounted - Checking required data...');
     if (!competitionId || !judgeNumber) {
+      console.error('❌ Missing required data:', { competitionId, judgeNumber });
       toast.error('Missing competition data');
-      navigate('/judge-selection');
+      setTimeout(() => navigate('/judge-selection'), 500);
     } else {
+      console.log('✅ Required data present, setting entries...');
       setEntries(allEntries);
       setLoading(false);
     }
@@ -348,6 +360,34 @@ function ScoringInterface() {
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-teal-500 border-t-transparent mx-auto mb-4"></div>
             <p className="text-gray-600 text-lg">Loading entries...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Missing required data - show error and redirect
+  if (!competitionId || !judgeNumber || !competition) {
+    return (
+      <Layout overlayOpacity="bg-white/80">
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center max-w-md">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Missing Competition Data</h2>
+            <p className="text-gray-600 mb-4">
+              {!competitionId && "No competition ID provided. "}
+              {!judgeNumber && "No judge number selected. "}
+              {!competition && "Competition information not loaded. "}
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              Redirecting to Judge Selection...
+            </p>
+            <button
+              onClick={() => navigate('/judge-selection', { state: { competitionId } })}
+              className="px-6 py-3 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600 transition-colors"
+            >
+              Back to Judge Selection
+            </button>
           </div>
         </div>
       </Layout>
