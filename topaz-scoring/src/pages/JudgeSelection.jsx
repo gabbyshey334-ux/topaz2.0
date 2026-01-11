@@ -13,6 +13,8 @@ function JudgeSelection() {
   
   const { competitionId } = location.state || {};
 
+  console.log('🎯 JudgeSelection render - State:', { competitionId, locationState: location.state });
+
   // Ready-made image paths
   const logoPath = '/logo.png';
   const leftImagePath = '/left-dancer.png';
@@ -24,10 +26,13 @@ function JudgeSelection() {
   const [ageDivisions, setAgeDivisions] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Redirect if no competitionId
   useEffect(() => {
+    console.log('🔍 JudgeSelection mounted - competitionId:', competitionId);
     if (!competitionId) {
+      console.error('❌ No competitionId provided');
       toast.error('No competition selected');
       navigate('/setup');
     }
@@ -36,11 +41,16 @@ function JudgeSelection() {
   // Load data from Supabase
   useEffect(() => {
     const loadData = async () => {
-      if (!competitionId) return;
+      if (!competitionId) {
+        console.warn('⚠️ No competitionId, skipping data load');
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
-        console.log('Loading competition data:', competitionId);
+        setError(null);
+        console.log('📡 Loading competition data:', competitionId);
 
         // Load all data in parallel
         const [compResult, catsResult, divsResult, entriesResult] = await Promise.all([
@@ -50,8 +60,15 @@ function JudgeSelection() {
           getCompetitionEntries(competitionId)
         ]);
 
+        console.log('📥 Raw results:', {
+          competition: compResult,
+          categories: catsResult,
+          divisions: divsResult,
+          entries: entriesResult
+        });
+
         if (!compResult.success) {
-          throw new Error(compResult.error);
+          throw new Error(compResult.error || 'Failed to load competition');
         }
 
         setCompetition(compResult.data);
@@ -59,20 +76,21 @@ function JudgeSelection() {
         setAgeDivisions(divsResult.success ? divsResult.data : []);
         setEntries(entriesResult.success ? entriesResult.data : []);
 
-        console.log('✅ Data loaded:', {
+        console.log('✅ Data loaded successfully:', {
           competition: compResult.data,
-          categories: catsResult.data?.length,
-          ageDivisions: divsResult.data?.length,
-          entries: entriesResult.data?.length
+          categoriesCount: catsResult.data?.length || 0,
+          ageDivisionsCount: divsResult.data?.length || 0,
+          entriesCount: entriesResult.data?.length || 0
         });
 
         setLoading(false);
       } catch (error) {
         console.error('❌ Error loading competition data:', error);
+        setError(error.message);
         toast.error(`Failed to load competition: ${error.message}`);
         setLoading(false);
         // Navigate back after showing error
-        setTimeout(() => navigate('/setup'), 2000);
+        setTimeout(() => navigate('/setup'), 3000);
       }
     };
 
@@ -87,6 +105,37 @@ function JudgeSelection() {
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-teal-500 border-t-transparent mx-auto mb-4"></div>
             <p className="text-gray-600 text-lg">Loading competition...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // No competition data - show error state
+  if (!competition) {
+    return (
+      <Layout overlayOpacity="bg-white/80">
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center max-w-md">
+            <div className="text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">No Competition Found</h2>
+            <p className="text-gray-600 mb-2">Unable to load competition data.</p>
+            {error && (
+              <p className="text-red-600 text-sm mb-4 bg-red-50 p-3 rounded-lg">
+                Error: {error}
+              </p>
+            )}
+            {!competitionId && (
+              <p className="text-orange-600 text-sm mb-4 bg-orange-50 p-3 rounded-lg">
+                No competition ID provided. Please start from the Competition Setup page.
+              </p>
+            )}
+            <button
+              onClick={() => navigate('/setup')}
+              className="px-6 py-3 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600 transition-colors"
+            >
+              Back to Setup
+            </button>
           </div>
         </div>
       </Layout>

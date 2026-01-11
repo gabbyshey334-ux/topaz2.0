@@ -703,8 +703,18 @@ function CompetitionSetup() {
       // Success!
       toast.success('🎉 Competition created successfully!');
       
+      console.log('✅ All data saved, preparing navigation...');
+      console.log('📍 Navigation state:', {
+        competitionId: competitionId,
+        competitionName: competitionName,
+        competitionDate: competitionDate,
+        venue: venue,
+        judgeCount: judgeCount
+      });
+      
       // Navigate to judge selection
       setTimeout(() => {
+        console.log('🚀 Navigating to judge-selection with competitionId:', competitionId);
         navigate('/judge-selection', {
           state: {
             competitionId: competitionId,
