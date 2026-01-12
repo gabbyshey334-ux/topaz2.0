@@ -40,6 +40,7 @@ function ResultsPage() {
   const [expandedEntries, setExpandedEntries] = useState(new Set());
   const [awardingPoints, setAwardingPoints] = useState(false);
   const [showMedalStandings, setShowMedalStandings] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Redirect if no competitionId
   useEffect(() => {
@@ -197,16 +198,39 @@ function ResultsPage() {
     const newExpanded = new Set(expandedEntries);
     if (newExpanded.has(entryId)) {
       newExpanded.delete(entryId);
-    } else {
+      } else {
       newExpanded.add(entryId);
     }
     setExpandedEntries(newExpanded);
   };
 
-  const handlePrintScoreSheet = (entry) => {
-    const category = categories.find(c => c.id === entry.category_id);
-    const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
-    generateScoreSheet(entry, entry.scores, category, ageDivision, competition);
+  const handlePrintScoreSheet = async (entry) => {
+    try {
+      setGeneratingPdf(true);
+      console.log('📄 Starting PDF generation for:', entry.competitor_name);
+      
+      const category = categories.find(c => c.id === entry.category_id);
+      const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
+      
+      console.log('📊 Entry Scores:', entry.scores);
+      if (!entry.scores || entry.scores.length === 0) {
+        toast.error('No scores found for this entry');
+        return;
+      }
+      
+      const result = await generateScoreSheet(entry, entry.scores, category, ageDivision, competition);
+      
+      if (result.success) {
+        toast.success('Score sheet generated successfully!');
+      } else {
+        throw new Error(result.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('❌ Failed to generate PDF:', error);
+      toast.error(`Failed to generate score sheet: ${error.message}`);
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   const handleExport = () => {
@@ -376,7 +400,7 @@ function ResultsPage() {
             {/* Age Division Filter Tabs */}
             <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
               <span className="text-sm font-semibold text-gray-600">AGE GROUP:</span>
-              
+
               <button
                 onClick={() => setSelectedAgeDivision(null)}
                 className={`px-6 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
@@ -399,14 +423,14 @@ function ResultsPage() {
                   }`}
                 >
                   {div.name} ({div.min_age}-{div.max_age === 99 ? '13+' : div.max_age})
-                </button>
-              ))}
+              </button>
+            ))}
             </div>
 
             {/* Ability Level Filter Tabs */}
             <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
               <span className="text-sm font-semibold text-gray-600">EXPERIENCE:</span>
-              
+
               <button
                 onClick={() => setSelectedAbilityLevel(null)}
                 className={`px-6 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
@@ -431,7 +455,7 @@ function ResultsPage() {
                   {level}
                 </button>
               ))}
-            </div>
+          </div>
 
             {/* Results Count */}
             <p className="text-center text-sm text-gray-500">
@@ -538,7 +562,7 @@ function ResultsPage() {
                         </div>
                         <div className="text-5xl font-black text-white drop-shadow-lg">
                           {entry.averageScore.toFixed(2)}
-                        </div>
+                      </div>
                         <div className="text-xl text-white/80">/ 100</div>
                     </div>
 
@@ -638,10 +662,24 @@ function ResultsPage() {
                     <div className="px-8 py-5 bg-gray-50 border-t-2 border-gray-200 flex justify-end">
                       <button
                         onClick={() => handlePrintScoreSheet(entry)}
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200"
+                        disabled={generatingPdf}
+                        className={`inline-flex items-center gap-2 px-6 py-3 text-white font-semibold rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200 ${
+                          generatingPdf 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-gradient-to-r from-teal-500 to-cyan-500'
+                        }`}
                       >
-                        <span>🖨</span>
-                        <span>Print Score Sheet</span>
+                        {generatingPdf ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🖨</span>
+                            <span>Print Score Sheet</span>
+                          </>
+                        )}
                       </button>
                     </div>
                 </div>
