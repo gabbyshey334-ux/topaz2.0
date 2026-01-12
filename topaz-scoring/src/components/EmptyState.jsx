@@ -10,7 +10,12 @@ function EmptyState({
       <h3 className="text-xl font-bold text-gray-800 mb-2">{title}</h3>
       <p className="text-gray-600 mb-6 max-w-md">{description}</p>
       {action && (
-        <div>{action}</div>
+        <button
+          onClick={action.onClick}
+          className="px-6 py-3 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600 transition-colors min-h-[44px]"
+        >
+          {action.label}
+        </button>
       )}
     </div>
   );

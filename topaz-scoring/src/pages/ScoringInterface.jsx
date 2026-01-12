@@ -69,16 +69,27 @@ function ScoringInterface() {
   // Redirect if no data
   useEffect(() => {
     console.log('🔍 ScoringInterface mounted - Checking required data...');
+    console.log('📍 Full location state:', location.state);
+    console.log('📍 competitionId:', competitionId);
+    console.log('📍 judgeNumber:', judgeNumber);
+    console.log('📍 competition:', competition);
+    console.log('📍 allEntries length:', allEntries?.length);
+    
     if (!competitionId || !judgeNumber) {
       console.error('❌ Missing required data:', { competitionId, judgeNumber });
-      toast.error('Missing competition data');
-      setTimeout(() => navigate('/judge-selection'), 500);
+      toast.error('Missing competition data. Please start from Competition Setup.');
+      setTimeout(() => {
+        console.log('🔄 Redirecting to judge-selection...');
+        navigate('/judge-selection', { state: { competitionId } });
+      }, 1500);
+      return; // Don't set entries if redirecting
     } else {
       console.log('✅ Required data present, setting entries...');
+      console.log('📊 Setting', allEntries.length, 'entries');
       setEntries(allEntries);
       setLoading(false);
     }
-  }, [competitionId, judgeNumber, allEntries, navigate]);
+  }, [competitionId, judgeNumber, allEntries, navigate, location.state]);
 
   // Filter entries by category, age division, ability level, and search
   useEffect(() => {
@@ -368,6 +379,12 @@ function ScoringInterface() {
 
   // Missing required data - show error and redirect
   if (!competitionId || !judgeNumber || !competition) {
+    console.error('🚨 Rendering error screen - Missing data:', {
+      hasCompetitionId: !!competitionId,
+      hasJudgeNumber: !!judgeNumber,
+      hasCompetition: !!competition
+    });
+    
     return (
       <Layout overlayOpacity="bg-white/80">
         <div className="flex-1 flex items-center justify-center p-4">
@@ -375,19 +392,42 @@ function ScoringInterface() {
             <div className="text-6xl mb-4">⚠️</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Missing Competition Data</h2>
             <p className="text-gray-600 mb-4">
-              {!competitionId && "No competition ID provided. "}
-              {!judgeNumber && "No judge number selected. "}
-              {!competition && "Competition information not loaded. "}
+              {!competitionId && "• No competition ID provided. "}
+              {!judgeNumber && "• No judge number selected. "}
+              {!competition && "• Competition information not loaded. "}
             </p>
-            <p className="text-sm text-gray-500 mb-6">
-              Redirecting to Judge Selection...
-            </p>
-            <button
-              onClick={() => navigate('/judge-selection', { state: { competitionId } })}
-              className="px-6 py-3 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600 transition-colors"
-            >
-              Back to Judge Selection
-            </button>
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 mb-6">
+              <p className="text-sm text-yellow-800 font-semibold mb-2">
+                💡 How to fix this:
+              </p>
+              <p className="text-sm text-yellow-700">
+                1. Start from the Welcome page<br/>
+                2. Create a new competition<br/>
+                3. Select a judge to begin scoring
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  console.log('🏠 Navigating to home...');
+                  navigate('/');
+                }}
+                className="px-6 py-3 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600 transition-colors"
+              >
+                🏠 Back to Home
+              </button>
+              {competitionId && (
+                <button
+                  onClick={() => {
+                    console.log('🔙 Navigating back to judge selection with ID:', competitionId);
+                    navigate('/judge-selection', { state: { competitionId } });
+                  }}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  ← Back to Judge Selection
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </Layout>
