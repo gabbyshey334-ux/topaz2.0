@@ -184,22 +184,32 @@ function ScoringInterface() {
 
   // Validate scores
   const validateScores = () => {
+    // Check if all fields have values
     if (!technique || !creativity || !presentation || !appearance) {
       toast.error('Please enter all scores (Technique, Creativity, Presentation, Appearance)');
       return false;
     }
 
+    // Validate each score is in range 0-25
     const errors = [];
-    if (validateScore(technique)) errors.push('Technique');
-    if (validateScore(creativity)) errors.push('Creativity');
-    if (validateScore(presentation)) errors.push('Presentation');
-    if (validateScore(appearance)) errors.push('Appearance');
+    const techValidation = validateScore(technique);
+    if (!techValidation.valid) errors.push(`Technique: ${techValidation.error}`);
+    
+    const creatValidation = validateScore(creativity);
+    if (!creatValidation.valid) errors.push(`Creativity: ${creatValidation.error}`);
+    
+    const presValidation = validateScore(presentation);
+    if (!presValidation.valid) errors.push(`Presentation: ${presValidation.error}`);
+    
+    const appearValidation = validateScore(appearance);
+    if (!appearValidation.valid) errors.push(`Appearance: ${appearValidation.error}`);
 
     if (errors.length > 0) {
-      toast.error(`Invalid scores (must be 0-25): ${errors.join(', ')}`);
+      toast.error(`Invalid scores:\n${errors.join('\n')}`);
       return false;
     }
 
+    // Check total doesn't exceed 100
     if (total > 100) {
       toast.error('Total score cannot exceed 100');
       return false;
