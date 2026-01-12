@@ -37,11 +37,11 @@ function CompetitionSetup() {
   const [newCategoryName, setNewCategoryName] = useState('Jazz');
   const [newVarietyLevel, setNewVarietyLevel] = useState('None');
 
-  // SECTION 3: Age Divisions
-  const [ageDivisions, setAgeDivisions] = useState([]);
-  const [newDivisionName, setNewDivisionName] = useState('');
-  const [newMinAge, setNewMinAge] = useState('');
-  const [newMaxAge, setNewMaxAge] = useState('');
+  // SECTION 3: Age Divisions (FIXED)
+  const FIXED_AGE_DIVISIONS = [
+    { id: 'junior', name: 'Junior', minAge: 3, maxAge: 12, description: 'Junior Division (3-12 years)' },
+    { id: 'senior', name: 'Senior', minAge: 13, maxAge: 99, description: 'Senior Division (13+ years)' }
+  ];
 
   // SECTION 4: Entries
   const [entries, setEntries] = useState([]);
@@ -213,64 +213,6 @@ function CompetitionSetup() {
   };
 
   // ===================================================================
-  // AGE DIVISION HANDLERS
-  // ===================================================================
-
-  const handleAddAgeDivision = () => {
-    if (!newDivisionName.trim()) {
-      toast.error('Please enter division name');
-      return;
-    }
-
-    const minAge = parseInt(newMinAge);
-    const maxAge = parseInt(newMaxAge);
-
-    if (isNaN(minAge) || isNaN(maxAge)) {
-      toast.error('Please enter valid ages');
-      return;
-    }
-
-    if (minAge >= maxAge) {
-      toast.error('Min age must be less than max age');
-      return;
-    }
-
-    // Check for overlaps
-    const overlaps = ageDivisions.some(div => {
-      return (minAge >= div.minAge && minAge <= div.maxAge) ||
-             (maxAge >= div.minAge && maxAge <= div.maxAge) ||
-             (minAge <= div.minAge && maxAge >= div.maxAge);
-    });
-
-    if (overlaps) {
-      toast.error('Age range overlaps with existing division');
-      return;
-    }
-
-    const newDivision = {
-      id: Date.now().toString(),
-      name: newDivisionName.trim(),
-      minAge: minAge,
-      maxAge: maxAge
-    };
-
-    setAgeDivisions([...ageDivisions, newDivision]);
-    setNewDivisionName('');
-    setNewMinAge('');
-    setNewMaxAge('');
-    toast.success(`Added division: ${newDivision.name}`);
-  };
-
-  const handleDeleteAgeDivision = (id) => {
-    const division = ageDivisions.find(d => d.id === id);
-    if (!window.confirm(`Delete age division "${division?.name}"?`)) {
-      return;
-    }
-    setAgeDivisions(ageDivisions.filter(div => div.id !== id));
-    toast.info('Age division deleted');
-  };
-
-  // ===================================================================
   // ENTRY HANDLERS
   // ===================================================================
 
@@ -279,7 +221,7 @@ function CompetitionSetup() {
       type: 'solo',
       name: '',
       categoryId: categories.length > 0 ? categories[0].id : '',
-      ageDivisionId: ageDivisions.length > 0 ? ageDivisions[0].id : '',
+      ageDivisionId: FIXED_AGE_DIVISIONS[0].id,
       abilityLevel: 'Beginning',
       divisionType: 'Solo',
       isMedalProgram: true,
@@ -326,8 +268,8 @@ function CompetitionSetup() {
     });
 
     // Auto-select age division if age is valid
-    if (age && !isNaN(age) && ageDivisions.length > 0) {
-      const matchingDivision = ageDivisions.find(div => 
+    if (age && !isNaN(age)) {
+      const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
         age >= div.minAge && age <= div.maxAge
       );
 
@@ -412,14 +354,12 @@ function CompetitionSetup() {
     }
 
     // Warn if age doesn't match any division
-    if (ageDivisions.length > 0) {
-      const age = parseInt(currentEntry.age);
-      const hasMatchingDivision = ageDivisions.some(div => 
-        age >= div.minAge && age <= div.maxAge
-      );
-      if (!hasMatchingDivision && !currentEntry.ageDivisionId) {
-        toast.warning(`Age ${age} doesn't match any division. Entry will compete without age division.`);
-      }
+    const age = parseInt(currentEntry.age);
+    const hasMatchingDivision = FIXED_AGE_DIVISIONS.some(div => 
+      age >= div.minAge && age <= div.maxAge
+    );
+    if (!hasMatchingDivision && !currentEntry.ageDivisionId) {
+      toast.warning(`Age ${age} doesn't match any division. Entry will compete without age division.`);
     }
 
     if (currentEntry.type === 'group') {
@@ -439,7 +379,7 @@ function CompetitionSetup() {
     }
 
     const category = categories.find(c => c.id === currentEntry.categoryId);
-    const ageDivision = ageDivisions.find(d => d.id === currentEntry.ageDivisionId);
+    const ageDivision = FIXED_AGE_DIVISIONS.find(d => d.id === currentEntry.ageDivisionId);
 
     const newEntry = {
       id: Date.now().toString(),
@@ -632,25 +572,25 @@ function CompetitionSetup() {
       }
       console.log('✅ Categories saved:', categories.length);
 
-      // Step 3: Save age divisions (if any)
-      if (ageDivisions.length > 0) {
-        toast.info('Saving age divisions...');
-        for (const div of ageDivisions) {
-          const divResult = await createAgeDivision({
-            competition_id: competitionId,
-            name: div.name,
-            min_age: div.minAge,
-            max_age: div.maxAge
-          });
+      // Step 3: Save FIXED age divisions
+      toast.info('Saving age divisions...');
+      const ageDivisionMap = {}; // Map 'junior'/'senior' to Supabase IDs
+      
+      for (const div of FIXED_AGE_DIVISIONS) {
+        const divResult = await createAgeDivision({
+          competition_id: competitionId,
+          name: div.name,
+          min_age: div.minAge,
+          max_age: div.maxAge
+        });
 
-          if (!divResult.success) {
-            throw new Error(divResult.error);
-          }
-
-          div.supabaseId = divResult.data.id;
+        if (!divResult.success) {
+          throw new Error(divResult.error);
         }
-        console.log('✅ Age divisions saved:', ageDivisions.length);
+
+        ageDivisionMap[div.id] = divResult.data.id;
       }
+      console.log('✅ Age divisions saved: 2');
 
       // Step 4: Save entries with photos
       toast.info('Saving entries...');
@@ -676,9 +616,8 @@ function CompetitionSetup() {
         const category = categories.find(c => c.id === entry.categoryId);
         const categorySupabaseId = category?.supabaseId || null;
 
-        // Get Supabase age division ID (if assigned)
-        const ageDivision = ageDivisions.find(d => d.id === entry.ageDivisionId);
-        const ageDivisionSupabaseId = ageDivision?.supabaseId || null;
+        // Get Supabase age division ID from our map
+        const ageDivisionSupabaseId = ageDivisionMap[entry.ageDivisionId] || null;
 
         // Create entry
         const entryResult = await createEntry({
@@ -1009,97 +948,6 @@ function CompetitionSetup() {
             </div>
           </div>
 
-          {/* SECTION 3: AGE DIVISION BUILDER */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-5 sm:p-8 mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-teal-600 mb-2">
-              Age Divisions (Optional)
-            </h2>
-            <p className="text-sm text-gray-600 mb-5">
-              Add age divisions to separate rankings by age groups.
-            </p>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                    Division Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newDivisionName}
-                    onChange={(e) => setNewDivisionName(e.target.value)}
-                    placeholder="e.g., Junior"
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                    Min Age
-                  </label>
-                  <input
-                    type="number"
-                    value={newMinAge}
-                    onChange={(e) => setNewMinAge(e.target.value)}
-                    placeholder="5"
-                    min="0"
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                    Max Age
-                  </label>
-                  <input
-                    type="number"
-                    value={newMaxAge}
-                    onChange={(e) => setNewMaxAge(e.target.value)}
-                    placeholder="12"
-                    min="0"
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-                  />
-                </div>
-
-                <div className="flex items-end">
-                  <button
-                    onClick={handleAddAgeDivision}
-                    className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white px-4 py-2 rounded-lg font-semibold hover:from-cyan-600 hover:to-teal-600 transition-all min-h-[44px]"
-                  >
-                    + Add Division
-                  </button>
-                </div>
-              </div>
-
-              {/* Added divisions */}
-              {ageDivisions.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-gray-700">
-                    Added Divisions ({ageDivisions.length}):
-                  </p>
-                  <div className="space-y-2">
-                    {ageDivisions.map(div => (
-                      <div
-                        key={div.id}
-                        className="flex items-center justify-between bg-blue-50 border-2 border-blue-200 px-4 py-2 rounded-lg"
-                      >
-                        <span className="font-semibold text-blue-800">
-                          {div.name} ({div.minAge}-{div.maxAge} years)
-                        </span>
-                        <button
-                          onClick={() => handleDeleteAgeDivision(div.id)}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* SECTION 4: ENTRIES */}
           <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-5 sm:p-8 mb-6">
             <div className="flex items-center justify-between mb-5">
@@ -1329,7 +1177,7 @@ function CompetitionSetup() {
                     ✓ Age {currentEntry.age} → {autoSelectedDivision.name} Division (auto-selected)
                   </p>
                 )}
-                {currentEntry.age && ageDivisions.length > 0 && !autoSelectedDivision && (
+                {currentEntry.age && !autoSelectedDivision && (
                   <p className="text-sm text-orange-600 mt-1">
                     ⚠️ Age {currentEntry.age} doesn't match any division
                   </p>
@@ -1355,26 +1203,24 @@ function CompetitionSetup() {
               </div>
 
               {/* Age Division */}
-              {ageDivisions.length > 0 && (
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
-                    Age Division {autoSelectedDivision ? '(Auto-selected - can override)' : '(Optional)'}
-                  </label>
-                  <select
-                    value={currentEntry.ageDivisionId}
-                    onChange={(e) => setCurrentEntry({ ...currentEntry, ageDivisionId: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
-                  >
-                    <option value="">None</option>
-                    {ageDivisions.map(div => (
-                      <option key={div.id} value={div.id}>
-                        {div.name} ({div.minAge}-{div.maxAge} years)
-                        {autoSelectedDivision && div.id === autoSelectedDivision.id ? ' (recommended)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
+                  Age Division {autoSelectedDivision ? '(Auto-selected - can override)' : '(Fixed Divisions)'}
+                </label>
+                <select
+                  value={currentEntry.ageDivisionId}
+                  onChange={(e) => setCurrentEntry({ ...currentEntry, ageDivisionId: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
+                >
+                  <option value="">None</option>
+                  {FIXED_AGE_DIVISIONS.map(div => (
+                    <option key={div.id} value={div.id}>
+                      {div.description}
+                      {autoSelectedDivision && div.id === autoSelectedDivision.id ? ' (recommended)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               {/* Ability Level */}
               <div>

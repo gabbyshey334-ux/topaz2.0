@@ -87,10 +87,10 @@ function ResultsPage() {
     if (!competitionId) return;
 
     const channel = subscribeToScores(competitionId, async () => {
-      const scoresResult = await getCompetitionScores(competitionId);
-      if (scoresResult.success) {
-        setScores(scoresResult.data);
-        toast.info('Scores updated!', { autoClose: 2000 });
+        const scoresResult = await getCompetitionScores(competitionId);
+        if (scoresResult.success) {
+          setScores(scoresResult.data);
+          toast.info('Scores updated!', { autoClose: 2000 });
       }
     });
 
@@ -148,7 +148,7 @@ function ResultsPage() {
     }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(e =>
+      filtered = filtered.filter(e => 
         e.competitor_name.toLowerCase().includes(query) ||
         e.entry_number.toString().includes(query)
       );
@@ -269,13 +269,13 @@ function ResultsPage() {
               <div className="w-20 h-20 sm:w-24 sm:h-24">
                 <img src="/right-dancer.png" alt="" className="w-full h-full object-contain" />
               </div>
-            </div>
+          </div>
 
             {/* Main Title */}
             <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent tracking-wider mb-3">
               TOPAZ 2.0 DANCE COMPETITION
-            </h1>
-            
+          </h1>
+          
             {/* Decorative Divider */}
             <div className="w-48 h-1 bg-gradient-to-r from-cyan-500 to-teal-500 mx-auto mb-4"></div>
             
@@ -334,43 +334,101 @@ function ResultsPage() {
                   placeholder="Search by name or entry number..."
                   className="w-full pl-14 pr-4 py-4 text-lg border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none transition-colors"
                 />
-              </div>
-            </div>
+          </div>
+        </div>
 
-            {/* Filter Tabs */}
-            <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
-              <span className="text-sm font-semibold text-gray-600">VIEW:</span>
+            {/* Category Filter Tabs */}
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+              <span className="text-sm font-semibold text-gray-600">CATEGORY:</span>
               
-              <button
-                onClick={() => {
-                  setSelectedFilter('overall');
-                  setSelectedCategory(null);
-                  setSelectedAgeDivision(null);
-                  setSelectedAbilityLevel(null);
+            <button
+              onClick={() => {
+                setSelectedFilter('overall');
+                setSelectedCategory(null);
                 }}
-                className={`px-6 py-3 rounded-full font-semibold text-sm transition-all duration-200 ${
-                  selectedFilter === 'overall'
+                className={`px-6 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
+                  !selectedCategory
                     ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-md'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                All Results
+                All Categories
+            </button>
+
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => {
+                  setSelectedCategory(cat.id);
+                    if (selectedFilter === 'overall') setSelectedFilter('category');
+                  }}
+                  className={`px-6 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
+                    selectedCategory === cat.id
+                      ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+            </div>
+
+            {/* Age Division Filter Tabs */}
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+              <span className="text-sm font-semibold text-gray-600">AGE GROUP:</span>
+              
+              <button
+                onClick={() => setSelectedAgeDivision(null)}
+                className={`px-6 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
+                  !selectedAgeDivision
+                    ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Ages
               </button>
 
-              {categories.map(cat => (
+              {ageDivisions.map(div => (
                 <button
-                  key={cat.id}
-                  onClick={() => {
-                    setSelectedFilter('category');
-                    setSelectedCategory(cat.id);
-                  }}
-                  className={`px-6 py-3 rounded-full font-semibold text-sm transition-all duration-200 ${
-                    selectedCategory === cat.id
+                  key={div.id}
+                  onClick={() => setSelectedAgeDivision(div.id)}
+                  className={`px-6 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
+                    selectedAgeDivision === div.id
                       ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-md'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  {cat.name}
+                  {div.name} ({div.min_age}-{div.max_age === 99 ? '13+' : div.max_age})
+                </button>
+              ))}
+            </div>
+
+            {/* Ability Level Filter Tabs */}
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+              <span className="text-sm font-semibold text-gray-600">EXPERIENCE:</span>
+              
+              <button
+                onClick={() => setSelectedAbilityLevel(null)}
+                className={`px-6 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
+                  !selectedAbilityLevel
+                    ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Levels
+              </button>
+
+              {['Beginning', 'Intermediate', 'Advanced'].map(level => (
+                <button
+                  key={level}
+                  onClick={() => setSelectedAbilityLevel(level)}
+                  className={`px-6 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
+                    selectedAbilityLevel === level
+                      ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {level}
                 </button>
               ))}
             </div>
@@ -387,19 +445,19 @@ function ResultsPage() {
               <div className="text-6xl mb-6">🏆</div>
               <h3 className="text-3xl font-bold text-gray-800 mb-3">No Results Yet</h3>
               <p className="text-gray-600">Results will appear here once judges complete scoring.</p>
-            </div>
+        </div>
           ) : (
             <div className="space-y-6">
               {filteredResults.map((entry) => {
-                const isExpanded = expandedEntries.has(entry.id);
+              const isExpanded = expandedEntries.has(entry.id);
                 const categoryName = getCategoryName(entry.category_id);
                 const ageDivisionName = getAgeDivisionName(entry.age_division_id);
 
-                return (
-                  <div
-                    key={entry.id}
+              return (
+                <div
+                  key={entry.id}
                     className={`bg-white rounded-3xl shadow-xl border-3 ${getRankBorderColor(entry.rank)} overflow-hidden hover:shadow-2xl hover:scale-[1.01] transition-all duration-300`}
-                  >
+                >
                     {/* CARD HEADER */}
                     <div className={`bg-gradient-to-r ${getRankColor(entry.rank)} p-6 flex items-center gap-6 flex-wrap`}>
                       {/* Rank Badge */}
@@ -438,7 +496,7 @@ function ResultsPage() {
                       {/* Entry Info */}
                       <div className="flex-1 min-w-0">
                         <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 drop-shadow-lg">
-                          #{entry.entry_number} {entry.competitor_name}
+                            #{entry.entry_number} {entry.competitor_name}
                         </h3>
                         <div className="flex flex-wrap gap-2">
                           <span className="px-4 py-1.5 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
@@ -454,11 +512,11 @@ function ResultsPage() {
                           </span>
                         </div>
                       </div>
-                    </div>
+                        </div>
 
                     {/* CARD BODY */}
                     <div className="p-8">
-                      {/* Judge Scores */}
+                        {/* Judge Scores */}
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6">
                         {entry.scores.map((score) => (
                           <div key={score.id} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 text-center border-2 border-gray-200 shadow-sm">
@@ -469,11 +527,11 @@ function ResultsPage() {
                               {score.total_score.toFixed(1)}
                             </div>
                             <div className="text-sm text-gray-400">/ 100</div>
-                          </div>
-                        ))}
-                      </div>
+                            </div>
+                          ))}
+                        </div>
 
-                      {/* Average Score */}
+                        {/* Average Score */}
                       <div className="bg-gradient-to-r from-cyan-500 to-teal-500 rounded-2xl p-6 text-center mb-6">
                         <div className="text-sm font-bold text-white/80 uppercase tracking-widest mb-2">
                           Average Score
@@ -482,7 +540,7 @@ function ResultsPage() {
                           {entry.averageScore.toFixed(2)}
                         </div>
                         <div className="text-xl text-white/80">/ 100</div>
-                      </div>
+                    </div>
 
                       {/* Expand Button */}
                       <button
@@ -494,7 +552,7 @@ function ResultsPage() {
                       </button>
 
                       {/* EXPANDED BREAKDOWN */}
-                      {isExpanded && (
+                  {isExpanded && (
                         <div className="mt-6 pt-6 border-t-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6">
                           <h4 className="text-xl font-bold text-teal-600 mb-6">Detailed Score Breakdown</h4>
                           
@@ -515,7 +573,7 @@ function ResultsPage() {
                                   <span className={`text-xl font-bold ${getScoreColor(score.technique)}`}>
                                     {score.technique} / 25
                                   </span>
-                                </div>
+                            </div>
                                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                   <span className="font-semibold text-gray-700 flex items-center gap-2">
                                     <span>✨</span> Creativity
@@ -523,7 +581,7 @@ function ResultsPage() {
                                   <span className={`text-xl font-bold ${getScoreColor(score.creativity)}`}>
                                     {score.creativity} / 25
                                   </span>
-                                </div>
+                            </div>
                                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                   <span className="font-semibold text-gray-700 flex items-center gap-2">
                                     <span>🎭</span> Presentation
@@ -531,7 +589,7 @@ function ResultsPage() {
                                   <span className={`text-xl font-bold ${getScoreColor(score.presentation)}`}>
                                     {score.presentation} / 25
                                   </span>
-                                </div>
+                            </div>
                                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                   <span className="font-semibold text-gray-700 flex items-center gap-2">
                                     <span>👗</span> Appearance
@@ -539,17 +597,17 @@ function ResultsPage() {
                                   <span className={`text-xl font-bold ${getScoreColor(score.appearance)}`}>
                                     {score.appearance} / 25
                                   </span>
-                                </div>
-                              </div>
+                            </div>
+                          </div>
 
                               <div className="flex justify-between items-center p-4 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-xl">
                                 <span className="text-lg font-bold text-white uppercase">Total</span>
                                 <span className="text-3xl font-extrabold text-white">
                                   {score.total_score.toFixed(1)} / 100
                                 </span>
-                              </div>
+                          </div>
 
-                              {score.notes && (
+                          {score.notes && (
                                 <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
                                   <div className="flex items-center gap-2 mb-2">
                                     <span>📝</span>
@@ -558,12 +616,12 @@ function ResultsPage() {
                                     </span>
                                   </div>
                                   <p className="text-yellow-900 italic leading-relaxed">{score.notes}</p>
-                                </div>
-                              )}
                             </div>
-                          ))}
+                          )}
+                        </div>
+                      ))}
 
-                          {/* Overall Average */}
+                      {/* Overall Average */}
                           <div className="p-8 bg-gradient-to-r from-cyan-600 to-teal-600 rounded-2xl text-center shadow-lg">
                             <div className="text-lg font-bold text-white/80 uppercase tracking-widest mb-3">
                               Final Average
@@ -571,9 +629,9 @@ function ResultsPage() {
                             <div className="text-6xl font-black text-white drop-shadow-xl">
                               {entry.averageScore.toFixed(2)} / 100
                             </div>
-                          </div>
-                        </div>
-                      )}
+                      </div>
+                    </div>
+                  )}
                     </div>
 
                     {/* CARD FOOTER */}
@@ -586,11 +644,11 @@ function ResultsPage() {
                         <span>Print Score Sheet</span>
                       </button>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
           {/* FOOTER */}
           <div className="mt-16 pt-8 border-t-2 border-gray-200 text-center">
