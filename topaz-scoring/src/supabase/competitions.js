@@ -16,6 +16,7 @@ export const createCompetition = async (competitionData) => {
         date: competitionData.date,
         venue: competitionData.venue || null,
         judges_count: competitionData.judges_count || 3,
+        judge_names: competitionData.judge_names || [],
         status: competitionData.status || 'active'
       }])
       .select()

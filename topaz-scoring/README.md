@@ -152,13 +152,13 @@ A prestigious cumulative system that tracks greatness across an entire season.
 3. **Populate Entries**: Add dancers with photos, ages, and ability levels.
 
 ### 🎭 Phase 2: Live Scoring
-1. **Configure Judges**: Set up 1-10 judges for the event.
+1. **Configure Judges**: Set up 1-10 judges for the event, now with **custom judge names**.
 2. **Score Interface**: Judges enter marks (0-25) across 4 criteria:
    - 🎯 Technique
    - ✨ Creativity
    - 🎭 Presentation
    - 👗 Appearance
-3. **Instant Sync**: Totals (0-100) calculate and save in real-time.
+3. **Instant Sync**: Totals (0-100) calculate and save in real-time. Judge names appear on all digital interfaces and printed reports.
 
 ### 🏆 Phase 3: The Finale
 1. **Review Results**: Use advanced filters to view rankings.

@@ -207,8 +207,9 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       
       // Individual judge scores
       entryScores.forEach(score => {
+        const judgeName = competition?.judge_names?.[score.judge_number - 1] || `Judge ${score.judge_number}`;
         tableData.push([
-          `Judge ${score.judge_number}`,
+          judgeName,
           `${Number(score.technique).toFixed(1)} / 25`,
           `${Number(score.creativity).toFixed(1)} / 25`,
           `${Number(score.presentation).toFixed(1)} / 25`,
@@ -295,7 +296,14 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
         ['Appearance', ...entryScores.map(s => Number(s.appearance).toFixed(1)), avgAppearance.toFixed(2)]
       ];
       
-      const categoryHeaders = ['Category', ...entryScores.map(s => `J${s.judge_number}`), 'Avg'];
+      const categoryHeaders = ['Category', ...entryScores.map(s => {
+        const judgeName = competition?.judge_names?.[s.judge_number - 1];
+        // If it's a real name, use initials or first word, otherwise J#
+        if (judgeName && !judgeName.startsWith('Judge ')) {
+          return judgeName.split(' ')[0].substring(0, 5); // Shorten if too long
+        }
+        return `J${s.judge_number}`;
+      }), 'Avg'];
       
       doc.autoTable({
         startY: yPos,
@@ -364,10 +372,11 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
           doc.roundedRect(14, yPos, pageWidth - 28, noteHeight, 2, 2, 'F');
           
           // Judge label
+          const judgeName = competition?.judge_names?.[score.judge_number - 1] || `Judge ${score.judge_number}`;
           doc.setTextColor(...darkGray);
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
-          doc.text(`Judge ${score.judge_number}:`, 18, yPos + 6);
+          doc.text(`${judgeName}:`, 18, yPos + 6);
           
           // Notes text
           doc.setFont('helvetica', 'normal');

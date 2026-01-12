@@ -482,7 +482,7 @@ function ScoringInterface() {
               {competition?.name}
             </h1>
             <p className="text-teal-600 font-semibold text-sm sm:text-base">
-              Judge {judgeNumber} Scoring
+              {competition?.judge_names?.[judgeNumber - 1] || `Judge ${judgeNumber}`} Scoring
             </p>
           </div>
 

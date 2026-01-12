@@ -294,19 +294,22 @@ function JudgeSelection() {
 
           {/* Judge Buttons Grid - 1 col for tiny screens, 2 for mobile/small tablet, 3 for iPad/Desktop */}
           <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8 px-4">
-            {Array.from({ length: competition?.judges_count || 3 }, (_, i) => i + 1).map((judgeNum) => (
-              <button
-                key={judgeNum}
-                onClick={() => handleJudgeSelect(judgeNum)}
-                className="aspect-[4/3] sm:aspect-square bg-gradient-to-br from-cyan-400 to-teal-500 rounded-2xl 
-                           flex flex-col items-center justify-center p-4 sm:p-6
-                           hover:from-cyan-500 hover:to-teal-600 active:scale-95 
-                           transition-all shadow-xl hover:shadow-2xl min-h-[120px]"
-              >
-                <span className="text-4xl sm:text-5xl md:text-6xl mb-2 sm:mb-3">🎭</span>
-                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight">Judge {judgeNum}</span>
-              </button>
-            ))}
+            {Array.from({ length: competition?.judges_count || 3 }, (_, i) => i + 1).map((judgeNum) => {
+              const judgeName = competition?.judge_names?.[judgeNum - 1] || `Judge ${judgeNum}`;
+              return (
+                <button
+                  key={judgeNum}
+                  onClick={() => handleJudgeSelect(judgeNum)}
+                  className="aspect-[4/3] sm:aspect-square bg-gradient-to-br from-cyan-400 to-teal-500 rounded-2xl 
+                             flex flex-col items-center justify-center p-4 sm:p-6
+                             hover:from-cyan-500 hover:to-teal-600 active:scale-95 
+                             transition-all shadow-xl hover:shadow-2xl min-h-[120px]"
+                >
+                  <span className="text-4xl sm:text-5xl md:text-6xl mb-2 sm:mb-3">🎭</span>
+                  <span className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight">{judgeName}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Admin Section - Responsive sizing and padding */}

@@ -580,14 +580,16 @@ function ResultsPage() {
                         <div className="mt-6 pt-6 border-t-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6">
                           <h4 className="text-xl font-bold text-teal-600 mb-6">Detailed Score Breakdown</h4>
                           
-                          {entry.scores.map((score) => (
-                            <div key={score.id} className="mb-6 p-6 bg-white rounded-2xl border-2 border-gray-200 shadow-sm">
-                              <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-gray-200">
-                                <div className="w-8 h-8 bg-gradient-to-r from-teal-400 to-cyan-400 rounded-full flex items-center justify-center">
-                                  <span className="text-white font-bold text-sm">J{score.judge_number}</span>
+                          {entry.scores.map((score) => {
+                            const judgeName = competition?.judge_names?.[score.judge_number - 1] || `Judge ${score.judge_number}`;
+                            return (
+                              <div key={score.id} className="mb-6 p-6 bg-white rounded-2xl border-2 border-gray-200 shadow-sm">
+                                <div className="flex items-center gap-3 mb-4 pb-4 border-b-2 border-gray-200">
+                                  <div className="w-8 h-8 bg-gradient-to-r from-teal-400 to-cyan-400 rounded-full flex items-center justify-center">
+                                    <span className="text-white font-bold text-sm">J{score.judge_number}</span>
+                                  </div>
+                                  <h5 className="text-lg font-bold text-gray-800">{judgeName}</h5>
                                 </div>
-                                <h5 className="text-lg font-bold text-gray-800">Judge {score.judge_number}</h5>
-                              </div>
 
                               <div className="grid gap-3 mb-4">
                                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
@@ -640,10 +642,11 @@ function ResultsPage() {
                                     </span>
                                   </div>
                                   <p className="text-yellow-900 italic leading-relaxed">{score.notes}</p>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            );
+                          })}
 
                       {/* Overall Average */}
                           <div className="p-8 bg-gradient-to-r from-cyan-600 to-teal-600 rounded-2xl text-center shadow-lg">

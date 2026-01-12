@@ -31,6 +31,20 @@ function CompetitionSetup() {
   );
   const [venue, setVenue] = useState('');
   const [judgeCount, setJudgeCount] = useState(3);
+  const [judgeNames, setJudgeNames] = useState(['', '', '']);
+
+  const handleJudgeCountChange = (count) => {
+    setJudgeCount(count);
+    // Resize judgeNames array while preserving existing names
+    const newNames = Array.from({ length: count }, (_, i) => judgeNames[i] || '');
+    setJudgeNames(newNames);
+  };
+
+  const handleJudgeNameChange = (index, name) => {
+    const newNames = [...judgeNames];
+    newNames[index] = name;
+    setJudgeNames(newNames);
+  };
 
   // SECTION 2: Categories
   const [categories, setCategories] = useState([]);
@@ -543,6 +557,7 @@ function CompetitionSetup() {
         date: competitionDate,
         venue: venue.trim() || null,
         judges_count: judgeCount,
+        judge_names: judgeNames.map((name, i) => name.trim() || `Judge ${i + 1}`),
         status: 'active'
       });
 
@@ -749,7 +764,7 @@ function CompetitionSetup() {
                   </label>
                   <select
                     value={judgeCount}
-                    onChange={(e) => setJudgeCount(parseInt(e.target.value))}
+                    onChange={(e) => handleJudgeCountChange(parseInt(e.target.value))}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none text-base sm:text-lg min-h-[48px]"
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
@@ -758,6 +773,32 @@ function CompetitionSetup() {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Judge Names Section */}
+              <div className="bg-teal-50/50 rounded-xl p-4 sm:p-6 border-2 border-teal-100 mt-4">
+                <h3 className="text-lg font-bold text-teal-700 mb-2 flex items-center gap-2">
+                  <span>⚖️</span> Judge Names (Optional)
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Enter names to display on score sheets and results. Leave blank to use "Judge 1", "Judge 2", etc.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: judgeCount }, (_, i) => (
+                    <div key={i}>
+                      <label className="block text-gray-600 text-xs font-semibold mb-1 uppercase tracking-wider">
+                        Judge {i + 1} Name
+                      </label>
+                      <input
+                        type="text"
+                        value={judgeNames[i] || ''}
+                        onChange={(e) => handleJudgeNameChange(i, e.target.value)}
+                        placeholder={`e.g., Sarah Johnson`}
+                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-teal-500 focus:outline-none text-sm"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
 
