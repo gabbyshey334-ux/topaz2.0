@@ -552,14 +552,17 @@ function CompetitionSetup() {
     try {
       // Step 1: Create competition
       toast.info('Creating competition...');
-      const compResult = await createCompetition({
+      
+      const compData = {
         name: competitionName.trim(),
         date: competitionDate,
         venue: venue.trim() || null,
         judges_count: judgeCount,
         judge_names: judgeNames.map((name, i) => name.trim() || `Judge ${i + 1}`),
         status: 'active'
-      });
+      };
+
+      const compResult = await createCompetition(compData);
 
       if (!compResult.success) {
         throw new Error(compResult.error);

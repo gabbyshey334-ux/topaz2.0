@@ -9,6 +9,8 @@ export const createCompetition = async (competitionData) => {
   try {
     console.log('Creating competition:', competitionData);
     
+    // TEMPORARY DEFENSIVE WORKAROUND
+    // If the database column 'judge_names' doesn't exist yet, we try to save without it
     const { data, error } = await supabase
       .from('competitions')
       .insert([{
@@ -16,13 +18,33 @@ export const createCompetition = async (competitionData) => {
         date: competitionData.date,
         venue: competitionData.venue || null,
         judges_count: competitionData.judges_count || 3,
-        judge_names: competitionData.judge_names || [],
+        judge_names: competitionData.judge_names || [], // Try saving with names
         status: competitionData.status || 'active'
       }])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // If error is about missing column, retry without judge_names
+      if (error.message?.includes('judge_names')) {
+        console.warn('⚠️ judge_names column missing in DB, retrying without it...');
+        const { data: retryData, error: retryError } = await supabase
+          .from('competitions')
+          .insert([{
+            name: competitionData.name,
+            date: competitionData.date,
+            venue: competitionData.venue || null,
+            judges_count: competitionData.judges_count || 3,
+            status: competitionData.status || 'active'
+          }])
+          .select()
+          .single();
+          
+        if (retryError) throw retryError;
+        return { success: true, data: retryData };
+      }
+      throw error;
+    }
     
     console.log('✅ Competition created:', data);
     return { success: true, data };
