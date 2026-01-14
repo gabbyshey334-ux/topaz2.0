@@ -9,26 +9,53 @@ export const createEntry = async (entryData) => {
   try {
     console.log('Creating entry:', entryData);
     
+    // Build entry object with fallback for is_medal_program column
+    const entryToInsert = {
+      competition_id: entryData.competition_id,
+      entry_number: entryData.entry_number,
+      competitor_name: entryData.competitor_name,
+      category_id: entryData.category_id || null,
+      age_division_id: entryData.age_division_id || null,
+      age: entryData.age || null,
+      dance_type: entryData.dance_type || null,
+      ability_level: entryData.ability_level || null,
+      medal_points: entryData.medal_points || 0,
+      current_medal_level: entryData.current_medal_level || 'None',
+      photo_url: entryData.photo_url || null
+    };
+
+    // Try to include is_medal_program if provided
+    // If the column doesn't exist, the insert will still work without it
+    if (entryData.is_medal_program !== undefined) {
+      entryToInsert.is_medal_program = entryData.is_medal_program;
+    }
+
     const { data, error } = await supabase
       .from('entries')
-      .insert([{
-        competition_id: entryData.competition_id,
-        entry_number: entryData.entry_number,
-        competitor_name: entryData.competitor_name,
-        category_id: entryData.category_id || null,
-        age_division_id: entryData.age_division_id || null,
-        age: entryData.age || null,
-        dance_type: entryData.dance_type || null,
-        ability_level: entryData.ability_level || null,
-        is_medal_program: entryData.is_medal_program || false,
-        medal_points: entryData.medal_points || 0,
-        current_medal_level: entryData.current_medal_level || 'None',
-        photo_url: entryData.photo_url || null
-      }])
+      .insert([entryToInsert])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // If error is about is_medal_program column, try without it
+      if (error.message && error.message.includes('is_medal_program')) {
+        console.warn('⚠️ is_medal_program column not found, saving without it...');
+        delete entryToInsert.is_medal_program;
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from('entries')
+          .insert([entryToInsert])
+          .select()
+          .single();
+        
+        if (retryError) throw retryError;
+        
+        console.log('✅ Entry created (without is_medal_program):', retryData);
+        return { success: true, data: retryData };
+      }
+      
+      throw error;
+    }
     
     console.log('✅ Entry created:', data);
     return { success: true, data };
