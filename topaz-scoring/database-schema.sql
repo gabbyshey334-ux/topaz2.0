@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS entries (
   age INTEGER CHECK (age >= 0 AND age <= 150),
   dance_type TEXT,
   ability_level TEXT CHECK (ability_level IN ('Beginning', 'Intermediate', 'Advanced')),
+  is_medal_program BOOLEAN DEFAULT FALSE,
   medal_points INTEGER DEFAULT 0 CHECK (medal_points >= 0),
   current_medal_level TEXT DEFAULT 'None' CHECK (current_medal_level IN ('None', 'Bronze', 'Silver', 'Gold')),
   photo_url TEXT,

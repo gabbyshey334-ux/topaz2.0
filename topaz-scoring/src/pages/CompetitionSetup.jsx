@@ -213,7 +213,7 @@ function CompetitionSetup() {
     if (isSpecial) {
       toast.success(`Added: ${displayName} ⚠️ Special Category (participation recognition only)`);
     } else {
-      toast.success(`Added: ${displayName}`);
+    toast.success(`Added: ${displayName}`);
     }
   };
 
@@ -591,23 +591,23 @@ function CompetitionSetup() {
       console.log('✅ Categories saved:', categories.length);
 
       // Step 3: Save FIXED age divisions
-      toast.info('Saving age divisions...');
+        toast.info('Saving age divisions...');
       const ageDivisionMap = {}; // Map 'junior'/'senior' to Supabase IDs
       
       for (const div of FIXED_AGE_DIVISIONS) {
-        const divResult = await createAgeDivision({
-          competition_id: competitionId,
-          name: div.name,
-          min_age: div.minAge,
-          max_age: div.maxAge
-        });
+          const divResult = await createAgeDivision({
+            competition_id: competitionId,
+            name: div.name,
+            min_age: div.minAge,
+            max_age: div.maxAge
+          });
 
-        if (!divResult.success) {
-          throw new Error(divResult.error);
-        }
+          if (!divResult.success) {
+            throw new Error(divResult.error);
+          }
 
         ageDivisionMap[div.id] = divResult.data.id;
-      }
+        }
       console.log('✅ Age divisions saved: 2');
 
       // Step 4: Save entries with photos
@@ -646,6 +646,7 @@ function CompetitionSetup() {
           category_id: categorySupabaseId,
           age_division_id: ageDivisionSupabaseId,
           ability_level: entry.abilityLevel,
+          is_medal_program: entry.isMedalProgram,
           dance_type: `${entry.divisionType} | ${entry.type} | Medal: ${entry.isMedalProgram} | Members: ${JSON.stringify(entry.groupMembers)}`,
           photo_url: photoUrl
         });
@@ -911,8 +912,8 @@ function CompetitionSetup() {
                   >
                     <optgroup label="━━━ PERFORMING ARTS ━━━">
                       {performingArtsCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                     </optgroup>
                     <optgroup label="━━━ SPECIAL CATEGORIES ━━━">
                       {specialCategories.map(cat => (
@@ -1247,24 +1248,24 @@ function CompetitionSetup() {
               </div>
 
               {/* Age Division */}
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
                   Age Division {autoSelectedDivision ? '(Auto-selected - can override)' : '(Fixed Divisions)'}
-                </label>
-                <select
-                  value={currentEntry.ageDivisionId}
-                  onChange={(e) => setCurrentEntry({ ...currentEntry, ageDivisionId: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
-                >
-                  <option value="">None</option>
+                  </label>
+                  <select
+                    value={currentEntry.ageDivisionId}
+                    onChange={(e) => setCurrentEntry({ ...currentEntry, ageDivisionId: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
+                  >
+                    <option value="">None</option>
                   {FIXED_AGE_DIVISIONS.map(div => (
-                    <option key={div.id} value={div.id}>
+                      <option key={div.id} value={div.id}>
                       {div.description}
                       {autoSelectedDivision && div.id === autoSelectedDivision.id ? ' (recommended)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
               {/* Ability Level */}
               <div>

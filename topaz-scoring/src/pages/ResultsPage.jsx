@@ -158,6 +158,68 @@ function ResultsPage() {
     return filtered;
   }, [rankedResults, selectedCategory, selectedAgeDivision, selectedAbilityLevel, searchQuery]);
 
+  // Medal Program Results - Top 4 per category
+  const medalProgramResults = useMemo(() => {
+    if (selectedFilter !== 'medal') return [];
+
+    const grouped = {};
+    
+    // Only include entries enrolled in medal program
+    const medalEntries = rankedResults.filter(e => e.is_medal_program);
+
+    categories.forEach(cat => {
+      if (specialCategoryNames.includes(cat.name)) return; // Skip special categories
+
+      const catResults = medalEntries
+        .filter(e => e.category_id === cat.id)
+        .slice(0, 4); // Top 4
+
+      if (catResults.length > 0) {
+        grouped[cat.id] = {
+          name: cat.name,
+          results: catResults
+        };
+      }
+    });
+
+    return Object.values(grouped);
+  }, [rankedResults, categories, selectedFilter]);
+
+  const handleAwardMedalPoints = async () => {
+    if (!window.confirm('Award 1 point to all 1st place Medal Program winners?')) return;
+
+    try {
+      setAwardingPoints(true);
+      
+      // Find all 1st place winners enrolled in medal program
+      const firstPlaceWinners = rankedResults
+        .filter(e => e.rank === 1 && e.is_medal_program)
+        .map(e => e.id);
+
+      if (firstPlaceWinners.length === 0) {
+        toast.info('No 1st place medal program entries found to award.');
+        setAwardingPoints(false);
+        return;
+      }
+
+      const result = await awardMedalPointsToWinners(competitionId, firstPlaceWinners);
+      
+      if (result.success) {
+        toast.success(`Successfully awarded points to ${result.totalAwarded} winners!`);
+        // Refresh entries to show updated points
+        const entriesResult = await getCompetitionEntries(competitionId);
+        if (entriesResult.success) setEntries(entriesResult.data);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error awarding points:', error);
+      toast.error('Failed to award medal points');
+    } finally {
+      setAwardingPoints(false);
+    }
+  };
+
   // Helper functions
   const getCategoryName = (categoryId) => {
     return categories.find(c => c.id === categoryId)?.name || 'Unknown';
@@ -455,6 +517,30 @@ function ResultsPage() {
                   {level}
                 </button>
               ))}
+            </div>
+
+            {/* Medal Program Toggle */}
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+              <span className="text-sm font-semibold text-gray-600">PROGRAMS:</span>
+              <button
+                onClick={() => {
+                  setSelectedFilter(selectedFilter === 'medal' ? 'overall' : 'medal');
+                  // Clear other filters when entering medal view for clarity
+                  if (selectedFilter !== 'medal') {
+                  setSelectedCategory(null);
+                  setSelectedAgeDivision(null);
+                    setSelectedAbilityLevel(null);
+                  }
+                }}
+                className={`px-8 py-2 rounded-full font-bold text-sm transition-all duration-200 flex items-center gap-2 ${
+                  selectedFilter === 'medal'
+                    ? 'bg-gradient-to-r from-yellow-400 to-amber-600 text-white shadow-lg scale-105'
+                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-2 border-amber-200'
+                }`}
+              >
+                <span>⭐</span>
+                <span>Medal Program View</span>
+              </button>
           </div>
 
             {/* Results Count */}
@@ -463,8 +549,116 @@ function ResultsPage() {
             </p>
           </div>
 
+          {/* MEDAL PROGRAM VIEW */}
+          {selectedFilter === 'medal' && (
+            <div className="space-y-12">
+              <div className="bg-gradient-to-br from-yellow-50 to-amber-100 rounded-3xl p-8 border-2 border-amber-200 shadow-xl">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 text-center md:text-left">
+                  <div>
+                    <h2 className="text-3xl font-black text-amber-800 flex items-center justify-center md:justify-start gap-3">
+                      <span>🏆</span> MEDAL PROGRAM SEASON STANDINGS
+                    </h2>
+                    <p className="text-amber-700 font-semibold mt-2 italic">
+                      Tracking progress toward Bronze, Silver, and Gold milestones
+          </p>
+        </div>
+
+                  <button
+                    onClick={handleAwardMedalPoints}
+                    disabled={awardingPoints}
+                    className="px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-600 text-white font-bold rounded-xl shadow-lg hover:from-amber-600 hover:to-yellow-700 hover:scale-105 transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {awardingPoints ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <span>⭐</span>
+                    )}
+                    <span>Award Points to 1st Place Winners</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                  <div className="bg-white/60 p-4 rounded-xl text-center">
+                    <span className="text-2xl mb-1 block">🥉</span>
+                    <span className="text-xs font-bold text-amber-800 uppercase tracking-widest">Bronze</span>
+                    <p className="text-lg font-black text-amber-900">25 Points</p>
+                  </div>
+                  <div className="bg-white/60 p-4 rounded-xl text-center">
+                    <span className="text-2xl mb-1 block">🥈</span>
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">Silver</span>
+                    <p className="text-lg font-black text-gray-800">35 Points</p>
+                  </div>
+                  <div className="bg-white/60 p-4 rounded-xl text-center">
+                    <span className="text-2xl mb-1 block">🥇</span>
+                    <span className="text-xs font-bold text-yellow-600 uppercase tracking-widest">Gold</span>
+                    <p className="text-lg font-black text-yellow-700">50 Points</p>
+                  </div>
+                </div>
+
+                {medalProgramResults.length === 0 ? (
+                  <div className="bg-white/40 p-12 rounded-2xl text-center italic text-amber-800">
+                    No medal program entries found for this competition.
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {medalProgramResults.map((group) => (
+                      <div key={group.name} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border-2 border-amber-100 shadow-md">
+                        <h3 className="text-xl font-bold text-amber-900 mb-6 border-b-2 border-amber-100 pb-3 flex items-center gap-2">
+                          <span>✨</span> {group.name} - Top 4
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {group.results.map((entry) => (
+                            <div key={entry.id} className="relative bg-white rounded-xl p-4 border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
+                              {/* Rank Badge */}
+                              <div className={`absolute -top-3 -left-3 w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-md border-2 border-white ${
+                                entry.rank === 1 ? 'bg-yellow-400 text-white' : 
+                                entry.rank === 2 ? 'bg-gray-300 text-white' :
+                                entry.rank === 3 ? 'bg-orange-400 text-white' :
+                                'bg-teal-500 text-white'
+                              }`}>
+                                {entry.rank}
+                              </div>
+
+                              <div className="flex flex-col items-center text-center">
+                                <div className="w-20 h-20 rounded-full overflow-hidden mb-3 border-2 border-amber-100">
+                                  {entry.photo_url ? (
+                                    <img src={entry.photo_url} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full bg-amber-50 flex items-center justify-center text-2xl text-amber-200">
+                                      👤
+                                    </div>
+                                  )}
+                                </div>
+                                <h4 className="font-bold text-gray-800 line-clamp-1">{entry.competitor_name}</h4>
+                                <div className="text-amber-600 font-black text-lg mb-2">
+                                  {entry.averageScore.toFixed(2)}
+                                </div>
+                                
+                                <div className="w-full pt-3 border-t border-gray-100 mt-2">
+                                  <div className="flex items-center justify-center gap-1 mb-1">
+                                    <MedalBadge medalLevel={entry.current_medal_level} size="sm" />
+                                    <span className="text-xs font-bold text-gray-500 uppercase">{entry.medal_points} PTS</span>
+                                  </div>
+                                  <p className="text-[10px] text-amber-700 font-semibold uppercase leading-tight">
+                                    {getMedalProgress(entry.medal_points)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* RESULTS CARDS */}
-          {filteredResults.length === 0 ? (
+          {selectedFilter !== 'medal' && (
+            filteredResults.length === 0 ? (
             <div className="bg-white rounded-3xl shadow-lg p-20 text-center">
               <div className="text-6xl mb-6">🏆</div>
               <h3 className="text-3xl font-bold text-gray-800 mb-3">No Results Yet</h3>
@@ -519,9 +713,22 @@ function ResultsPage() {
 
                       {/* Entry Info */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 drop-shadow-lg">
-                            #{entry.entry_number} {entry.competitor_name}
-                        </h3>
+                        <div className="flex items-center gap-3 mb-2 flex-wrap">
+                          <h3 className="text-2xl sm:text-3xl font-extrabold text-white drop-shadow-lg">
+                              #{entry.entry_number} {entry.competitor_name}
+                          </h3>
+                          {entry.is_medal_program && (
+                            <div className="flex items-center gap-2">
+                              <span className="bg-yellow-400 text-yellow-900 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter border border-yellow-200 shadow-sm">
+                                ⭐ MEDAL PROGRAM
+                              </span>
+                              <MedalBadge medalLevel={entry.current_medal_level} size="sm" />
+                              <span className="text-white/90 text-xs font-bold font-mono">
+                                [{entry.medal_points} PTS]
+                              </span>
+                            </div>
+                          )}
+                        </div>
                         <div className="flex flex-wrap gap-2">
                           <span className="px-4 py-1.5 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
                             {categoryName}
@@ -531,9 +738,14 @@ function ResultsPage() {
                               🎂 {ageDivisionName}
                             </span>
                           )}
-                          <span className="px-4 py-1.5 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
+                          <span className="px-4 py-1.5 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white border border-white/20">
                             ⭐ {entry.ability_level}
                           </span>
+                          {entry.is_medal_program && (
+                            <span className="px-4 py-1.5 bg-yellow-400/20 backdrop-blur rounded-full text-[10px] font-black text-yellow-200 border border-yellow-400/30 uppercase tracking-widest">
+                              🏆 {getMedalProgress(entry.medal_points)}
+                            </span>
+                          )}
                         </div>
                       </div>
                         </div>
@@ -642,9 +854,9 @@ function ResultsPage() {
                                     </span>
                                   </div>
                                   <p className="text-yellow-900 italic leading-relaxed">{score.notes}</p>
-                                </div>
-                              )}
                             </div>
+                          )}
+                        </div>
                             );
                           })}
 
@@ -688,8 +900,8 @@ function ResultsPage() {
                 </div>
               );
             })}
-          </div>
-        )}
+            </div>
+          ))}
 
           {/* FOOTER */}
           <div className="mt-16 pt-8 border-t-2 border-gray-200 text-center">

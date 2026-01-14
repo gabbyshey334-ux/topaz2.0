@@ -20,6 +20,7 @@ export const createEntry = async (entryData) => {
         age: entryData.age || null,
         dance_type: entryData.dance_type || null,
         ability_level: entryData.ability_level || null,
+        is_medal_program: entryData.is_medal_program || false,
         medal_points: entryData.medal_points || 0,
         current_medal_level: entryData.current_medal_level || 'None',
         photo_url: entryData.photo_url || null
