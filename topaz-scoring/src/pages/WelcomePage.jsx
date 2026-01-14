@@ -1,15 +1,99 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
+import { supabase } from '../supabase/config';
+import { subscribeToTable, unsubscribeFromChannel } from '../supabase/realtime';
 
 function WelcomePage() {
   const navigate = useNavigate();
   const [showInstructions, setShowInstructions] = useState(false);
+  const [competitions, setCompetitions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAllCompetitions, setShowAllCompetitions] = useState(false);
 
   // Ready-made image paths
   const logoPath = '/logo.png';
   const leftImagePath = '/left-dancer.png';
   const rightImagePath = '/right-dancer.png';
+
+  // Load competitions from database
+  useEffect(() => {
+    loadCompetitions();
+  }, []);
+
+  // Real-time subscription for competition updates
+  useEffect(() => {
+    const channel = subscribeToTable('competitions', () => {
+      console.log('🔄 Competition list updated - reloading...');
+      loadCompetitions();
+      toast.info('Competition list updated!', { autoClose: 2000 });
+    });
+
+    return () => {
+      if (channel) unsubscribeFromChannel(channel);
+    };
+  }, []);
+
+  const loadCompetitions = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch competitions with entry count
+      const { data: comps, error: compsError } = await supabase
+        .from('competitions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (compsError) throw compsError;
+
+      // Get entry counts for each competition
+      const compsWithCounts = await Promise.all(
+        (comps || []).map(async (comp) => {
+          const { count, error: countError } = await supabase
+            .from('entries')
+            .select('*', { count: 'exact', head: true })
+            .eq('competition_id', comp.id);
+
+          if (countError) {
+            console.error('Error counting entries:', countError);
+            return { ...comp, entry_count: 0 };
+          }
+
+          return { ...comp, entry_count: count || 0 };
+        })
+      );
+
+      setCompetitions(compsWithCounts);
+      console.log('✅ Loaded competitions:', compsWithCounts.length);
+    } catch (error) {
+      console.error('❌ Error loading competitions:', error);
+      toast.error('Failed to load competitions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContinueCompetition = (comp) => {
+    navigate('/judge-selection', {
+      state: {
+        competitionId: comp.id,
+        competitionName: comp.name,
+        competitionDate: comp.date,
+        venue: comp.venue,
+        judgeCount: comp.judges_count
+      }
+    });
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
 
   return (
     <Layout>
@@ -80,6 +164,103 @@ function WelcomePage() {
           calculations, rankings, and real-time results
         </p>
 
+        {/* Available Competitions Section */}
+        {loading ? (
+          <div className="w-full max-w-2xl px-4 mb-8">
+            <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-8 text-center">
+              <div className="w-12 h-12 border-4 border-gray-200 border-t-teal-500 rounded-full animate-spin mx-auto mb-3"></div>
+              <p className="text-gray-600 font-semibold">Loading competitions...</p>
+            </div>
+          </div>
+        ) : competitions.length > 0 ? (
+          <div className="w-full max-w-2xl px-4 mb-8">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border-2 border-teal-100">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-xl sm:text-2xl font-bold text-teal-600 flex items-center gap-2">
+                  <span>📋</span> Available Competitions
+                </h2>
+                {competitions.length > 3 && (
+                  <button
+                    onClick={() => setShowAllCompetitions(!showAllCompetitions)}
+                    className="text-sm text-teal-600 hover:text-teal-700 font-semibold"
+                  >
+                    {showAllCompetitions ? 'Show Less' : `Show All (${competitions.length})`}
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {(showAllCompetitions ? competitions : competitions.slice(0, 3)).map((comp) => (
+                  <div
+                    key={comp.id}
+                    className="bg-gradient-to-br from-cyan-50 to-teal-50 rounded-xl p-4 border-2 border-teal-200 hover:border-teal-400 hover:shadow-md transition-all cursor-pointer"
+                    onClick={() => handleContinueCompetition(comp)}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold text-gray-800 truncate mb-1">
+                          {comp.name}
+                        </h3>
+                        <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+                          <span className="flex items-center gap-1">
+                            📅 {formatDate(comp.date)}
+                          </span>
+                          {comp.venue && (
+                            <span className="flex items-center gap-1">
+                              📍 {comp.venue}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        comp.status === 'active' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {comp.status === 'active' ? '🟢 Active' : '⚪ Completed'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-4 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <span className="font-semibold text-teal-600">{comp.entry_count}</span> entries
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="font-semibold text-teal-600">{comp.judges_count}</span> judges
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleContinueCompetition(comp);
+                        }}
+                        className="px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-bold rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all shadow-sm"
+                      >
+                        Continue →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {competitions.length > 3 && !showAllCompetitions && (
+                <div className="mt-3 text-center text-sm text-gray-500">
+                  + {competitions.length - 3} more competitions
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="w-full max-w-2xl px-4 mb-8">
+            <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-8 text-center border-2 border-dashed border-gray-300">
+              <div className="text-4xl mb-3">🎭</div>
+              <p className="text-gray-600 font-semibold mb-2">No Competitions Yet</p>
+              <p className="text-sm text-gray-500">Create your first competition to get started!</p>
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons - Touch friendly and responsive width */}
         <div className="flex flex-col gap-4 w-full max-w-[280px] sm:max-w-md px-4">
           <button
@@ -88,7 +269,7 @@ function WelcomePage() {
                        hover:from-cyan-600 hover:to-teal-600 active:scale-95 transition-all shadow-lg 
                        hover:shadow-cyan-500/50 min-h-[56px]"
           >
-            🎭 Start New Competition
+            ➕ Start New Competition
           </button>
           
           <button

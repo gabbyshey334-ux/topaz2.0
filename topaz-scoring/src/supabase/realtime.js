@@ -125,6 +125,41 @@ export const subscribeToCompetition = (competitionId, callback) => {
 };
 
 /**
+ * Subscribe to any table in real-time
+ * @param {string} tableName - Name of the table to subscribe to
+ * @param {Function} callback - Function to call when table changes
+ * @param {string} filter - Optional filter (e.g., 'competition_id=eq.123')
+ * @returns {Object} - Subscription channel
+ */
+export const subscribeToTable = (tableName, callback, filter = null) => {
+  console.log(`📡 Subscribing to table: ${tableName}`, filter ? `with filter: ${filter}` : '');
+  
+  const channelName = filter ? `${tableName}-${filter}` : `${tableName}-all`;
+  
+  const channelConfig = {
+    event: '*',
+    schema: 'public',
+    table: tableName
+  };
+  
+  if (filter) {
+    channelConfig.filter = filter;
+  }
+  
+  const channel = supabase
+    .channel(channelName)
+    .on('postgres_changes', channelConfig, (payload) => {
+      console.log(`📡 ${tableName} update received:`, payload);
+      callback(payload);
+    })
+    .subscribe((status) => {
+      console.log(`📡 ${tableName} subscription status:`, status);
+    });
+  
+  return channel;
+};
+
+/**
  * Unsubscribe from a channel
  * @param {Object} channel - Channel object to unsubscribe from
  * @returns {Promise} - Unsubscribe promise
