@@ -327,3 +327,4 @@ While age auto-assignment is recommended, users can still manually select a diff
 **Breaking Changes:** None (backward compatible with database)  
 **Testing Required:** Manual testing of new competition creation
 
+
