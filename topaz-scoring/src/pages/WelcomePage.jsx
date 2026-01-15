@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { Trash2, Loader } from 'lucide-react';
 import Layout from '../components/Layout';
 import { supabase } from '../supabase/config';
 import { subscribeToTable, unsubscribeFromChannel } from '../supabase/realtime';
+import { deleteCompetition, bulkDeleteCompetitions, deleteAllCompetitions } from '../supabase/competitions';
 
 function WelcomePage() {
   const navigate = useNavigate();
@@ -11,6 +13,10 @@ function WelcomePage() {
   const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAllCompetitions, setShowAllCompetitions] = useState(false);
+  const [selectedCompetitions, setSelectedCompetitions] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [showDangerZone, setShowDangerZone] = useState(false);
 
   // Ready-made image paths
   const logoPath = '/logo.png';
@@ -93,6 +99,125 @@ function WelcomePage() {
       day: 'numeric', 
       year: 'numeric' 
     });
+  };
+
+  const handleDeleteCompetition = async (comp) => {
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${comp.name}"?\n\n` +
+      `This will permanently delete:\n` +
+      `• ${comp.entry_count || 0} entries\n` +
+      `• All scores and results\n` +
+      `• All photos and data\n\n` +
+      `This action cannot be undone!`
+    );
+    
+    if (!confirmed) return;
+    
+    setDeletingId(comp.id);
+    
+    try {
+      const result = await deleteCompetition(comp.id);
+      
+      if (result.success) {
+        toast.success(`"${comp.name}" deleted successfully!`);
+        loadCompetitions();
+        // Remove from selected if it was selected
+        setSelectedCompetitions(prev => prev.filter(id => id !== comp.id));
+      } else {
+        toast.error(`Failed to delete: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('An error occurred while deleting');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCompetitions.length === 0) {
+      toast.error('Please select competitions to delete');
+      return;
+    }
+    
+    const confirmed = window.confirm(
+      `Delete ${selectedCompetitions.length} competition${selectedCompetitions.length > 1 ? 's' : ''}?\n\n` +
+      `This will permanently delete all entries, scores, photos, and data.\n` +
+      `This action cannot be undone!`
+    );
+    
+    if (!confirmed) return;
+    
+    setBulkDeleting(true);
+    
+    try {
+      const result = await bulkDeleteCompetitions(selectedCompetitions);
+      
+      if (result.success) {
+        toast.success(result.message);
+        loadCompetitions();
+        setSelectedCompetitions([]);
+      } else {
+        toast.error(`Failed to delete: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      toast.error('An error occurred during bulk delete');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    const firstConfirm = window.confirm(
+      `⚠️ DELETE ALL COMPETITIONS?\n\n` +
+      `This will delete EVERY competition in the system (${competitions.length} total).\n` +
+      `Are you absolutely sure? This cannot be undone!`
+    );
+    
+    if (!firstConfirm) return;
+    
+    const confirmText = prompt('Type "DELETE ALL" to confirm:');
+    if (confirmText !== 'DELETE ALL') {
+      toast.error('Deletion cancelled - text did not match');
+      return;
+    }
+    
+    setBulkDeleting(true);
+    
+    try {
+      const result = await deleteAllCompetitions();
+      
+      if (result.success) {
+        toast.success(result.message);
+        loadCompetitions();
+        setSelectedCompetitions([]);
+      } else {
+        toast.error(`Failed to delete all: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Delete all error:', error);
+      toast.error('An error occurred during delete all');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const toggleSelectCompetition = (compId) => {
+    setSelectedCompetitions(prev => 
+      prev.includes(compId) 
+        ? prev.filter(id => id !== compId)
+        : [...prev, compId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedCompetitions.length === competitions.length) {
+      setSelectedCompetitions([]);
+    } else {
+      setSelectedCompetitions(competitions.map(c => c.id));
+    }
   };
 
   return (
@@ -189,56 +314,134 @@ function WelcomePage() {
                 )}
               </div>
 
+              {/* Bulk Actions */}
+              {competitions.length > 1 && (
+                <div className="mb-4 flex flex-wrap items-center gap-3 pb-4 border-b border-gray-200">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-semibold transition-all"
+                  >
+                    {selectedCompetitions.length === competitions.length ? '☑️ Deselect All' : '☐ Select All'}
+                  </button>
+                  
+                  {selectedCompetitions.length > 0 && (
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={bulkDeleting}
+                      className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-2 text-sm font-bold transition-all"
+                    >
+                      {bulkDeleting ? (
+                        <>
+                          <Loader className="animate-spin" size={16} />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 size={16} />
+                          Delete {selectedCompetitions.length} Selected
+                        </>
+                      )}
+                    </button>
+                  )}
+                  
+                  {competitions.length > 5 && (
+                    <button
+                      onClick={() => setShowDangerZone(!showDangerZone)}
+                      className="ml-auto px-3 py-2 text-xs text-red-600 hover:text-red-700 font-semibold"
+                    >
+                      {showDangerZone ? 'Hide' : 'Show'} Danger Zone
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-3 max-h-[400px] overflow-y-auto">
                 {(showAllCompetitions ? competitions : competitions.slice(0, 3)).map((comp) => (
                   <div
                     key={comp.id}
-                    className="bg-gradient-to-br from-cyan-50 to-teal-50 rounded-xl p-4 border-2 border-teal-200 hover:border-teal-400 hover:shadow-md transition-all cursor-pointer"
-                    onClick={() => handleContinueCompetition(comp)}
+                    className={`bg-gradient-to-br from-cyan-50 to-teal-50 rounded-xl p-4 border-2 transition-all relative ${
+                      selectedCompetitions.includes(comp.id)
+                        ? 'border-red-400 bg-red-50'
+                        : 'border-teal-200 hover:border-teal-400 hover:shadow-md'
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold text-gray-800 truncate mb-1">
-                          {comp.name}
-                        </h3>
-                        <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                          <span className="flex items-center gap-1">
-                            📅 {formatDate(comp.date)}
-                          </span>
-                          {comp.venue && (
+                    {/* Selection Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedCompetitions.includes(comp.id)}
+                      onChange={() => toggleSelectCompetition(comp.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-3 left-3 w-5 h-5 cursor-pointer accent-red-500 z-10"
+                      title="Select for bulk delete"
+                    />
+                    
+                    <div 
+                      className="cursor-pointer ml-8"
+                      onClick={() => handleContinueCompetition(comp)}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-bold text-gray-800 truncate mb-1">
+                            {comp.name}
+                          </h3>
+                          <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                             <span className="flex items-center gap-1">
-                              📍 {comp.venue}
+                              📅 {formatDate(comp.date)}
                             </span>
-                          )}
+                            {comp.venue && (
+                              <span className="flex items-center gap-1">
+                                📍 {comp.venue}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          comp.status === 'active' 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {comp.status === 'active' ? '🟢 Active' : '⚪ Completed'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex gap-4 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <span className="font-semibold text-teal-600">{comp.entry_count}</span> entries
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="font-semibold text-teal-600">{comp.judges_count}</span> judges
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCompetition(comp);
+                            }}
+                            disabled={deletingId === comp.id}
+                            className="px-3 py-2 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1 transition-all"
+                            title="Delete Competition"
+                          >
+                            {deletingId === comp.id ? (
+                              <Loader className="animate-spin" size={14} />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
+                          </button>
+                          
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleContinueCompetition(comp);
+                            }}
+                            className="px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-bold rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all shadow-sm"
+                          >
+                            Continue →
+                          </button>
                         </div>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        comp.status === 'active' 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {comp.status === 'active' ? '🟢 Active' : '⚪ Completed'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-4 text-xs text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <span className="font-semibold text-teal-600">{comp.entry_count}</span> entries
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="font-semibold text-teal-600">{comp.judges_count}</span> judges
-                        </span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleContinueCompetition(comp);
-                        }}
-                        className="px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-bold rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all shadow-sm"
-                      >
-                        Continue →
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -247,6 +450,35 @@ function WelcomePage() {
               {competitions.length > 3 && !showAllCompetitions && (
                 <div className="mt-3 text-center text-sm text-gray-500">
                   + {competitions.length - 3} more competitions
+                </div>
+              )}
+
+              {/* Danger Zone */}
+              {showDangerZone && competitions.length > 5 && (
+                <div className="mt-6 p-4 bg-red-50 border-2 border-red-300 rounded-xl">
+                  <h3 className="text-lg font-bold text-red-600 mb-2 flex items-center gap-2">
+                    ⚠️ Danger Zone
+                  </h3>
+                  <p className="text-red-700 text-sm mb-3">
+                    These actions are permanent and cannot be undone!
+                  </p>
+                  <button
+                    onClick={handleDeleteAll}
+                    disabled={bulkDeleting}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 disabled:bg-gray-400 text-sm flex items-center gap-2"
+                  >
+                    {bulkDeleting ? (
+                      <>
+                        <Loader className="animate-spin" size={16} />
+                        Deleting All...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={16} />
+                        Delete ALL {competitions.length} Competitions
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
             </div>

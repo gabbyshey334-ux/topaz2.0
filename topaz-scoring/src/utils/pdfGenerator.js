@@ -172,11 +172,22 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       doc.text(`• ${entry.ability_level}`, badgeX, badgeY);
     }
     
+    // Category Rank (if available) - NEW
+    if (entry.categoryRank) {
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...goldColor);
+      const rankSuffix = entry.categoryRank === 1 ? 'st' : entry.categoryRank === 2 ? 'nd' : entry.categoryRank === 3 ? 'rd' : 'th';
+      doc.text(`🏆 ${entry.categoryRank}${rankSuffix} Place in Category Combination`, nameX, yPos + 28);
+    }
+    
     // Average score (if available)
     if (averageScore) {
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Average: ${averageScore.toFixed(2)} / 100`, nameX, yPos + 36);
+      doc.setTextColor(...darkGray);
+      const scoreY = entry.categoryRank ? yPos + 36 : yPos + 28;
+      doc.text(`Average: ${averageScore.toFixed(2)} / 100`, nameX, scoreY);
     }
     
     yPos += 55;

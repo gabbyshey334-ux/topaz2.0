@@ -51,10 +51,12 @@ function CompetitionSetup() {
   const [newCategoryName, setNewCategoryName] = useState('Jazz');
   const [newVarietyLevel, setNewVarietyLevel] = useState('None');
 
-  // SECTION 3: Age Divisions (FIXED)
+  // SECTION 3: Age Divisions (FIXED - 4 DIVISIONS)
   const FIXED_AGE_DIVISIONS = [
-    { id: 'junior', name: 'Junior', minAge: 3, maxAge: 12, description: 'Junior Division (3-12 years)' },
-    { id: 'senior', name: 'Senior', minAge: 13, maxAge: 99, description: 'Senior Division (13+ years)' }
+    { id: 'junior_primary', name: 'Junior Primary', minAge: 3, maxAge: 7, description: 'Junior Primary (3-7 years)' },
+    { id: 'junior_advanced', name: 'Junior Advanced', minAge: 8, maxAge: 12, description: 'Junior Advanced (8-12 years)' },
+    { id: 'senior_youth', name: 'Senior Youth', minAge: 13, maxAge: 18, description: 'Senior Youth (13-18 years)' },
+    { id: 'senior_adult', name: 'Senior Adult', minAge: 19, maxAge: 99, description: 'Senior Adult (19-99 years)' }
   ];
 
   // SECTION 4: Entries
@@ -313,20 +315,44 @@ function CompetitionSetup() {
       age: newMemberAge ? parseInt(newMemberAge) : null
     };
 
+    const updatedMembers = [...currentEntry.groupMembers, member];
+    
+    // Auto-calculate oldest member age
+    const ages = updatedMembers.map(m => m.age).filter(a => a && !isNaN(a));
+    const oldestAge = ages.length > 0 ? Math.max(...ages) : '';
+    
     setCurrentEntry({
       ...currentEntry,
-      groupMembers: [...currentEntry.groupMembers, member]
+      groupMembers: updatedMembers,
+      age: oldestAge || currentEntry.age
     });
+    
+    // Auto-assign age division if we have an age
+    if (oldestAge) {
+      handleAgeChange(oldestAge.toString());
+    }
 
     setNewMemberName('');
     setNewMemberAge('');
   };
 
   const handleDeleteGroupMember = (id) => {
+    const updatedMembers = currentEntry.groupMembers.filter(m => m.id !== id);
+    
+    // Recalculate oldest age after deletion
+    const ages = updatedMembers.map(m => m.age).filter(a => a && !isNaN(a));
+    const oldestAge = ages.length > 0 ? Math.max(...ages) : '';
+    
     setCurrentEntry({
       ...currentEntry,
-      groupMembers: currentEntry.groupMembers.filter(m => m.id !== id)
+      groupMembers: updatedMembers,
+      age: oldestAge || currentEntry.age
     });
+    
+    // Update age division if age changed
+    if (oldestAge) {
+      handleAgeChange(oldestAge.toString());
+    }
   };
 
   const validateGroupMembers = () => {
@@ -377,6 +403,7 @@ function CompetitionSetup() {
     }
 
     if (currentEntry.type === 'group') {
+      // Validate group member count
       if (!validateGroupMembers()) {
         const divType = currentEntry.divisionType;
         if (divType === 'Duo/Trio') {
@@ -389,6 +416,36 @@ function CompetitionSetup() {
           toast.error('Production must have 10+ members');
         }
         return;
+      }
+      
+      // Validate all members have ages
+      const missingAges = currentEntry.groupMembers.filter(m => !m.age);
+      if (missingAges.length > 0) {
+        toast.error('All group members must have ages');
+        return;
+      }
+      
+      // Validate age matches oldest member
+      const ages = currentEntry.groupMembers.map(m => m.age).filter(a => a && !isNaN(a));
+      if (ages.length > 0) {
+        const oldestAge = Math.max(...ages);
+        const entryAge = parseInt(currentEntry.age);
+        
+        if (entryAge !== oldestAge) {
+          const confirmMismatch = window.confirm(
+            `⚠️ Age Mismatch Detected!\n\n` +
+            `Age field shows ${entryAge} but oldest member is ${oldestAge}.\n\n` +
+            `The system will use ${oldestAge} for age division assignment.\n\n` +
+            `Continue anyway?`
+          );
+          if (!confirmMismatch) {
+            return;
+          }
+          
+          // Auto-fix the age to oldest member
+          setCurrentEntry(prev => ({ ...prev, age: oldestAge }));
+          handleAgeChange(oldestAge.toString());
+        }
       }
     }
 
@@ -608,7 +665,7 @@ function CompetitionSetup() {
 
         ageDivisionMap[div.id] = divResult.data.id;
         }
-      console.log('✅ Age divisions saved: 2');
+      console.log('✅ Age divisions saved: 4');
 
       // Step 4: Save entries with photos
       toast.info('Saving entries...');
@@ -1049,7 +1106,16 @@ function CompetitionSetup() {
                               #{entry.number}
                             </span>
                             <span className="font-semibold text-gray-700">
-                              {entry.name} {entry.age && `(${entry.age})`}
+                              {entry.name} {entry.age && entry.type === 'group' && entry.groupMembers.length > 0 
+                                ? (() => {
+                                    const ages = entry.groupMembers.map(m => m.age).filter(a => a);
+                                    if (ages.length === 0) return `(Age ${entry.age})`;
+                                    const minAge = Math.min(...ages);
+                                    const maxAge = Math.max(...ages);
+                                    return `(Ages ${minAge === maxAge ? minAge : `${minAge}-${maxAge}`} • Oldest: ${entry.age})`;
+                                  })()
+                                : entry.age ? `(Age ${entry.age})` : ''
+                              }
                             </span>
                             {entry.isMedalProgram && (
                               <span className="text-yellow-500 text-lg" title="Medal Program">
@@ -1089,13 +1155,18 @@ function CompetitionSetup() {
                               {entry.isExpanded ? '▼' : '▶'} Group of {entry.groupMembers.length} members
                             </button>
                             {entry.isExpanded && (
-                              <ul className="mt-2 ml-4 text-sm text-gray-600 space-y-1">
-                                {entry.groupMembers.map(member => (
-                                  <li key={member.id}>
-                                    • {member.name} {member.age && `(${member.age} years)`}
-                                  </li>
-                                ))}
-                              </ul>
+                              <div className="mt-2 ml-4">
+                                <ul className="text-sm text-gray-600 space-y-1 mb-2">
+                                  {entry.groupMembers.map(member => (
+                                    <li key={member.id}>
+                                      • {member.name} {member.age && `(${member.age} years old)`}
+                                    </li>
+                                  ))}
+                                </ul>
+                                <p className="text-xs text-teal-600 font-semibold mt-2 px-3 py-1 bg-teal-50 rounded inline-block">
+                                  Competing in {entry.ageDivisionName || 'N/A'} (based on oldest member: {entry.age} years)
+                                </p>
+                              </div>
                             )}
                           </div>
                         )}
@@ -1395,6 +1466,55 @@ function CompetitionSetup() {
                       </div>
                     </div>
                   )}
+
+                  {/* Auto-calculated age display */}
+                  {currentEntry.groupMembers.length > 0 && (() => {
+                    const ages = currentEntry.groupMembers.map(m => m.age).filter(a => a && !isNaN(a));
+                    if (ages.length === 0) return null;
+                    
+                    const oldestAge = Math.max(...ages);
+                    const youngestAge = Math.min(...ages);
+                    const entryAge = parseInt(currentEntry.age);
+                    const hasMismatch = entryAge && entryAge !== oldestAge;
+                    
+                    return (
+                      <div className="mt-4 space-y-3">
+                        {/* Age calculation info */}
+                        <div className="p-4 bg-teal-50 border-2 border-teal-300 rounded-lg">
+                          <p className="font-semibold text-teal-700 flex items-center gap-2">
+                            <span>✓</span>
+                            <span>Age Range: {youngestAge === oldestAge ? `${youngestAge}` : `${youngestAge}-${oldestAge}`} years</span>
+                          </p>
+                          <p className="text-sm text-teal-600 mt-1">
+                            Oldest Member: {oldestAge} years • This age will be used for division assignment
+                          </p>
+                        </div>
+                        
+                        {/* Age mismatch warning */}
+                        {hasMismatch && (
+                          <div className="p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg">
+                            <p className="text-yellow-800 font-semibold flex items-center gap-2">
+                              <span>⚠️</span>
+                              <span>Age Mismatch Detected!</span>
+                            </p>
+                            <p className="text-sm text-yellow-700 mt-1">
+                              Age field shows <strong>{entryAge}</strong> but oldest member is <strong>{oldestAge}</strong>.
+                              {' '}The system will use <strong>{oldestAge}</strong> for age division assignment.
+                            </p>
+                            <button
+                              onClick={() => {
+                                setCurrentEntry(prev => ({ ...prev, age: oldestAge }));
+                                handleAgeChange(oldestAge.toString());
+                              }}
+                              className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm font-semibold hover:bg-yellow-700 transition-colors"
+                            >
+                              Fix Age to {oldestAge}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

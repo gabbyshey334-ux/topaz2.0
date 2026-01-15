@@ -143,9 +143,84 @@ export const updateCompetition = async (competitionId, updates) => {
  */
 export const deleteCompetition = async (competitionId) => {
   try {
-    console.log('Deleting competition:', competitionId);
+    console.log('🗑️  Starting deletion of competition:', competitionId);
     
-    // Supabase will handle cascade deletes based on foreign key constraints
+    // Step 1: Delete all photos from storage
+    console.log('🗑️  Step 1: Deleting photos from storage...');
+    try {
+      const { data: entries } = await supabase
+        .from('entries')
+        .select('photo_url')
+        .eq('competition_id', competitionId);
+      
+      if (entries && entries.length > 0) {
+        const photoUrls = entries
+          .filter(e => e.photo_url)
+          .map(e => {
+            // Extract file path from full URL
+            const urlParts = e.photo_url.split('/');
+            return `${competitionId}/${urlParts[urlParts.length - 1]}`;
+          });
+        
+        if (photoUrls.length > 0) {
+          const { error: storageError } = await supabase
+            .storage
+            .from('entry-photos')
+            .remove(photoUrls);
+          
+          if (storageError) {
+            console.warn('⚠️  Some photos may not have been deleted:', storageError);
+          } else {
+            console.log(`✅ Deleted ${photoUrls.length} photos`);
+          }
+        }
+      }
+    } catch (photoError) {
+      console.warn('⚠️  Error deleting photos (continuing):', photoError);
+    }
+    
+    // Step 2: Delete all scores
+    console.log('🗑️  Step 2: Deleting scores...');
+    const { error: scoresError } = await supabase
+      .from('scores')
+      .delete()
+      .eq('competition_id', competitionId);
+    
+    if (scoresError) throw scoresError;
+    console.log('✅ Scores deleted');
+    
+    // Step 3: Delete all entries
+    console.log('🗑️  Step 3: Deleting entries...');
+    const { error: entriesError } = await supabase
+      .from('entries')
+      .delete()
+      .eq('competition_id', competitionId);
+    
+    if (entriesError) throw entriesError;
+    console.log('✅ Entries deleted');
+    
+    // Step 4: Delete all age divisions
+    console.log('🗑️  Step 4: Deleting age divisions...');
+    const { error: divisionsError } = await supabase
+      .from('age_divisions')
+      .delete()
+      .eq('competition_id', competitionId);
+    
+    if (divisionsError) throw divisionsError;
+    console.log('✅ Age divisions deleted');
+    
+    // Step 5: Delete all categories
+    console.log('🗑️  Step 5: Deleting categories...');
+    const { error: categoriesError } = await supabase
+      .from('categories')
+      .delete()
+      .eq('competition_id', competitionId);
+    
+    if (categoriesError) throw categoriesError;
+    console.log('✅ Categories deleted');
+    
+    // Step 6: Finally, delete the competition itself
+    console.log('🗑️  Step 6: Deleting competition...');
     const { error } = await supabase
       .from('competitions')
       .delete()
@@ -153,10 +228,78 @@ export const deleteCompetition = async (competitionId) => {
 
     if (error) throw error;
     
-    console.log('✅ Competition deleted');
+    console.log('✅ Competition deleted successfully');
     return { success: true };
   } catch (error) {
     console.error('❌ Error deleting competition:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Delete multiple competitions (bulk delete)
+ * @param {Array} competitionIds - Array of competition UUIDs
+ * @returns {Object} - Success status with details
+ */
+export const bulkDeleteCompetitions = async (competitionIds) => {
+  try {
+    console.log(`🗑️  Bulk deleting ${competitionIds.length} competitions...`);
+    
+    const results = {
+      success: [],
+      failed: []
+    };
+    
+    for (const compId of competitionIds) {
+      const result = await deleteCompetition(compId);
+      if (result.success) {
+        results.success.push(compId);
+      } else {
+        results.failed.push({ id: compId, error: result.error });
+      }
+    }
+    
+    console.log(`✅ Bulk delete complete: ${results.success.length} succeeded, ${results.failed.length} failed`);
+    return { 
+      success: true, 
+      data: results,
+      message: `Deleted ${results.success.length} of ${competitionIds.length} competitions`
+    };
+  } catch (error) {
+    console.error('❌ Error in bulk delete:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Delete ALL competitions (danger zone)
+ * @returns {Object} - Success status with count
+ */
+export const deleteAllCompetitions = async () => {
+  try {
+    console.log('🗑️  DANGER: Deleting ALL competitions...');
+    
+    // Get all competition IDs
+    const { data: allCompetitions, error: fetchError } = await supabase
+      .from('competitions')
+      .select('id');
+    
+    if (fetchError) throw fetchError;
+    
+    if (!allCompetitions || allCompetitions.length === 0) {
+      return { success: true, data: { count: 0 }, message: 'No competitions to delete' };
+    }
+    
+    const competitionIds = allCompetitions.map(c => c.id);
+    const result = await bulkDeleteCompetitions(competitionIds);
+    
+    return { 
+      success: true, 
+      data: { count: result.data.success.length },
+      message: `Deleted ${result.data.success.length} competitions`
+    };
+  } catch (error) {
+    console.error('❌ Error deleting all competitions:', error);
     return { success: false, error: error.message };
   }
 };

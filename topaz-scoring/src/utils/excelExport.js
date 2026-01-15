@@ -105,6 +105,12 @@ export const exportResultsToExcel = (entries, allScores, competition, categories
       // Add average score
       row['Average Score'] = avgScore.toFixed(2);
       
+      // Add overall rank (if available)
+      row['Overall Rank'] = entry.rank || 'N/A';
+      
+      // Add category combination rank (if available) - NEW
+      row['Category Combination Rank'] = entry.categoryRank || 'N/A';
+      
       // Add group members if applicable
       if (entryType === 'Group') {
         row['Group Members'] = groupMembers;

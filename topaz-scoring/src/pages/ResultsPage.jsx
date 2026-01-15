@@ -16,6 +16,7 @@ import { getCompetitionScores } from '../supabase/scores';
 import { subscribeToScores, unsubscribeFromChannel } from '../supabase/realtime';
 import { generateScoreSheet } from '../utils/pdfGenerator';
 import { exportResultsToExcel } from '../utils/excelExport';
+import { groupByExactCombination, calculateRankingsPerGroup, extractVarietyLevel } from '../utils/calculations';
 
 function ResultsPage() {
   const navigate = useNavigate();
@@ -41,6 +42,7 @@ function ResultsPage() {
   const [awardingPoints, setAwardingPoints] = useState(false);
   const [showMedalStandings, setShowMedalStandings] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [viewMode, setViewMode] = useState('grouped'); // 'grouped' or 'filtered'
 
   // Redirect if no competitionId
   useEffect(() => {
@@ -158,43 +160,71 @@ function ResultsPage() {
     return filtered;
   }, [rankedResults, selectedCategory, selectedAgeDivision, selectedAbilityLevel, searchQuery]);
 
-  // Medal Program Results - Top 4 per category
+  // Calculate grouped rankings by exact combination (Category + Variety + Age + Ability)
+  const groupedRankings = useMemo(() => {
+    if (rankedResults.length === 0) return {};
+
+    // Group entries by exact combination
+    const groups = groupByExactCombination(rankedResults, categories, ageDivisions);
+    
+    // Calculate rankings per group
+    const rankedGroups = calculateRankingsPerGroup(groups);
+    
+    return rankedGroups;
+  }, [rankedResults, categories, ageDivisions]);
+
+  // Medal Program Results - Top 4 per category combination
   const medalProgramResults = useMemo(() => {
     if (selectedFilter !== 'medal') return [];
 
-    const grouped = {};
+    const medalGroups = [];
     
-    // Only include entries enrolled in medal program
-    const medalEntries = rankedResults.filter(e => e.is_medal_program);
-
-    categories.forEach(cat => {
-      if (specialCategoryNames.includes(cat.name)) return; // Skip special categories
-
-      const catResults = medalEntries
-        .filter(e => e.category_id === cat.id)
-        .slice(0, 4); // Top 4
-
-      if (catResults.length > 0) {
-        grouped[cat.id] = {
-          name: cat.name,
-          results: catResults
-        };
+    // Iterate through grouped rankings
+    Object.keys(groupedRankings).forEach(key => {
+      const group = groupedRankings[key];
+      
+      // Filter only medal program entries
+      const medalEntries = group.entries.filter(e => e.is_medal_program);
+      
+      if (medalEntries.length > 0) {
+        // Skip special categories
+        const category = categories.find(c => c.id === group.categoryId);
+        if (category && specialCategoryNames.includes(category.name)) return;
+        
+        medalGroups.push({
+          key: key,
+          category: group.category,
+          variety: group.variety,
+          ageDivision: group.ageDivision,
+          abilityLevel: group.abilityLevel,
+          results: medalEntries.slice(0, 4) // Top 4
+        });
       }
     });
 
-    return Object.values(grouped);
-  }, [rankedResults, categories, selectedFilter]);
+    return medalGroups;
+  }, [groupedRankings, categories, selectedFilter]);
 
   const handleAwardMedalPoints = async () => {
-    if (!window.confirm('Award 1 point to all 1st place Medal Program winners?')) return;
+    if (!window.confirm('Award 1 point to all 1st place Medal Program winners in each category combination?')) return;
 
     try {
       setAwardingPoints(true);
       
-      // Find all 1st place winners enrolled in medal program
-      const firstPlaceWinners = rankedResults
-        .filter(e => e.rank === 1 && e.is_medal_program)
-        .map(e => e.id);
+      // Find all 1st place winners per category combination (enrolled in medal program)
+      const firstPlaceWinners = [];
+      
+      // Iterate through grouped rankings to find 1st place in each group
+      Object.keys(groupedRankings).forEach(key => {
+        const group = groupedRankings[key];
+        
+        // Find 1st place entry in this group (enrolled in medal program)
+        const firstPlace = group.entries.find(e => e.categoryRank === 1 && e.is_medal_program);
+        
+        if (firstPlace) {
+          firstPlaceWinners.push(firstPlace.id);
+        }
+      });
 
       if (firstPlaceWinners.length === 0) {
         toast.info('No 1st place medal program entries found to award.');
@@ -205,10 +235,15 @@ function ResultsPage() {
       const result = await awardMedalPointsToWinners(competitionId, firstPlaceWinners);
       
       if (result.success) {
-        toast.success(`Successfully awarded points to ${result.totalAwarded} winners!`);
+        toast.success(`Successfully awarded points to ${result.totalAwarded} winners across ${firstPlaceWinners.length} category combinations!`);
         // Refresh entries to show updated points
         const entriesResult = await getCompetitionEntries(competitionId);
-        if (entriesResult.success) setEntries(entriesResult.data);
+        if (entriesResult.success) {
+          setEntries(entriesResult.data);
+          // Refresh scores to recalculate rankings
+          const scoresResult = await getCompetitionScores(competitionId);
+          if (scoresResult.success) setScores(scoresResult.data);
+        }
       } else {
         throw new Error(result.error);
       }
@@ -552,14 +587,89 @@ function ResultsPage() {
           {/* MEDAL PROGRAM VIEW */}
           {selectedFilter === 'medal' && (
             <div className="space-y-12">
+              {/* SEASON LEADERBOARD */}
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-8 border-2 border-purple-200 shadow-xl">
+                <h2 className="text-4xl font-black text-purple-800 text-center mb-8 flex items-center justify-center gap-3">
+                  <span>👑</span> SEASON LEADERBOARD - TOP 10
+                </h2>
+                
+                {(() => {
+                  const medalEntries = rankedResults
+                    .filter(e => e.is_medal_program && (e.medal_points || 0) > 0)
+                    .sort((a, b) => (b.medal_points || 0) - (a.medal_points || 0))
+                    .slice(0, 10);
+                  
+                  return medalEntries.length === 0 ? (
+                    <div className="bg-white/40 p-12 rounded-2xl text-center italic text-purple-700">
+                      No medal points awarded yet. Award points to 1st place winners below!
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {medalEntries.map((entry, index) => (
+                        <div key={entry.id} className={`flex items-center gap-4 p-4 rounded-xl shadow-md transition-all hover:scale-[1.02] ${
+                          index === 0 ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-2 border-yellow-400' :
+                          index === 1 ? 'bg-gradient-to-r from-gray-100 to-slate-100 border-2 border-gray-400' :
+                          index === 2 ? 'bg-gradient-to-r from-orange-100 to-amber-100 border-2 border-orange-400' :
+                          'bg-white'
+                        }`}>
+                          {/* Rank */}
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-xl ${
+                            index === 0 ? 'bg-yellow-400 text-white' :
+                            index === 1 ? 'bg-gray-400 text-white' :
+                            index === 2 ? 'bg-orange-400 text-white' :
+                            'bg-purple-100 text-purple-600'
+                          }`}>
+                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                          </div>
+                          
+                          {/* Photo */}
+                          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-md">
+                            {entry.photo_url ? (
+                              <img src={entry.photo_url} alt={entry.competitor_name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-purple-100 flex items-center justify-center text-2xl">
+                                👤
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-xl font-bold text-gray-800 truncate">{entry.competitor_name}</h3>
+                            <p className="text-sm text-gray-600">
+                              {getCategoryName(entry.category_id)} • {entry.ability_level}
+                            </p>
+                          </div>
+                          
+                          {/* Medal Info */}
+                          <div className="text-center">
+                            <p className="text-3xl font-black text-purple-600">
+                              {entry.medal_points || 0}
+                            </p>
+                            <p className="text-xs font-bold text-gray-500 uppercase">Points</p>
+                            <div className="mt-1">
+                              {entry.current_medal_level === 'Gold' && <span className="text-lg">🥇</span>}
+                              {entry.current_medal_level === 'Silver' && <span className="text-lg">🥈</span>}
+                              {entry.current_medal_level === 'Bronze' && <span className="text-lg">🥉</span>}
+                              {entry.current_medal_level === 'None' && <span className="text-lg">⭐</span>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* COMPETITION RESULTS */}
               <div className="bg-gradient-to-br from-yellow-50 to-amber-100 rounded-3xl p-8 border-2 border-amber-200 shadow-xl">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 text-center md:text-left">
                   <div>
                     <h2 className="text-3xl font-black text-amber-800 flex items-center justify-center md:justify-start gap-3">
-                      <span>🏆</span> MEDAL PROGRAM SEASON STANDINGS
+                      <span>🏆</span> THIS COMPETITION - MEDAL PROGRAM RESULTS
                     </h2>
                     <p className="text-amber-700 font-semibold mt-2 italic">
-                      Tracking progress toward Bronze, Silver, and Gold milestones
+                      Top 4 per category combination • Only 1st place earns points
           </p>
         </div>
 
@@ -602,28 +712,39 @@ function ResultsPage() {
                 ) : (
                   <div className="space-y-8">
                     {medalProgramResults.map((group) => (
-                      <div key={group.name} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border-2 border-amber-100 shadow-md">
-                        <h3 className="text-xl font-bold text-amber-900 mb-6 border-b-2 border-amber-100 pb-3 flex items-center gap-2">
-                          <span>✨</span> {group.name} - Top 4
+                      <div key={group.key} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border-2 border-amber-100 shadow-md">
+                        <h3 className="text-xl font-bold text-amber-900 mb-2 border-b-2 border-amber-100 pb-3 flex items-center gap-2">
+                          <span>✨</span> {group.category} {group.variety !== 'None' ? group.variety : ''} - Top 4
                         </h3>
+                        <p className="text-sm text-amber-700 mb-4 flex gap-2 flex-wrap">
+                          <span className="px-2 py-1 bg-amber-50 rounded">📅 {group.ageDivision}</span>
+                          <span className="px-2 py-1 bg-amber-50 rounded">⭐ {group.abilityLevel}</span>
+                        </p>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                           {group.results.map((entry) => (
                             <div key={entry.id} className="relative bg-white rounded-xl p-4 border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
-                              {/* Rank Badge */}
+                              {/* Rank Badge - Use categoryRank */}
                               <div className={`absolute -top-3 -left-3 w-10 h-10 rounded-full flex items-center justify-center font-bold shadow-md border-2 border-white ${
-                                entry.rank === 1 ? 'bg-yellow-400 text-white' : 
-                                entry.rank === 2 ? 'bg-gray-300 text-white' :
-                                entry.rank === 3 ? 'bg-orange-400 text-white' :
+                                entry.categoryRank === 1 ? 'bg-yellow-400 text-white' : 
+                                entry.categoryRank === 2 ? 'bg-gray-300 text-white' :
+                                entry.categoryRank === 3 ? 'bg-orange-400 text-white' :
                                 'bg-teal-500 text-white'
                               }`}>
-                                {entry.rank}
+                                {entry.categoryRank}
                               </div>
+
+                              {/* 1st Place Winner Badge */}
+                              {entry.categoryRank === 1 && (
+                                <div className="absolute -top-2 -right-2 text-2xl animate-pulse">
+                                  🏆
+                                </div>
+                              )}
 
                               <div className="flex flex-col items-center text-center">
                                 <div className="w-20 h-20 rounded-full overflow-hidden mb-3 border-2 border-amber-100">
                                   {entry.photo_url ? (
-                                    <img src={entry.photo_url} className="w-full h-full object-cover" />
+                                    <img src={entry.photo_url} alt={entry.competitor_name} className="w-full h-full object-cover" />
                                   ) : (
                                     <div className="w-full h-full bg-amber-50 flex items-center justify-center text-2xl text-amber-200">
                                       👤
@@ -638,11 +759,18 @@ function ResultsPage() {
                                 <div className="w-full pt-3 border-t border-gray-100 mt-2">
                                   <div className="flex items-center justify-center gap-1 mb-1">
                                     <MedalBadge medalLevel={entry.current_medal_level} size="sm" />
-                                    <span className="text-xs font-bold text-gray-500 uppercase">{entry.medal_points} PTS</span>
+                                    <span className="text-xs font-bold text-gray-500 uppercase">{entry.medal_points || 0} PTS</span>
                                   </div>
                                   <p className="text-[10px] text-amber-700 font-semibold uppercase leading-tight">
-                                    {getMedalProgress(entry.medal_points)}
+                                    {getMedalProgress(entry.medal_points || 0)}
                                   </p>
+                                  
+                                  {/* Points Earned This Competition */}
+                                  {entry.categoryRank === 1 && (
+                                    <p className="text-[10px] text-green-600 font-bold mt-1">
+                                      +1 pt for 1st place!
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -656,8 +784,214 @@ function ResultsPage() {
             </div>
           )}
 
-          {/* RESULTS CARDS */}
+          {/* VIEW MODE TABS */}
           {selectedFilter !== 'medal' && (
+            <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={() => setViewMode('grouped')}
+                  className={`px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center gap-2 ${
+                    viewMode === 'grouped'
+                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg scale-105'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span>🏆</span>
+                  <span>By Category Combination</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('filtered')}
+                  className={`px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center gap-2 ${
+                    viewMode === 'filtered'
+                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg scale-105'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span>🔍</span>
+                  <span>Custom Filter</span>
+                </button>
+              </div>
+              <p className="text-center text-sm text-gray-500 mt-4">
+                {viewMode === 'grouped' 
+                  ? 'Viewing rankings by exact category combination (each group has its own 1st, 2nd, 3rd place)'
+                  : 'Viewing overall rankings with custom filters'}
+              </p>
+            </div>
+          )}
+
+          {/* GROUPED RESULTS VIEW */}
+          {selectedFilter !== 'medal' && viewMode === 'grouped' && (
+            Object.keys(groupedRankings).length === 0 ? (
+              <div className="bg-white rounded-3xl shadow-lg p-20 text-center">
+                <div className="text-6xl mb-6">🏆</div>
+                <h3 className="text-3xl font-bold text-gray-800 mb-3">No Results Yet</h3>
+                <p className="text-gray-600">Results will appear here once judges complete scoring.</p>
+              </div>
+            ) : (
+              <div className="space-y-12">
+                {Object.keys(groupedRankings).map((key) => {
+                  const group = groupedRankings[key];
+                  
+                  return (
+                    <div key={key} className="bg-white rounded-3xl shadow-2xl overflow-hidden border-2 border-gray-200">
+                      {/* Group Header */}
+                      <div className="bg-gradient-to-r from-teal-600 via-cyan-500 to-teal-600 p-8">
+                        <h2 className="text-3xl font-extrabold text-white mb-3 drop-shadow-lg">
+                          🏆 {group.category}
+                          {group.variety !== 'None' && ` ${group.variety}`}
+                        </h2>
+                        <div className="flex flex-wrap gap-3 mb-3">
+                          <span className="px-4 py-2 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
+                            📅 {group.ageDivision}
+                          </span>
+                          <span className="px-4 py-2 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
+                            ⭐ {group.abilityLevel}
+                          </span>
+                        </div>
+                        <p className="text-white/90 text-lg font-semibold">
+                          {group.entries.length} competitor{group.entries.length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+
+                      {/* Rankings Within This Group */}
+                      <div className="p-6 space-y-4">
+                        {group.entries.map((entry) => {
+                          const isExpanded = expandedEntries.has(entry.id);
+                          const categoryName = getCategoryName(entry.category_id);
+                          const ageDivisionName = getAgeDivisionName(entry.age_division_id);
+
+                          return (
+                            <div
+                              key={entry.id}
+                              className={`bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-md border-2 ${getRankBorderColor(entry.categoryRank)} overflow-hidden hover:shadow-xl transition-all duration-300`}
+                            >
+                              {/* Entry Header */}
+                              <div className={`bg-gradient-to-r ${getRankColor(entry.categoryRank)} p-4 flex items-center gap-4 flex-wrap`}>
+                                {/* Rank Badge */}
+                                <div className="relative">
+                                  <div className="w-16 h-16 bg-white rounded-full flex flex-col items-center justify-center shadow-lg">
+                                    <span className={`text-2xl font-extrabold ${entry.categoryRank <= 3 ? getScoreColor(100) : 'text-teal-600'}`}>
+                                      {entry.categoryRank}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                      {entry.categoryRank === 1 ? 'st' : entry.categoryRank === 2 ? 'nd' : entry.categoryRank === 3 ? 'rd' : 'th'}
+                                    </span>
+                                  </div>
+                                  {entry.categoryRank <= 3 && (
+                                    <span className="absolute -top-1 -right-1 text-2xl">
+                                      {getMedalEmoji(entry.categoryRank)}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Entry Photo */}
+                                <div className="w-20 h-20 rounded-xl overflow-hidden border-3 border-white shadow-lg">
+                                  {entry.photo_url ? (
+                                    <LazyLoadImage
+                                      src={entry.photo_url}
+                                      alt={entry.competitor_name}
+                                      effect="blur"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                                      <span className="text-3xl text-gray-400">👤</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Entry Info */}
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-xl sm:text-2xl font-extrabold text-white drop-shadow-lg mb-2">
+                                    #{entry.entry_number} {entry.competitor_name}
+                                  </h3>
+                                  <div className="flex items-center gap-3">
+                                    <span className="px-3 py-1 bg-white/30 backdrop-blur rounded-full text-xs font-bold text-white">
+                                      Age {entry.age}
+                                    </span>
+                                    {entry.is_medal_program && (
+                                      <span className="px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-xs font-bold">
+                                        ⭐ MEDAL PROGRAM
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Score Badge */}
+                                <div className="bg-white rounded-2xl px-6 py-3 shadow-lg text-center">
+                                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Score</div>
+                                  <div className={`text-3xl font-extrabold ${getScoreColor(entry.averageScore)}`}>
+                                    {entry.averageScore.toFixed(2)}
+                                  </div>
+                                  <div className="text-xs text-gray-400 mt-1">out of 100</div>
+                                </div>
+                              </div>
+
+                              {/* Expand Button */}
+                              <button
+                                onClick={() => toggleExpanded(entry.id)}
+                                className="w-full p-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2 text-sm font-semibold text-gray-600"
+                              >
+                                <span>{isExpanded ? '▲' : '▼'}</span>
+                                <span>{isExpanded ? 'Hide Details' : 'View Score Details'}</span>
+                              </button>
+
+                              {/* Expanded Score Details */}
+                              {isExpanded && entry.scores && entry.scores.length > 0 && (
+                                <div className="p-6 bg-gray-50 border-t-2 border-gray-200">
+                                  <h4 className="text-lg font-bold text-gray-800 mb-4">Judge Scores</h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {entry.scores.map((score) => (
+                                      <div key={score.id} className="bg-white rounded-xl p-4 border-2 border-gray-200 shadow-sm">
+                                        <h5 className="font-bold text-teal-600 mb-3">Judge {score.judge_number}</h5>
+                                        <div className="space-y-2 text-sm">
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Technique:</span>
+                                            <span className="font-bold">{score.technique}/25</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Creativity:</span>
+                                            <span className="font-bold">{score.creativity}/25</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Presentation:</span>
+                                            <span className="font-bold">{score.presentation}/25</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Appearance:</span>
+                                            <span className="font-bold">{score.appearance}/25</span>
+                                          </div>
+                                          <div className="flex justify-between pt-2 border-t-2 border-gray-200">
+                                            <span className="font-bold text-teal-600">Total:</span>
+                                            <span className="font-bold text-teal-600">{score.total_score}/100</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <button
+                                    onClick={() => handlePrintScoreSheet(entry)}
+                                    disabled={generatingPdf}
+                                    className="mt-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all flex items-center gap-2 mx-auto"
+                                  >
+                                    <span>🖨</span>
+                                    <span>Print Score Sheet</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {/* FILTERED RESULTS VIEW (ORIGINAL) */}
+          {selectedFilter !== 'medal' && viewMode === 'filtered' && (
             filteredResults.length === 0 ? (
             <div className="bg-white rounded-3xl shadow-lg p-20 text-center">
               <div className="text-6xl mb-6">🏆</div>

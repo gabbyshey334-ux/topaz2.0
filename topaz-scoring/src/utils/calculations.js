@@ -307,3 +307,111 @@ export const getCategoryBreakdown = (scores) => {
   return breakdown;
 };
 
+/**
+ * Extract variety level from category description
+ * @param {string} description - Category description (e.g., "Jazz | Variety A")
+ * @returns {string} - Variety level or "None"
+ */
+export const extractVarietyLevel = (description) => {
+  if (!description) return 'None';
+  
+  // Description format: "CategoryName | VarietyLevel"
+  const parts = description.split('|');
+  if (parts.length > 1) {
+    return parts[1].trim();
+  }
+  
+  return 'None';
+};
+
+/**
+ * Group entries by exact combination of Category + Variety + Age Division + Ability Level
+ * Each group represents a separate competition with its own rankings
+ * @param {Array} entries - Array of entry objects with averageScore
+ * @param {Array} categories - Array of category objects
+ * @param {Array} ageDivisions - Array of age division objects
+ * @returns {Object} - Object with combination keys mapping to group data
+ */
+export const groupByExactCombination = (entries, categories = [], ageDivisions = []) => {
+  if (!entries || entries.length === 0) return {};
+  
+  const groups = {};
+  
+  entries.forEach(entry => {
+    // Get category info
+    const category = categories.find(c => c.id === entry.category_id);
+    const categoryName = category?.name || 'Unknown';
+    const varietyLevel = extractVarietyLevel(category?.description);
+    
+    // Get age division info
+    const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
+    const ageDivisionName = ageDivision?.name || 'No Division';
+    
+    // Get ability level
+    const abilityLevel = entry.ability_level || 'Unknown';
+    
+    // Create unique key for this exact combination
+    const key = `${categoryName}|${varietyLevel}|${ageDivisionName}|${abilityLevel}`;
+    
+    if (!groups[key]) {
+      groups[key] = {
+        category: categoryName,
+        categoryId: entry.category_id,
+        variety: varietyLevel,
+        ageDivision: ageDivisionName,
+        ageDivisionId: entry.age_division_id,
+        abilityLevel: abilityLevel,
+        entries: []
+      };
+    }
+    
+    groups[key].entries.push(entry);
+  });
+  
+  return groups;
+};
+
+/**
+ * Calculate rankings per group (each group gets its own 1st, 2nd, 3rd place)
+ * @param {Object} groups - Groups object from groupByExactCombination
+ * @returns {Object} - Groups with rankings assigned to each entry
+ */
+export const calculateRankingsPerGroup = (groups) => {
+  const rankedGroups = {};
+  
+  Object.keys(groups).forEach(key => {
+    const group = { ...groups[key] };
+    
+    // Sort entries by average score (descending)
+    const sortedEntries = [...group.entries].sort((a, b) => b.averageScore - a.averageScore);
+    
+    // Assign ranks within this group (handle ties)
+    let currentRank = 1;
+    let previousScore = null;
+    let skipCount = 0;
+    
+    const rankedEntries = sortedEntries.map((entry, index) => {
+      if (previousScore !== null && entry.averageScore < previousScore) {
+        currentRank += skipCount;
+        skipCount = 1;
+      } else if (previousScore !== null && entry.averageScore === previousScore) {
+        skipCount++;
+      } else {
+        skipCount = 1;
+      }
+      
+      previousScore = entry.averageScore;
+      
+      return {
+        ...entry,
+        categoryRank: currentRank // Rank within this specific category combination
+      };
+    });
+    
+    group.entries = rankedEntries;
+    rankedGroups[key] = group;
+  });
+  
+  return rankedGroups;
+};
+
