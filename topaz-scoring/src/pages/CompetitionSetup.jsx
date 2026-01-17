@@ -372,6 +372,16 @@ function CompetitionSetup() {
   };
 
   const handleSaveEntry = () => {
+    console.log('🎯 SAVE ENTRY ATTEMPT');
+    console.log('Entry details:', {
+      name: currentEntry.name,
+      type: currentEntry.type,
+      age: currentEntry.age,
+      isGroup: currentEntry.type === 'group',
+      groupMembers: currentEntry.groupMembers,
+      memberCount: currentEntry.groupMembers.length
+    });
+
     // Validation
     if (!currentEntry.name.trim() && currentEntry.type === 'solo') {
       toast.error('Please enter dancer name');
@@ -418,20 +428,25 @@ function CompetitionSetup() {
         return;
       }
       
-      // Validate all members have ages
-      const missingAges = currentEntry.groupMembers.filter(m => !m.age);
-      if (missingAges.length > 0) {
-        toast.error('All group members must have ages');
-        return;
+      // FIXED: Make ages OPTIONAL for group members
+      // Only validate if some (but not all) members have ages
+      const membersWithAges = currentEntry.groupMembers.filter(m => m.age && m.age !== '');
+      const membersWithoutAges = currentEntry.groupMembers.filter(m => !m.age || m.age === '');
+      
+      // If SOME have ages but not ALL, show warning (but don't block save)
+      if (membersWithAges.length > 0 && membersWithoutAges.length > 0) {
+        console.warn(`⚠️ Mixed ages: ${membersWithAges.length} with ages, ${membersWithoutAges.length} without`);
+        // Still allow save - just use the ages that are provided
       }
       
-      // Validate age matches oldest member
+      // Validate age matches oldest member (only if any ages provided)
       const ages = currentEntry.groupMembers.map(m => m.age).filter(a => a && !isNaN(a));
       if (ages.length > 0) {
         const oldestAge = Math.max(...ages);
         const entryAge = parseInt(currentEntry.age);
         
-        if (entryAge !== oldestAge) {
+        // Only warn if there's a significant mismatch
+        if (entryAge && entryAge !== oldestAge) {
           const confirmMismatch = window.confirm(
             `⚠️ Age Mismatch Detected!\n\n` +
             `Age field shows ${entryAge} but oldest member is ${oldestAge}.\n\n` +
@@ -452,6 +467,18 @@ function CompetitionSetup() {
     const category = categories.find(c => c.id === currentEntry.categoryId);
     const ageDivision = FIXED_AGE_DIVISIONS.find(d => d.id === currentEntry.ageDivisionId);
 
+    // Clean group members data
+    const cleanedGroupMembers = currentEntry.type === 'group' 
+      ? currentEntry.groupMembers.map(m => ({
+          id: m.id,
+          name: m.name || '',
+          age: m.age ? parseInt(m.age) : null
+        }))
+      : [];
+
+    console.log('✅ Validation passed - creating entry object');
+    console.log('Cleaned group members:', cleanedGroupMembers);
+
     const newEntry = {
       id: Date.now().toString(),
       number: entries.length + 1,
@@ -468,9 +495,11 @@ function CompetitionSetup() {
       isMedalProgram: currentEntry.isMedalProgram,
       photoFile: currentEntry.photoFile,
       photoPreview: currentEntry.photoFile ? URL.createObjectURL(currentEntry.photoFile) : null,
-      groupMembers: currentEntry.type === 'group' ? [...currentEntry.groupMembers] : [],
+      groupMembers: cleanedGroupMembers,
       isExpanded: false
     };
+
+    console.log('📦 New entry object created:', newEntry);
 
     setEntries([...entries, newEntry]);
     toast.success(`Added: ${newEntry.name}`);
@@ -694,6 +723,21 @@ function CompetitionSetup() {
         // Get Supabase age division ID from our map
         const ageDivisionSupabaseId = ageDivisionMap[entry.ageDivisionId] || null;
 
+        // FIXED: Clean up group members data before saving
+        const cleanedGroupMembers = entry.type === 'group' && entry.groupMembers.length > 0
+          ? entry.groupMembers.map(m => ({
+              name: m.name || '',
+              age: m.age ? parseInt(m.age) : null
+            }))
+          : null;
+
+        console.log('💾 Saving entry:', {
+          name: entry.name,
+          type: entry.type,
+          isGroup: entry.type === 'group',
+          groupMembers: cleanedGroupMembers
+        });
+
         // Create entry
         const entryResult = await createEntry({
           competition_id: competitionId,
@@ -704,7 +748,8 @@ function CompetitionSetup() {
           age_division_id: ageDivisionSupabaseId,
           ability_level: entry.abilityLevel,
           is_medal_program: entry.isMedalProgram,
-          dance_type: `${entry.divisionType} | ${entry.type} | Medal: ${entry.isMedalProgram} | Members: ${JSON.stringify(entry.groupMembers)}`,
+          dance_type: entry.divisionType,
+          group_members: cleanedGroupMembers, // Send as separate field
           photo_url: photoUrl
         });
 

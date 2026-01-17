@@ -30,6 +30,20 @@ export const createEntry = async (entryData) => {
       entryToInsert.is_medal_program = entryData.is_medal_program;
     }
 
+    // FIXED: Add group_members as JSONB if provided
+    if (entryData.group_members !== undefined) {
+      // Clean up group members data - convert ages to numbers or null
+      const cleanedMembers = Array.isArray(entryData.group_members) 
+        ? entryData.group_members.map(m => ({
+            name: m.name || '',
+            age: m.age ? parseInt(m.age) : null
+          }))
+        : null;
+      
+      entryToInsert.group_members = cleanedMembers;
+      console.log('📦 Group members being saved:', cleanedMembers);
+    }
+
     const { data, error } = await supabase
       .from('entries')
       .insert([entryToInsert])
