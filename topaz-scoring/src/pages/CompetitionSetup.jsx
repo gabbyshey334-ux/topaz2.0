@@ -278,32 +278,38 @@ function CompetitionSetup() {
   // Handle age input with automatic age division assignment
   const handleAgeChange = (ageValue) => {
     const age = parseInt(ageValue);
-    setCurrentEntry({
-      ...currentEntry,
-      age: ageValue
-    });
-
-    // Auto-select age division if age is valid
+    
+    // Find matching age division
+    let ageDivisionId = currentEntry.ageDivisionId;
+    let autoDiv = null;
+    
     if (age && !isNaN(age)) {
       const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
         age >= div.minAge && age <= div.maxAge
       );
 
       if (matchingDivision) {
-        setCurrentEntry(prev => ({
-          ...prev,
-          ageDivisionId: matchingDivision.id
-        }));
-        setAutoSelectedDivision(matchingDivision);
-      } else {
-        setAutoSelectedDivision(null);
+        ageDivisionId = matchingDivision.id;
+        autoDiv = matchingDivision;
       }
-    } else {
-      setAutoSelectedDivision(null);
     }
+
+    // FIXED: Single state update combining all changes
+    setCurrentEntry(prev => ({
+      ...prev,
+      age: ageValue,
+      ageDivisionId: ageDivisionId
+    }));
+    
+    setAutoSelectedDivision(autoDiv);
   };
 
   const handleAddGroupMember = () => {
+    console.log('🔵 ADD GROUP MEMBER CLICKED');
+    console.log('📝 Name:', newMemberName);
+    console.log('📝 Age:', newMemberAge);
+    console.log('📋 Current members BEFORE:', currentEntry.groupMembers);
+
     if (!newMemberName.trim()) {
       toast.error('Please enter member name');
       return;
@@ -315,44 +321,100 @@ function CompetitionSetup() {
       age: newMemberAge ? parseInt(newMemberAge) : null
     };
 
+    console.log('➕ New member to add:', member);
+
     const updatedMembers = [...currentEntry.groupMembers, member];
+    console.log('📋 Members AFTER add:', updatedMembers);
     
     // Auto-calculate oldest member age
-    const ages = updatedMembers.map(m => m.age).filter(a => a && !isNaN(a));
-    const oldestAge = ages.length > 0 ? Math.max(...ages) : '';
+    const validAges = updatedMembers
+      .map(m => m.age)
+      .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
     
-    setCurrentEntry({
-      ...currentEntry,
-      groupMembers: updatedMembers,
-      age: oldestAge || currentEntry.age
-    });
+    const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
+    console.log('📊 Valid ages:', validAges);
+    console.log('👴 Oldest age:', oldestAge);
     
-    // Auto-assign age division if we have an age
+    // Find matching age division
+    let ageDivisionId = currentEntry.ageDivisionId;
+    let autoDiv = null;
+    
     if (oldestAge) {
-      handleAgeChange(oldestAge.toString());
+      const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
+        oldestAge >= div.minAge && oldestAge <= div.maxAge
+      );
+      
+      if (matchingDivision) {
+        ageDivisionId = matchingDivision.id;
+        autoDiv = matchingDivision;
+        console.log('✅ Auto-selected division:', matchingDivision.name);
+      }
+    }
+    
+    // FIXED: Single state update combining all changes
+    setCurrentEntry(prev => ({
+      ...prev,
+      groupMembers: updatedMembers,
+      age: oldestAge || prev.age,
+      ageDivisionId: ageDivisionId
+    }));
+    
+    if (autoDiv) {
+      setAutoSelectedDivision(autoDiv);
     }
 
+    // Clear inputs
     setNewMemberName('');
     setNewMemberAge('');
+    
+    console.log('✅ Add member complete!');
+    toast.success(`Added: ${member.name}${member.age ? ` (Age ${member.age})` : ''}`);
   };
 
   const handleDeleteGroupMember = (id) => {
+    console.log('🗑️ DELETE GROUP MEMBER:', id);
+    
     const updatedMembers = currentEntry.groupMembers.filter(m => m.id !== id);
+    console.log('📋 Members after delete:', updatedMembers);
     
     // Recalculate oldest age after deletion
-    const ages = updatedMembers.map(m => m.age).filter(a => a && !isNaN(a));
-    const oldestAge = ages.length > 0 ? Math.max(...ages) : '';
+    const validAges = updatedMembers
+      .map(m => m.age)
+      .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
     
-    setCurrentEntry({
-      ...currentEntry,
-      groupMembers: updatedMembers,
-      age: oldestAge || currentEntry.age
-    });
+    const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
+    console.log('👴 New oldest age after delete:', oldestAge);
     
-    // Update age division if age changed
+    // Find matching age division
+    let ageDivisionId = currentEntry.ageDivisionId;
+    let autoDiv = null;
+    
     if (oldestAge) {
-      handleAgeChange(oldestAge.toString());
+      const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
+        oldestAge >= div.minAge && oldestAge <= div.maxAge
+      );
+      
+      if (matchingDivision) {
+        ageDivisionId = matchingDivision.id;
+        autoDiv = matchingDivision;
+      }
     }
+    
+    // FIXED: Single state update combining all changes
+    setCurrentEntry(prev => ({
+      ...prev,
+      groupMembers: updatedMembers,
+      age: oldestAge || '',
+      ageDivisionId: ageDivisionId
+    }));
+    
+    if (autoDiv) {
+      setAutoSelectedDivision(autoDiv);
+    } else if (!oldestAge) {
+      setAutoSelectedDivision(null);
+    }
+    
+    console.log('✅ Delete member complete!');
   };
 
   const validateGroupMembers = () => {

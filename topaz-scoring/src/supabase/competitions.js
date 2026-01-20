@@ -82,16 +82,22 @@ export const getCompetition = async (competitionId) => {
 /**
  * Get all competitions
  * @param {string} status - Filter by status (active/completed/all)
+ * @param {boolean} includeArchived - Whether to include archived competitions (default: false)
  * @returns {Array} - List of competitions
  */
-export const getAllCompetitions = async (status = 'all') => {
+export const getAllCompetitions = async (status = 'all', includeArchived = false) => {
   try {
-    console.log('Fetching all competitions, status:', status);
+    console.log('Fetching all competitions, status:', status, 'includeArchived:', includeArchived);
     
     let query = supabase
       .from('competitions')
       .select('*')
       .order('date', { ascending: false });
+    
+    // Filter out archived competitions by default
+    if (!includeArchived) {
+      query = query.or('is_archived.is.null,is_archived.eq.false');
+    }
     
     if (status !== 'all') {
       query = query.eq('status', status);
@@ -105,6 +111,78 @@ export const getAllCompetitions = async (status = 'all') => {
     return { success: true, data };
   } catch (error) {
     console.error('❌ Error fetching competitions:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Get only archived competitions
+ * @returns {Array} - List of archived competitions
+ */
+export const getArchivedCompetitions = async () => {
+  try {
+    console.log('Fetching archived competitions');
+    
+    const { data, error } = await supabase
+      .from('competitions')
+      .select('*')
+      .eq('is_archived', true)
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+    
+    console.log('✅ Archived competitions fetched:', data?.length);
+    return { success: true, data };
+  } catch (error) {
+    console.error('❌ Error fetching archived competitions:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Archive a competition (soft delete)
+ * @param {string} competitionId - UUID of competition to archive
+ * @returns {Object} - Success status
+ */
+export const archiveCompetition = async (competitionId) => {
+  try {
+    console.log('Archiving competition:', competitionId);
+    
+    const { error } = await supabase
+      .from('competitions')
+      .update({ is_archived: true })
+      .eq('id', competitionId);
+
+    if (error) throw error;
+    
+    console.log('✅ Competition archived');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Error archiving competition:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Restore a competition from archive
+ * @param {string} competitionId - UUID of competition to restore
+ * @returns {Object} - Success status
+ */
+export const restoreCompetition = async (competitionId) => {
+  try {
+    console.log('Restoring competition:', competitionId);
+    
+    const { error } = await supabase
+      .from('competitions')
+      .update({ is_archived: false })
+      .eq('id', competitionId);
+
+    if (error) throw error;
+    
+    console.log('✅ Competition restored');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Error restoring competition:', error);
     return { success: false, error: error.message };
   }
 };
