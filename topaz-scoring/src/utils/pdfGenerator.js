@@ -143,6 +143,21 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       entry.competitor_name;
     doc.text(nameText, nameX, yPos + 15);
     
+    // Studio and Teacher info (if provided)
+    if (entry.studio_name || entry.teacher_name) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      let studioTeacherText = '';
+      if (entry.studio_name && entry.teacher_name) {
+        studioTeacherText = `${entry.studio_name} • ${entry.teacher_name}`;
+      } else if (entry.studio_name) {
+        studioTeacherText = entry.studio_name;
+      } else {
+        studioTeacherText = entry.teacher_name;
+      }
+      doc.text(studioTeacherText, nameX, yPos + 20);
+    }
+    
     // Medal emoji for top 3
     if (medalEmoji) {
       doc.setFontSize(16);
@@ -152,7 +167,7 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     // Category badges
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    let badgeY = yPos + 25;
+    let badgeY = entry.studio_name || entry.teacher_name ? yPos + 30 : yPos + 25;
     let badgeX = nameX;
     
     // Category
@@ -178,7 +193,8 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...goldColor);
       const rankSuffix = entry.categoryRank === 1 ? 'st' : entry.categoryRank === 2 ? 'nd' : entry.categoryRank === 3 ? 'rd' : 'th';
-      doc.text(`🏆 ${entry.categoryRank}${rankSuffix} Place in Category Combination`, nameX, yPos + 28);
+      const categoryRankY = entry.studio_name || entry.teacher_name ? badgeY + 3 : yPos + 28;
+      doc.text(`🏆 ${entry.categoryRank}${rankSuffix} Place in Category Combination`, nameX, categoryRankY);
     }
     
     // Average score (if available)
@@ -186,11 +202,53 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...darkGray);
-      const scoreY = entry.categoryRank ? yPos + 36 : yPos + 28;
+      const scoreY = entry.categoryRank ? 
+        (entry.studio_name || entry.teacher_name ? badgeY + 11 : yPos + 36) :
+        (entry.studio_name || entry.teacher_name ? badgeY + 3 : yPos + 28);
       doc.text(`Average: ${averageScore.toFixed(2)} / 100`, nameX, scoreY);
     }
     
     yPos += 55;
+    
+    // =============================================================================
+    // GROUP MEMBERS SECTION (for group entries)
+    // =============================================================================
+    if (entry.group_members && Array.isArray(entry.group_members) && entry.group_members.length > 0) {
+      console.log('👥 Adding group members section...');
+      
+      // Calculate height needed for group members box
+      const memberCount = entry.group_members.length;
+      const boxHeight = 12 + (memberCount * 5) + 8; // Header + members + padding
+      
+      // Group members box
+      doc.setFillColor(...lightGray);
+      doc.roundedRect(14, yPos, pageWidth - 28, boxHeight, 3, 3, 'F');
+      
+      yPos += 8;
+      
+      // "GROUP MEMBERS" header
+      doc.setTextColor(...darkGray);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('GROUP MEMBERS:', 18, yPos);
+      
+      yPos += 6;
+      
+      // List each member
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      
+      entry.group_members.forEach((member, index) => {
+        const memberText = member.age 
+          ? `• ${member.name} (Age ${member.age})`
+          : `• ${member.name}`;
+        doc.text(memberText, 20, yPos);
+        yPos += 5;
+      });
+      
+      yPos += 10;
+    }
     
     // =============================================================================
     // DETAILED SCORES TABLE

@@ -325,7 +325,7 @@ export const extractVarietyLevel = (description) => {
 };
 
 /**
- * Group entries by exact combination of Category + Variety + Age Division + Ability Level
+ * Group entries by exact combination of Category + Variety + Age Division + Ability Level + Division Type
  * Each group represents a separate competition with its own rankings
  * @param {Array} entries - Array of entry objects with averageScore
  * @param {Array} categories - Array of category objects
@@ -350,8 +350,11 @@ export const groupByExactCombination = (entries, categories = [], ageDivisions =
     // Get ability level
     const abilityLevel = entry.ability_level || 'Unknown';
     
-    // Create unique key for this exact combination
-    const key = `${categoryName}|${varietyLevel}|${ageDivisionName}|${abilityLevel}`;
+    // Get division type (Solo, Duo/Trio, Small Group, etc.)
+    const divisionType = entry.dance_type || 'Solo';
+    
+    // Create unique key for this exact combination (NOW INCLUDING DIVISION TYPE)
+    const key = `${categoryName}|${varietyLevel}|${ageDivisionName}|${abilityLevel}|${divisionType}`;
     
     if (!groups[key]) {
       groups[key] = {
@@ -361,6 +364,7 @@ export const groupByExactCombination = (entries, categories = [], ageDivisions =
         ageDivision: ageDivisionName,
         ageDivisionId: entry.age_division_id,
         abilityLevel: abilityLevel,
+        divisionType: divisionType,
         entries: []
       };
     }
@@ -413,5 +417,63 @@ export const calculateRankingsPerGroup = (groups) => {
   });
   
   return rankedGroups;
+};
+
+/**
+ * Calculate top 4 highest overall scores across the entire competition
+ * @param {Array} entries - Array of all entries with averageScore
+ * @returns {Array} - Top 4 entries sorted by score
+ */
+export const calculateTop4Overall = (entries) => {
+  if (!entries || entries.length === 0) return [];
+  
+  // Sort all entries by average score (descending)
+  const sorted = [...entries].sort((a, b) => b.averageScore - a.averageScore);
+  
+  // Return top 4 (or fewer if less than 4 entries)
+  return sorted.slice(0, 4);
+};
+
+/**
+ * Get division type emoji
+ * @param {string} divisionType - Division type (Solo, Duo/Trio, etc.)
+ * @returns {string} - Emoji representing the division type
+ */
+export const getDivisionTypeEmoji = (divisionType) => {
+  if (!divisionType) return '👤';
+  
+  const type = divisionType.toLowerCase();
+  
+  if (type.includes('solo')) {
+    return '👤';
+  } else if (type.includes('duo') || type.includes('trio')) {
+    return '👥';
+  } else if (type.includes('small group')) {
+    return '👥👥';
+  } else if (type.includes('large group')) {
+    return '👥👥👥';
+  } else if (type.includes('production')) {
+    return '🎭';
+  }
+  
+  return '👥';
+};
+
+/**
+ * Get division type display name
+ * @param {string} divisionType - Division type from database
+ * @returns {string} - Clean display name
+ */
+export const getDivisionTypeDisplayName = (divisionType) => {
+  if (!divisionType) return 'Solo';
+  
+  // Clean up the division type for display
+  if (divisionType.includes('Solo')) return 'Solo';
+  if (divisionType.includes('Duo/Trio')) return 'Duo/Trio';
+  if (divisionType.includes('Small Group')) return 'Small Group';
+  if (divisionType.includes('Large Group')) return 'Large Group';
+  if (divisionType.includes('Production')) return 'Production';
+  
+  return divisionType;
 };
 

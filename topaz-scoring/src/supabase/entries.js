@@ -21,7 +21,9 @@ export const createEntry = async (entryData) => {
       ability_level: entryData.ability_level || null,
       medal_points: entryData.medal_points || 0,
       current_medal_level: entryData.current_medal_level || 'None',
-      photo_url: entryData.photo_url || null
+      photo_url: entryData.photo_url || null,
+      studio_name: entryData.studio_name || null,
+      teacher_name: entryData.teacher_name || null
     };
 
     // Try to include is_medal_program if provided

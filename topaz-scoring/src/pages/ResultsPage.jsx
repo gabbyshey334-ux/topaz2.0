@@ -8,15 +8,24 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import CategoryBadge from '../components/CategoryBadge';
 import AbilityBadge from '../components/AbilityBadge';
 import MedalBadge, { getMedalProgress } from '../components/MedalBadge';
+import MedalLeaderboard from '../components/MedalLeaderboard';
 import { getCompetition } from '../supabase/competitions';
 import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
-import { getCompetitionEntries, awardMedalPointsToWinners } from '../supabase/entries';
+import { getCompetitionEntries } from '../supabase/entries';
 import { getCompetitionScores } from '../supabase/scores';
+import { awardMedalPointsForCompetition } from '../supabase/medalParticipants';
 import { subscribeToScores, unsubscribeFromChannel } from '../supabase/realtime';
 import { generateScoreSheet } from '../utils/pdfGenerator';
 import { exportResultsToExcel } from '../utils/excelExport';
-import { groupByExactCombination, calculateRankingsPerGroup, extractVarietyLevel } from '../utils/calculations';
+import { 
+  groupByExactCombination, 
+  calculateRankingsPerGroup, 
+  extractVarietyLevel,
+  calculateTop4Overall,
+  getDivisionTypeEmoji,
+  getDivisionTypeDisplayName
+} from '../utils/calculations';
 
 function ResultsPage() {
   const navigate = useNavigate();
@@ -160,11 +169,11 @@ function ResultsPage() {
     return filtered;
   }, [rankedResults, selectedCategory, selectedAgeDivision, selectedAbilityLevel, searchQuery]);
 
-  // Calculate grouped rankings by exact combination (Category + Variety + Age + Ability)
+  // Calculate grouped rankings by exact combination (Category + Variety + Age + Ability + Division Type)
   const groupedRankings = useMemo(() => {
     if (rankedResults.length === 0) return {};
 
-    // Group entries by exact combination
+    // Group entries by exact combination (NOW INCLUDING DIVISION TYPE)
     const groups = groupByExactCombination(rankedResults, categories, ageDivisions);
     
     // Calculate rankings per group
@@ -172,6 +181,13 @@ function ResultsPage() {
     
     return rankedGroups;
   }, [rankedResults, categories, ageDivisions]);
+
+  // Calculate Top 4 Overall Highest Scores
+  const top4Overall = useMemo(() => {
+    if (rankedResults.length === 0) return [];
+    
+    return calculateTop4Overall(rankedResults);
+  }, [rankedResults]);
 
   // Medal Program Results - Top 4 per category combination
   const medalProgramResults = useMemo(() => {
@@ -206,50 +222,31 @@ function ResultsPage() {
   }, [groupedRankings, categories, selectedFilter]);
 
   const handleAwardMedalPoints = async () => {
-    if (!window.confirm('Award 1 point to all 1st place Medal Program winners in each category combination?')) return;
+    if (!window.confirm('Award medal points to all 1st place Medal Program winners?\n\nNote: Each group member will receive individual points!')) return;
 
     try {
       setAwardingPoints(true);
       
-      // Find all 1st place winners per category combination (enrolled in medal program)
-      const firstPlaceWinners = [];
-      
-      // Iterate through grouped rankings to find 1st place in each group
-      Object.keys(groupedRankings).forEach(key => {
-        const group = groupedRankings[key];
-        
-        // Find 1st place entry in this group (enrolled in medal program)
-        const firstPlace = group.entries.find(e => e.categoryRank === 1 && e.is_medal_program);
-        
-        if (firstPlace) {
-          firstPlaceWinners.push(firstPlace.id);
-        }
-      });
-
-      if (firstPlaceWinners.length === 0) {
-        toast.info('No 1st place medal program entries found to award.');
-        setAwardingPoints(false);
-        return;
-      }
-
-      const result = await awardMedalPointsToWinners(competitionId, firstPlaceWinners);
+      // Use new medal participants system
+      const result = await awardMedalPointsForCompetition(competitionId);
       
       if (result.success) {
-        toast.success(`Successfully awarded points to ${result.totalAwarded} winners across ${firstPlaceWinners.length} category combinations!`);
-        // Refresh entries to show updated points
-        const entriesResult = await getCompetitionEntries(competitionId);
-        if (entriesResult.success) {
-          setEntries(entriesResult.data);
-          // Refresh scores to recalculate rankings
-          const scoresResult = await getCompetitionScores(competitionId);
-          if (scoresResult.success) setScores(scoresResult.data);
+        toast.success(
+          `✅ Successfully awarded points to ${result.totalAwarded} participants ` +
+          `from ${result.firstPlaceCount} first-place entries!`,
+          { autoClose: 5000 }
+        );
+        
+        // Show summary if available
+        if (result.summary && result.summary.length > 0) {
+          console.log('Medal Points Summary:', result.summary);
         }
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || 'Failed to award medal points');
       }
     } catch (error) {
-      console.error('Error awarding points:', error);
-      toast.error('Failed to award medal points');
+      console.error('Error awarding medal points:', error);
+      toast.error(`Failed to award points: ${error.message}`);
     } finally {
       setAwardingPoints(false);
     }
@@ -554,7 +551,7 @@ function ResultsPage() {
               ))}
             </div>
 
-            {/* Medal Program Toggle */}
+            {/* Medal Program and Season Leaderboard Toggle */}
             <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
               <span className="text-sm font-semibold text-gray-600">PROGRAMS:</span>
               <button
@@ -575,6 +572,26 @@ function ResultsPage() {
               >
                 <span>⭐</span>
                 <span>Medal Program View</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setSelectedFilter(selectedFilter === 'leaderboard' ? 'overall' : 'leaderboard');
+                  // Clear other filters
+                  if (selectedFilter !== 'leaderboard') {
+                    setSelectedCategory(null);
+                    setSelectedAgeDivision(null);
+                    setSelectedAbilityLevel(null);
+                  }
+                }}
+                className={`px-8 py-2 rounded-full font-bold text-sm transition-all duration-200 flex items-center gap-2 ${
+                  selectedFilter === 'leaderboard'
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg scale-105'
+                    : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-2 border-purple-200'
+                }`}
+              >
+                <span>🏅</span>
+                <span>Season Leaderboard</span>
               </button>
           </div>
 
@@ -813,9 +830,89 @@ function ResultsPage() {
               </div>
               <p className="text-center text-sm text-gray-500 mt-4">
                 {viewMode === 'grouped' 
-                  ? 'Viewing rankings by exact category combination (each group has its own 1st, 2nd, 3rd place)'
+                  ? 'Viewing rankings by exact category combination + division type (each group has its own 1st, 2nd, 3rd place)'
                   : 'Viewing overall rankings with custom filters'}
               </p>
+            </div>
+          )}
+
+          {/* TOP 4 OVERALL HIGHEST SCORES */}
+          {selectedFilter !== 'medal' && viewMode === 'grouped' && top4Overall.length > 0 && (
+            <div className="bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50 rounded-3xl shadow-2xl p-8 mb-12 border-4 border-yellow-400">
+              <div className="text-center mb-8">
+                <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 mb-2">
+                  🏆 TOP 4 HIGHEST OVERALL SCORES
+                </h2>
+                <p className="text-lg text-gray-700 font-semibold">
+                  Entire Competition - All Categories, All Divisions
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {top4Overall.map((entry, index) => {
+                  const rankColors = [
+                    'from-yellow-400 to-amber-500',
+                    'from-gray-300 to-gray-400',
+                    'from-orange-400 to-orange-500',
+                    'from-teal-400 to-cyan-500'
+                  ];
+                  const borderColors = [
+                    'border-yellow-500',
+                    'border-gray-400',
+                    'border-orange-500',
+                    'border-teal-500'
+                  ];
+                  const medals = ['🥇', '🥈', '🥉', '🏅'];
+                  const labels = ['1st Overall', '2nd Overall', '3rd Overall', '4th Overall'];
+                  
+                  return (
+                    <div 
+                      key={entry.id}
+                      className={`bg-white rounded-2xl shadow-xl overflow-hidden border-4 ${borderColors[index]} transform hover:scale-105 transition-all duration-300`}
+                    >
+                      <div className={`bg-gradient-to-r ${rankColors[index]} p-4 text-center`}>
+                        <div className="text-5xl mb-2">{medals[index]}</div>
+                        <div className="text-white font-black text-lg">{labels[index]}</div>
+                      </div>
+                      
+                      <div className="p-4">
+                        <div className="flex flex-col items-center text-center mb-3">
+                          <div className="w-20 h-20 rounded-full overflow-hidden mb-3 border-4 border-gray-200">
+                            {entry.photo_url ? (
+                              <img src={entry.photo_url} alt={entry.competitor_name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl">
+                                {entry.dance_type && entry.dance_type.includes('Solo') ? '👤' : '👥'}
+                              </div>
+                            )}
+                          </div>
+                          
+                          <h3 className="text-xl font-bold text-gray-800 mb-1 line-clamp-2">
+                            {entry.competitor_name}
+                          </h3>
+                          
+                          <p className="text-sm text-gray-600 mb-2">
+                            {getDivisionTypeDisplayName(entry.dance_type)}
+                          </p>
+                          
+                          <div className="w-full h-px bg-gray-200 my-2"></div>
+                          
+                          <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-cyan-600">
+                            {entry.averageScore.toFixed(2)}
+                          </div>
+                          <div className="text-xs text-gray-500 font-semibold">AVERAGE SCORE</div>
+                        </div>
+                        
+                        <div className="text-xs text-gray-500 space-y-1">
+                          <div>📂 {getCategoryName(entry.category_id)}</div>
+                          <div>🎂 {getAgeDivisionName(entry.age_division_id) || 'N/A'}</div>
+                          <div>⭐ {entry.ability_level}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -847,9 +944,12 @@ function ResultsPage() {
                           <span className="px-4 py-2 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
                             ⭐ {group.abilityLevel}
                           </span>
+                          <span className="px-4 py-2 bg-yellow-400/90 backdrop-blur rounded-full text-sm font-black text-gray-800 border-2 border-yellow-500">
+                            {getDivisionTypeEmoji(group.divisionType)} {getDivisionTypeDisplayName(group.divisionType)}
+                          </span>
                         </div>
                         <p className="text-white/90 text-lg font-semibold">
-                          {group.entries.length} competitor{group.entries.length !== 1 ? 's' : ''}
+                          {group.entries.length} competitor{group.entries.length !== 1 ? 's' : ''} in this division
                         </p>
                       </div>
 
@@ -939,6 +1039,25 @@ function ResultsPage() {
                               {/* Expanded Score Details */}
                               {isExpanded && entry.scores && entry.scores.length > 0 && (
                                 <div className="p-6 bg-gray-50 border-t-2 border-gray-200">
+                                  {/* Studio and Teacher Info */}
+                                  {(entry.studio_name || entry.teacher_name) && (
+                                    <div className="mb-4 p-4 bg-white rounded-xl border-2 border-teal-100">
+                                      <h4 className="text-sm font-bold text-teal-600 mb-2 uppercase tracking-wider">Studio & Teacher</h4>
+                                      <div className="space-y-1">
+                                        {entry.studio_name && (
+                                          <p className="text-gray-700">
+                                            <span className="font-semibold">Studio:</span> {entry.studio_name}
+                                          </p>
+                                        )}
+                                        {entry.teacher_name && (
+                                          <p className="text-gray-700">
+                                            <span className="font-semibold">Teacher/Choreographer:</span> {entry.teacher_name}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
                                   <h4 className="text-lg font-bold text-gray-800 mb-4">Judge Scores</h4>
                                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {entry.scores.map((score) => (
@@ -1124,6 +1243,30 @@ function ResultsPage() {
                       {/* EXPANDED BREAKDOWN */}
                   {isExpanded && (
                         <div className="mt-6 pt-6 border-t-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6">
+                          {/* Studio and Teacher Info */}
+                          {(entry.studio_name || entry.teacher_name) && (
+                            <div className="mb-6 p-5 bg-white rounded-xl border-2 border-teal-200 shadow-sm">
+                              <h4 className="text-lg font-bold text-teal-600 mb-3 flex items-center gap-2">
+                                <span>🏫</span>
+                                <span>Studio & Teacher Information</span>
+                              </h4>
+                              <div className="space-y-2">
+                                {entry.studio_name && (
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-gray-500 font-semibold min-w-[100px]">Studio:</span>
+                                    <span className="text-gray-800 font-medium">{entry.studio_name}</span>
+                                  </div>
+                                )}
+                                {entry.teacher_name && (
+                                  <div className="flex items-start gap-2">
+                                    <span className="text-gray-500 font-semibold min-w-[100px]">Teacher:</span>
+                                    <span className="text-gray-800 font-medium">{entry.teacher_name}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
                           <h4 className="text-xl font-bold text-teal-600 mb-6">Detailed Score Breakdown</h4>
                           
                           {entry.scores.map((score) => {
@@ -1236,6 +1379,63 @@ function ResultsPage() {
             })}
             </div>
           ))}
+
+          {/* SEASON LEADERBOARD VIEW */}
+          {selectedFilter === 'leaderboard' && (
+            <div className="space-y-6">
+              <MedalLeaderboard />
+              
+              {/* Info Section */}
+              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border-2 border-teal-200">
+                <h3 className="text-lg font-bold text-teal-800 mb-3">
+                  💡 How the Season Leaderboard Works
+                </h3>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  <li className="flex items-start gap-2">
+                    <span className="text-teal-600 font-bold">•</span>
+                    <span><strong>Individual Tracking:</strong> Each performer earns points individually (not per entry)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-teal-600 font-bold">•</span>
+                    <span><strong>Group Credits:</strong> In group entries, EACH member receives 1 point for a 1st place win</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-teal-600 font-bold">•</span>
+                    <span><strong>Multiple Entries:</strong> Same performer can earn points from solo AND group entries in one competition</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-teal-600 font-bold">•</span>
+                    <span><strong>Medal Levels:</strong> Bronze (25+ pts), Silver (35+ pts), Gold (50+ pts)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-teal-600 font-bold">•</span>
+                    <span><strong>Season Long:</strong> Points accumulate across ALL competitions throughout the season</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Award Points Button */}
+              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-6 border-2 border-amber-300 text-center">
+                <p className="text-gray-700 font-semibold mb-4">
+                  Competition scored? Award medal points to 1st place Medal Program winners!
+                </p>
+                <button
+                  onClick={handleAwardMedalPoints}
+                  disabled={awardingPoints}
+                  className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-600 text-white font-bold rounded-xl shadow-lg hover:from-amber-600 hover:to-yellow-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {awardingPoints ? (
+                    <>
+                      <div className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Awarding Points...
+                    </>
+                  ) : (
+                    '🏆 Award Medal Points for This Competition'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* FOOTER */}
           <div className="mt-16 pt-8 border-t-2 border-gray-200 text-center">

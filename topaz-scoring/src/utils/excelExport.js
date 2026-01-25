@@ -81,6 +81,8 @@ export const exportResultsToExcel = (entries, allScores, competition, categories
         'Name': entry.competitor_name,
         'Age': entry.age || 'N/A',
         'Type': entryType,
+        'Studio Name': entry.studio_name || '',
+        'Teacher/Choreographer': entry.teacher_name || '',
         'Category': categoryName,
         'Variety Level': varietyLevel,
         'Age Division': ageDivisionName,
@@ -128,6 +130,8 @@ export const exportResultsToExcel = (entries, allScores, competition, categories
       { wch: 25 }, // Name
       { wch: 8 },  // Age
       { wch: 10 }, // Type
+      { wch: 25 }, // Studio Name
+      { wch: 25 }, // Teacher/Choreographer
       { wch: 20 }, // Category
       { wch: 15 }, // Variety Level
       { wch: 15 }, // Age Division

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
 import PhotoUpload from '../components/PhotoUpload';
+import PhotoUploadManager from '../components/PhotoUploadManager';
 import EmptyState from '../components/EmptyState';
 import AbilityBadge from '../components/AbilityBadge';
 import { 
@@ -46,10 +47,9 @@ function CompetitionSetup() {
     setJudgeNames(newNames);
   };
 
-  // SECTION 2: Categories
-  const [categories, setCategories] = useState([]);
-  const [newCategoryName, setNewCategoryName] = useState('Jazz');
-  const [newVarietyLevel, setNewVarietyLevel] = useState('None');
+  // SECTION 2: Categories (Checkbox selection system)
+  // selectedCategories: { categoryName: { selected: true/false, varietyLevel: 'None'/'Variety A'/etc } }
+  const [selectedCategories, setSelectedCategories] = useState({});
 
   // SECTION 3: Age Divisions (FIXED - 4 DIVISIONS)
   const FIXED_AGE_DIVISIONS = [
@@ -72,7 +72,9 @@ function CompetitionSetup() {
     divisionType: 'Solo',
     isMedalProgram: true,
     photoFile: null,
-    groupMembers: []
+    groupMembers: [],
+    studioName: '',
+    teacherName: ''
   });
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberAge, setNewMemberAge] = useState('');
@@ -84,31 +86,32 @@ function CompetitionSetup() {
   
   // Bulk Photo Upload State
   const [isBulkUploading, setIsBulkUploading] = useState(false);
+  const [showPhotoManager, setShowPhotoManager] = useState(false);
+  const [savedCompetitionId, setSavedCompetitionId] = useState(null);
 
-  // Category options - PERFORMING ARTS
-  const performingArtsCategories = [
-    'Tap',
-    'Jazz',
-    'Ballet',
-    'Lyrical/Contemporary',
-    'Vocal',
-    'Acting',
-    'Hip Hop'
+  // FIXED CATEGORIES - Admin-only, users can only select
+  const FIXED_CATEGORIES = [
+    { name: 'Tap', color: 'blue' },
+    { name: 'Jazz', color: 'purple' },
+    { name: 'Ballet', color: 'pink' },
+    { name: 'Lyrical/Contemporary', color: 'teal' },
+    { name: 'Vocal', color: 'yellow' },
+    { name: 'Acting', color: 'orange' },
+    { name: 'Hip Hop', color: 'red' }
   ];
 
-  // SPECIAL CATEGORIES - Not eligible for high scoring awards
-  const specialCategories = [
-    'Production',
-    'Student Choreography',
-    'Teacher/Student'
+  const SPECIAL_CATEGORIES = [
+    { name: 'Production', color: 'gray', special: true },
+    { name: 'Student Choreography', color: 'green', special: true },
+    { name: 'Teacher/Student', color: 'indigo', special: true }
   ];
 
   // All categories combined
-  const categoryOptions = [...performingArtsCategories, ...specialCategories];
+  const ALL_AVAILABLE_CATEGORIES = [...FIXED_CATEGORIES, ...SPECIAL_CATEGORIES];
 
   // Check if category is special (not eligible for high score awards)
   const isSpecialCategory = (categoryName) => {
-    return specialCategories.includes(categoryName);
+    return SPECIAL_CATEGORIES.some(cat => cat.name === categoryName);
   };
 
   const varietyOptions = [
@@ -183,49 +186,50 @@ function CompetitionSetup() {
   };
 
   // ===================================================================
-  // CATEGORY HANDLERS
+  // CATEGORY HANDLERS (Checkbox Selection System)
   // ===================================================================
 
-  const handleAddCategory = () => {
-    const displayName = generateCategoryDisplayName(newCategoryName, newVarietyLevel);
-    
-    // Check for duplicates
-    const exists = categories.some(
-      cat => cat.name === newCategoryName && cat.varietyLevel === newVarietyLevel
-    );
-    
-    if (exists) {
-      toast.error('This category and variety combination already exists');
-      return;
-    }
-
-    // Check if this is a special category (not eligible for high score awards)
-    const isSpecial = isSpecialCategory(newCategoryName);
-
-    const newCategory = {
-      id: Date.now().toString(),
-      name: newCategoryName,
-      varietyLevel: newVarietyLevel,
-      displayName: displayName,
-      isSpecialCategory: isSpecial
-    };
-
-    setCategories([...categories, newCategory]);
-    
-    if (isSpecial) {
-      toast.success(`Added: ${displayName} ⚠️ Special Category (participation recognition only)`);
-    } else {
-    toast.success(`Added: ${displayName}`);
-    }
+  // Toggle category selection
+  const handleToggleCategory = (categoryName) => {
+    setSelectedCategories(prev => {
+      const newSelection = { ...prev };
+      
+      if (newSelection[categoryName]?.selected) {
+        // Unselect
+        delete newSelection[categoryName];
+      } else {
+        // Select with default variety level
+        newSelection[categoryName] = {
+          selected: true,
+          varietyLevel: 'None'
+        };
+      }
+      
+      return newSelection;
+    });
   };
 
-  const handleDeleteCategory = (id) => {
-    const category = categories.find(c => c.id === id);
-    if (!window.confirm(`Delete "${category?.displayName}"? Entries in this category will need to be reassigned.`)) {
-      return;
-    }
-    setCategories(categories.filter(cat => cat.id !== id));
-    toast.info('Category deleted');
+  // Update variety level for a selected category
+  const handleUpdateVarietyLevel = (categoryName, varietyLevel) => {
+    setSelectedCategories(prev => ({
+      ...prev,
+      [categoryName]: {
+        ...prev[categoryName],
+        varietyLevel: varietyLevel
+      }
+    }));
+  };
+
+  // Get list of selected categories as array (for saving to DB)
+  const getSelectedCategoriesArray = () => {
+    return Object.entries(selectedCategories)
+      .filter(([_, data]) => data.selected)
+      .map(([name, data]) => ({
+        name,
+        varietyLevel: data.varietyLevel,
+        displayName: generateCategoryDisplayName(name, data.varietyLevel),
+        isSpecialCategory: isSpecialCategory(name)
+      }));
   };
 
   // ===================================================================
@@ -233,16 +237,23 @@ function CompetitionSetup() {
   // ===================================================================
 
   const handleOpenAddEntry = () => {
+    const selectedCats = getSelectedCategoriesArray();
+    const defaultCategoryId = selectedCats.length > 0 
+      ? `${selectedCats[0].name}_${selectedCats[0].varietyLevel}` 
+      : '';
+    
     setCurrentEntry({
       type: 'solo',
       name: '',
-      categoryId: categories.length > 0 ? categories[0].id : '',
+      categoryId: defaultCategoryId,
       ageDivisionId: FIXED_AGE_DIVISIONS[0].id,
       abilityLevel: 'Beginning',
       divisionType: 'Solo',
       isMedalProgram: true,
       photoFile: null,
-      groupMembers: []
+      groupMembers: [],
+      studioName: '',
+      teacherName: ''
     });
     setShowAddEntryModal(true);
   };
@@ -259,7 +270,9 @@ function CompetitionSetup() {
       divisionType: 'Solo',
       isMedalProgram: true,
       photoFile: null,
-      groupMembers: []
+      groupMembers: [],
+      studioName: '',
+      teacherName: ''
     });
     setNewMemberName('');
     setNewMemberAge('');
@@ -315,10 +328,20 @@ function CompetitionSetup() {
       return;
     }
 
+    // FIXED: Safer age parsing with validation
+    let parsedAge = null;
+    if (newMemberAge && newMemberAge.trim() !== '') {
+      const ageNum = parseInt(newMemberAge);
+      // Only use age if it's a valid positive number
+      if (!isNaN(ageNum) && ageNum > 0 && ageNum < 150) {
+        parsedAge = ageNum;
+      }
+    }
+
     const member = {
       id: Date.now().toString(),
       name: newMemberName.trim(),
-      age: newMemberAge ? parseInt(newMemberAge) : null
+      age: parsedAge
     };
 
     console.log('➕ New member to add:', member);
@@ -326,41 +349,50 @@ function CompetitionSetup() {
     const updatedMembers = [...currentEntry.groupMembers, member];
     console.log('📋 Members AFTER add:', updatedMembers);
     
-    // Auto-calculate oldest member age
-    const validAges = updatedMembers
-      .map(m => m.age)
-      .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
-    
-    const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
-    console.log('📊 Valid ages:', validAges);
-    console.log('👴 Oldest age:', oldestAge);
-    
-    // Find matching age division
-    let ageDivisionId = currentEntry.ageDivisionId;
-    let autoDiv = null;
-    
-    if (oldestAge) {
-      const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
-        oldestAge >= div.minAge && oldestAge <= div.maxAge
-      );
+    // Auto-calculate oldest member age with safety checks
+    try {
+      const validAges = updatedMembers
+        .map(m => m.age)
+        .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
       
-      if (matchingDivision) {
-        ageDivisionId = matchingDivision.id;
-        autoDiv = matchingDivision;
-        console.log('✅ Auto-selected division:', matchingDivision.name);
+      const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
+      console.log('📊 Valid ages:', validAges);
+      console.log('👴 Oldest age:', oldestAge);
+      
+      // Find matching age division
+      let ageDivisionId = currentEntry.ageDivisionId;
+      let autoDiv = null;
+      
+      if (oldestAge) {
+        const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
+          oldestAge >= div.minAge && oldestAge <= div.maxAge
+        );
+        
+        if (matchingDivision) {
+          ageDivisionId = matchingDivision.id;
+          autoDiv = matchingDivision;
+          console.log('✅ Auto-selected division:', matchingDivision.name);
+        }
       }
-    }
-    
-    // FIXED: Single state update combining all changes
-    setCurrentEntry(prev => ({
-      ...prev,
-      groupMembers: updatedMembers,
-      age: oldestAge || prev.age,
-      ageDivisionId: ageDivisionId
-    }));
-    
-    if (autoDiv) {
-      setAutoSelectedDivision(autoDiv);
+      
+      // FIXED: Single state update combining all changes
+      setCurrentEntry(prev => ({
+        ...prev,
+        groupMembers: updatedMembers,
+        age: oldestAge || prev.age,
+        ageDivisionId: ageDivisionId
+      }));
+      
+      if (autoDiv) {
+        setAutoSelectedDivision(autoDiv);
+      }
+    } catch (error) {
+      console.error('❌ Error calculating oldest age:', error);
+      // Still update members even if age calculation fails
+      setCurrentEntry(prev => ({
+        ...prev,
+        groupMembers: updatedMembers
+      }));
     }
 
     // Clear inputs
@@ -377,41 +409,50 @@ function CompetitionSetup() {
     const updatedMembers = currentEntry.groupMembers.filter(m => m.id !== id);
     console.log('📋 Members after delete:', updatedMembers);
     
-    // Recalculate oldest age after deletion
-    const validAges = updatedMembers
-      .map(m => m.age)
-      .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
-    
-    const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
-    console.log('👴 New oldest age after delete:', oldestAge);
-    
-    // Find matching age division
-    let ageDivisionId = currentEntry.ageDivisionId;
-    let autoDiv = null;
-    
-    if (oldestAge) {
-      const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
-        oldestAge >= div.minAge && oldestAge <= div.maxAge
-      );
+    // Recalculate oldest age after deletion with safety checks
+    try {
+      const validAges = updatedMembers
+        .map(m => m.age)
+        .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
       
-      if (matchingDivision) {
-        ageDivisionId = matchingDivision.id;
-        autoDiv = matchingDivision;
+      const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
+      console.log('👴 New oldest age after delete:', oldestAge);
+      
+      // Find matching age division
+      let ageDivisionId = currentEntry.ageDivisionId;
+      let autoDiv = null;
+      
+      if (oldestAge) {
+        const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
+          oldestAge >= div.minAge && oldestAge <= div.maxAge
+        );
+        
+        if (matchingDivision) {
+          ageDivisionId = matchingDivision.id;
+          autoDiv = matchingDivision;
+        }
       }
-    }
-    
-    // FIXED: Single state update combining all changes
-    setCurrentEntry(prev => ({
-      ...prev,
-      groupMembers: updatedMembers,
-      age: oldestAge || '',
-      ageDivisionId: ageDivisionId
-    }));
-    
-    if (autoDiv) {
-      setAutoSelectedDivision(autoDiv);
-    } else if (!oldestAge) {
-      setAutoSelectedDivision(null);
+      
+      // FIXED: Single state update combining all changes
+      setCurrentEntry(prev => ({
+        ...prev,
+        groupMembers: updatedMembers,
+        age: oldestAge || '',
+        ageDivisionId: ageDivisionId
+      }));
+      
+      if (autoDiv) {
+        setAutoSelectedDivision(autoDiv);
+      } else if (!oldestAge) {
+        setAutoSelectedDivision(null);
+      }
+    } catch (error) {
+      console.error('❌ Error recalculating age after delete:', error);
+      // Still update members even if age calculation fails
+      setCurrentEntry(prev => ({
+        ...prev,
+        groupMembers: updatedMembers
+      }));
     }
     
     console.log('✅ Delete member complete!');
@@ -558,7 +599,9 @@ function CompetitionSetup() {
       photoFile: currentEntry.photoFile,
       photoPreview: currentEntry.photoFile ? URL.createObjectURL(currentEntry.photoFile) : null,
       groupMembers: cleanedGroupMembers,
-      isExpanded: false
+      isExpanded: false,
+      studioName: currentEntry.studioName?.trim() || '',
+      teacherName: currentEntry.teacherName?.trim() || ''
     };
 
     console.log('📦 New entry object created:', newEntry);
@@ -680,8 +723,11 @@ function CompetitionSetup() {
       newErrors.competitionName = 'Competition name is required';
     }
 
-    if (categories.length === 0) {
-      newErrors.categories = 'Please add at least one category';
+    // Get selected categories as array
+    const categoriesToSave = getSelectedCategoriesArray();
+
+    if (categoriesToSave.length === 0) {
+      newErrors.categories = 'Please select at least one category';
     }
 
     if (entries.length === 0) {
@@ -718,10 +764,15 @@ function CompetitionSetup() {
 
       const competitionId = compResult.data.id;
       console.log('✅ Competition created:', competitionId);
+      
+      // Store competition ID for photo manager
+      setSavedCompetitionId(competitionId);
 
       // Step 2: Save categories
       toast.info('Saving categories...');
-      for (const cat of categories) {
+      const categoryMap = {}; // Map category names to Supabase IDs
+      
+      for (const cat of categoriesToSave) {
         const catResult = await createCategory({
           competition_id: competitionId,
           name: cat.displayName,
@@ -733,10 +784,10 @@ function CompetitionSetup() {
           throw new Error(catResult.error);
         }
 
-        // Store the Supabase ID back to our local category
-        cat.supabaseId = catResult.data.id;
+        // Store the Supabase ID for mapping entries
+        categoryMap[`${cat.name}_${cat.varietyLevel}`] = catResult.data.id;
       }
-      console.log('✅ Categories saved:', categories.length);
+      console.log('✅ Categories saved:', categoriesToSave.length);
 
       // Step 3: Save FIXED age divisions
         toast.info('Saving age divisions...');
@@ -778,9 +829,9 @@ function CompetitionSetup() {
           }
         }
 
-        // Get Supabase category ID
-        const category = categories.find(c => c.id === entry.categoryId);
-        const categorySupabaseId = category?.supabaseId || null;
+        // Get Supabase category ID from categoryMap
+        // entry.categoryId is in format "CategoryName_VarietyLevel"
+        const categorySupabaseId = categoryMap[entry.categoryId] || null;
 
         // Get Supabase age division ID from our map
         const ageDivisionSupabaseId = ageDivisionMap[entry.ageDivisionId] || null;
@@ -812,7 +863,9 @@ function CompetitionSetup() {
           is_medal_program: entry.isMedalProgram,
           dance_type: entry.divisionType,
           group_members: cleanedGroupMembers, // Send as separate field
-          photo_url: photoUrl
+          photo_url: photoUrl,
+          studio_name: entry.studioName || null,
+          teacher_name: entry.teacherName || null
         });
 
         if (!entryResult.success) {
@@ -989,21 +1042,47 @@ function CompetitionSetup() {
           <div className="bg-gradient-to-br from-teal-50/90 to-cyan-50/90 backdrop-blur-sm rounded-2xl shadow-lg p-5 sm:p-8 mb-6 border-2 border-teal-200">
             <div className="flex items-start gap-3 mb-4">
               <span className="text-3xl">📸</span>
-              <div>
+              <div className="flex-1">
                 <h2 className="text-xl sm:text-2xl font-bold text-teal-700 mb-2">
-                  Bulk Photo Upload (Competition Day)
+                  Photo Upload Options
                 </h2>
                 <p className="text-sm sm:text-base text-gray-700 mb-4">
-                  Upload multiple photos at once for all entries. Name your files with entry numbers 
-                  (e.g., <span className="font-mono bg-white px-2 py-1 rounded text-teal-700">1.jpg</span>, 
-                  <span className="font-mono bg-white px-2 py-1 rounded text-teal-700">2.jpg</span>, 
-                  <span className="font-mono bg-white px-2 py-1 rounded text-teal-700">3.jpg</span>). 
-                  The system will automatically match them to the correct entries.
+                  Upload photos for competition entries. Choose the method that works best for you.
                 </p>
               </div>
             </div>
 
+            {/* Photo Upload Manager Button */}
+            {savedCompetitionId && (
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 sm:p-6 border-2 border-purple-200 mb-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-purple-800 text-lg mb-1">📸 Photo Upload Manager</h3>
+                    <p className="text-sm text-gray-700">
+                      Recommended for competition day! Upload photos and automatically match them to entries.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowPhotoManager(true)}
+                    className="w-full sm:w-auto bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 px-6 rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 shadow-lg transform hover:scale-105 min-h-[48px] whitespace-nowrap"
+                  >
+                    Open Photo Manager →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!savedCompetitionId && (
+              <div className="bg-amber-50 rounded-xl p-4 border-2 border-amber-200 mb-4">
+                <p className="text-amber-800 text-sm font-semibold">
+                  💡 Save your competition first to unlock the Photo Upload Manager
+                </p>
+              </div>
+            )}
+
+            {/* Original Bulk Upload */}
             <div className="bg-white/90 rounded-xl p-4 sm:p-6 border-2 border-dashed border-teal-300">
+              <h3 className="font-bold text-teal-700 mb-3">Quick Bulk Upload (During Setup)</h3>
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <input
                   type="file"
@@ -1054,97 +1133,168 @@ function CompetitionSetup() {
             </div>
           </div>
 
-          {/* SECTION 2: CATEGORY BUILDER */}
+          {/* SECTION 2: CATEGORY SELECTION (Admin-Only Fixed Categories) */}
           <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-5 sm:p-8 mb-6">
             <h2 className="text-xl sm:text-2xl font-bold text-teal-600 mb-2">
-              Competition Categories
+              Select Categories for This Competition
             </h2>
             <p className="text-sm text-gray-600 mb-5">
-              Add all categories for this competition. Categories can have variety levels.
+              Choose which categories to include in your competition. Categories are fixed and managed by administrators.
             </p>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                    Category Name
-                  </label>
-                  <select
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-                  >
-                    <optgroup label="━━━ PERFORMING ARTS ━━━">
-                      {performingArtsCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                    </optgroup>
-                    <optgroup label="━━━ SPECIAL CATEGORIES ━━━">
-                      {specialCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat} (Not eligible for high score awards)</option>
-                      ))}
-                    </optgroup>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Special categories receive participation recognition only
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                    Variety Level
-                  </label>
-                  <select
-                    value={newVarietyLevel}
-                    onChange={(e) => setNewVarietyLevel(e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-                  >
-                    {varietyOptions.map(variety => (
-                      <option key={variety} value={variety}>
-                        {getVarietyDescription(variety)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex items-end">
-                  <button
-                    onClick={handleAddCategory}
-                    className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-4 py-2 rounded-lg font-semibold hover:from-teal-600 hover:to-cyan-600 transition-all min-h-[44px]"
-                    aria-label="Add category to competition"
-                  >
-                    + Add Category
-                  </button>
+            <div className="space-y-6">
+              {/* PERFORMING ARTS CATEGORIES */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-5 border-2 border-purple-200">
+                <h3 className="text-lg font-bold text-purple-800 mb-4">
+                  Performing Arts Categories
+                </h3>
+                <div className="space-y-3">
+                  {FIXED_CATEGORIES.map(category => {
+                    const isSelected = selectedCategories[category.name]?.selected;
+                    const varietyLevel = selectedCategories[category.name]?.varietyLevel || 'None';
+                    
+                    return (
+                      <div key={category.name} className="bg-white rounded-lg p-4 border-2 border-gray-200">
+                        <div className="flex items-start gap-3">
+                          {/* Checkbox */}
+                          <input
+                            type="checkbox"
+                            id={`cat-${category.name}`}
+                            checked={isSelected || false}
+                            onChange={() => handleToggleCategory(category.name)}
+                            className="w-5 h-5 mt-0.5 text-teal-600 rounded focus:ring-2 focus:ring-teal-500 cursor-pointer"
+                          />
+                          
+                          {/* Category Name */}
+                          <div className="flex-1">
+                            <label 
+                              htmlFor={`cat-${category.name}`}
+                              className="text-base font-semibold text-gray-800 cursor-pointer hover:text-teal-600 transition-colors"
+                            >
+                              {category.name}
+                            </label>
+                            
+                            {/* Variety Level Dropdown (only when selected) */}
+                            {isSelected && (
+                              <div className="mt-3">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                  Variety Level:
+                                </label>
+                                <select
+                                  value={varietyLevel}
+                                  onChange={(e) => handleUpdateVarietyLevel(category.name, e.target.value)}
+                                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none text-sm"
+                                >
+                                  {varietyOptions.map(variety => (
+                                    <option key={variety} value={variety}>
+                                      {getVarietyDescription(variety)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                            
+                            {/* Display Name Preview */}
+                            {isSelected && (
+                              <div className="mt-2 text-sm text-gray-600">
+                                <span className="font-semibold">Will appear as:</span>{' '}
+                                <span className="text-teal-700 font-semibold">
+                                  {generateCategoryDisplayName(category.name, varietyLevel)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Display preview */}
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  <span className="font-semibold">Preview:</span>{' '}
-                  {generateCategoryDisplayName(newCategoryName, newVarietyLevel)}
+              {/* SPECIAL CATEGORIES */}
+              <div className="bg-gradient-to-r from-gray-50 to-amber-50 rounded-xl p-5 border-2 border-amber-200">
+                <h3 className="text-lg font-bold text-amber-800 mb-2">
+                  Special Categories
+                </h3>
+                <p className="text-sm text-gray-700 mb-4">
+                  ⚠️ Special categories receive participation recognition only (not eligible for high score awards)
                 </p>
+                <div className="space-y-3">
+                  {SPECIAL_CATEGORIES.map(category => {
+                    const isSelected = selectedCategories[category.name]?.selected;
+                    const varietyLevel = selectedCategories[category.name]?.varietyLevel || 'None';
+                    
+                    return (
+                      <div key={category.name} className="bg-white rounded-lg p-4 border-2 border-gray-200">
+                        <div className="flex items-start gap-3">
+                          {/* Checkbox */}
+                          <input
+                            type="checkbox"
+                            id={`cat-${category.name}`}
+                            checked={isSelected || false}
+                            onChange={() => handleToggleCategory(category.name)}
+                            className="w-5 h-5 mt-0.5 text-amber-600 rounded focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                          />
+                          
+                          {/* Category Name */}
+                          <div className="flex-1">
+                            <label 
+                              htmlFor={`cat-${category.name}`}
+                              className="text-base font-semibold text-gray-800 cursor-pointer hover:text-amber-600 transition-colors"
+                            >
+                              {category.name}
+                            </label>
+                            
+                            {/* Variety Level Dropdown (only when selected) */}
+                            {isSelected && (
+                              <div className="mt-3">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                  Variety Level:
+                                </label>
+                                <select
+                                  value={varietyLevel}
+                                  onChange={(e) => handleUpdateVarietyLevel(category.name, e.target.value)}
+                                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-amber-500 focus:outline-none text-sm"
+                                >
+                                  {varietyOptions.map(variety => (
+                                    <option key={variety} value={variety}>
+                                      {getVarietyDescription(variety)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                            
+                            {/* Display Name Preview */}
+                            {isSelected && (
+                              <div className="mt-2 text-sm text-gray-600">
+                                <span className="font-semibold">Will appear as:</span>{' '}
+                                <span className="text-amber-700 font-semibold">
+                                  {generateCategoryDisplayName(category.name, varietyLevel)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Added categories */}
-              {categories.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-gray-700">
-                    Added Categories ({categories.length}):
+              {/* Selected Categories Summary */}
+              {getSelectedCategoriesArray().length > 0 && (
+                <div className="bg-teal-50 rounded-xl p-5 border-2 border-teal-200">
+                  <p className="text-sm font-semibold text-teal-800 mb-3">
+                    ✅ Selected Categories ({getSelectedCategoriesArray().length}):
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {categories.map(cat => (
+                    {getSelectedCategoriesArray().map(cat => (
                       <div
-                        key={cat.id}
-                        className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border-2 ${categoryColors[cat.name]}`}
+                        key={`${cat.name}_${cat.varietyLevel}`}
+                        className={`inline-flex items-center px-3 py-1 rounded-full border-2 ${categoryColors[cat.name]}`}
                       >
                         <span className="font-semibold text-sm">{cat.displayName}</span>
-                        <button
-                          onClick={() => handleDeleteCategory(cat.id)}
-                          className="text-current hover:opacity-70"
-                        >
-                          ×
-                        </button>
                       </div>
                     ))}
                   </div>
@@ -1152,7 +1302,9 @@ function CompetitionSetup() {
               )}
 
               {errors.categories && (
-                <p className="text-red-500 text-sm">{errors.categories}</p>
+                <p className="text-red-500 text-sm font-semibold bg-red-50 p-3 rounded-lg border border-red-200">
+                  {errors.categories}
+                </p>
               )}
             </div>
           </div>
@@ -1168,16 +1320,16 @@ function CompetitionSetup() {
               </div>
               <button
                 onClick={handleOpenAddEntry}
-                disabled={categories.length === 0}
+                disabled={getSelectedCategoriesArray().length === 0}
                 className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white px-4 py-2 rounded-lg font-semibold hover:from-teal-600 hover:to-cyan-600 transition-all min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 + Add Entry
               </button>
             </div>
 
-            {categories.length === 0 && (
+            {getSelectedCategoriesArray().length === 0 && (
               <p className="text-yellow-600 bg-yellow-50 border border-yellow-200 px-4 py-3 rounded-lg text-sm">
-                ⚠️ Please add at least one category before adding entries
+                ⚠️ Please select at least one category before adding entries
               </p>
             )}
 
@@ -1417,11 +1569,14 @@ function CompetitionSetup() {
                   onChange={(e) => setCurrentEntry({ ...currentEntry, categoryId: e.target.value })}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
                 >
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.displayName}
-                    </option>
-                  ))}
+                  {getSelectedCategoriesArray().map(cat => {
+                    const key = `${cat.name}_${cat.varietyLevel}`;
+                    return (
+                      <option key={key} value={key}>
+                        {cat.displayName}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -1497,6 +1652,34 @@ function CompetitionSetup() {
                     Include in Medal Program ⭐
                   </span>
                 </label>
+              </div>
+
+              {/* Studio Name (Optional) */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
+                  Studio Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={currentEntry.studioName || ''}
+                  onChange={(e) => setCurrentEntry({ ...currentEntry, studioName: e.target.value })}
+                  placeholder="e.g., ABC Dance Studio"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
+                />
+              </div>
+
+              {/* Teacher/Choreographer Name (Optional) */}
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
+                  Teacher/Choreographer Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={currentEntry.teacherName || ''}
+                  onChange={(e) => setCurrentEntry({ ...currentEntry, teacherName: e.target.value })}
+                  placeholder="e.g., Jane Smith"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
+                />
               </div>
 
               {/* Photo Upload */}
@@ -1643,6 +1826,14 @@ function CompetitionSetup() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Photo Upload Manager Modal */}
+      {showPhotoManager && savedCompetitionId && (
+        <PhotoUploadManager
+          competitionId={savedCompetitionId}
+          onClose={() => setShowPhotoManager(false)}
+        />
       )}
     </Layout>
   );

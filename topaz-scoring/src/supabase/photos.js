@@ -8,7 +8,7 @@ const BUCKET_NAME = 'entry-photos';
  * @param {File} imageFile - Original image file
  * @returns {File} - Compressed image file
  */
-const compressImage = async (imageFile) => {
+export const compressImage = async (imageFile) => {
   try {
     console.log('Original image size:', imageFile.size / 1024 / 1024, 'MB');
     
