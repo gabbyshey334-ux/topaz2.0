@@ -320,7 +320,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-semibold text-teal-800">Uploading...</span>
                         <span className="text-sm font-bold text-teal-600">
-                          {uploadProgress.uploaded} / {uploadProgress.total}
+                          {uploadProgress.uploaded} of {uploadProgress.total}
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -350,7 +350,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
                       disabled={uploadingBulk || fileMatches.filter(m => m.matched).length === 0}
                     >
                       {uploadingBulk ? (
-                        <>Uploading {uploadProgress.uploaded}/{uploadProgress.total}...</>
+                        <>Uploading {uploadProgress.uploaded} of {uploadProgress.total}...</>
                       ) : (
                         <>Upload {fileMatches.filter(m => m.matched).length} Photos</>
                       )}

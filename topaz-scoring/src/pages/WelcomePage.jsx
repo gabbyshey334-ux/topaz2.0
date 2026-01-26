@@ -302,11 +302,10 @@ function WelcomePage() {
                             }}
                             className="px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-bold rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all shadow-sm"
                           >
-                            Continue →
+                            Continue
                           </button>
                         </div>
                       </div>
-                    </div>
                   </div>
                 ))}
               </div>
