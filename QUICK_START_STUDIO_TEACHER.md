@@ -155,3 +155,4 @@ Just run the SQL migration and start adding studio/teacher info to your entries.
 
 *TOPAZ 2.0 - Making dance competitions even better!*
 
+

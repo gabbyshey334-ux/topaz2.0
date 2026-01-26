@@ -1,0 +1,9 @@
+*.md
+.git
+.gitignore
+node_modules
+topaz-scoring/node_modules
+*.log
+.DS_Store
+*.backup
+

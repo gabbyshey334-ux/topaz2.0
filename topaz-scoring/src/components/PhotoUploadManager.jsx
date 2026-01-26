@@ -445,3 +445,4 @@ function PhotoUploadManager({ competitionId, onClose }) {
 
 export default PhotoUploadManager;
 
+

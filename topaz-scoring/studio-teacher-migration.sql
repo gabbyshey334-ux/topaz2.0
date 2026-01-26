@@ -11,3 +11,4 @@ ADD COLUMN IF NOT EXISTS teacher_name TEXT;
 -- WHERE table_name = 'entries' 
 -- AND column_name IN ('studio_name', 'teacher_name');
 
+

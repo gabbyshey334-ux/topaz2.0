@@ -1,8 +1,8 @@
 {
-  "buildCommand": "cd topaz-scoring && npm install && npm run build",
+  "buildCommand": "cd topaz-scoring && rm -rf dist && npm ci && npm run build",
   "outputDirectory": "topaz-scoring/dist",
   "framework": "vite",
-  "installCommand": "cd topaz-scoring && npm install",
+  "installCommand": "cd topaz-scoring && npm ci",
   "rewrites": [
     {
       "source": "/(.*)",
@@ -10,6 +10,15 @@
     }
   ],
   "headers": [
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [
