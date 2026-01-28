@@ -569,7 +569,9 @@ function CompetitionSetup() {
       }
     }
 
-    const category = categories.find(c => c.id === currentEntry.categoryId);
+    // Parse categoryId (format: "CategoryName_VarietyLevel")
+    const [categoryName, varietyLevel] = currentEntry.categoryId.split('_');
+    const categoryDisplayName = generateCategoryDisplayName(categoryName, varietyLevel);
     const ageDivision = FIXED_AGE_DIVISIONS.find(d => d.id === currentEntry.ageDivisionId);
 
     // Clean group members data
@@ -591,8 +593,8 @@ function CompetitionSetup() {
       name: currentEntry.name.trim() || `${currentEntry.divisionType} Group`,
       age: parseInt(currentEntry.age),
       categoryId: currentEntry.categoryId,
-      categoryName: category?.displayName || '',
-      categoryColor: categoryColors[category?.name] || 'bg-gray-100 text-gray-800',
+      categoryName: categoryDisplayName || '',
+      categoryColor: categoryColors[categoryName] || 'bg-gray-100 text-gray-800',
       ageDivisionId: currentEntry.ageDivisionId || null,
       ageDivisionName: ageDivision?.name || null,
       abilityLevel: currentEntry.abilityLevel,
