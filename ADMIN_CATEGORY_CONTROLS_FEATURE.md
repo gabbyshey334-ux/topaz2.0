@@ -366,3 +366,4 @@ The admin-only category control feature is now **fully implemented** and ready f
 *Standardized categories for better competition management!* 🔒🎭✨
 
 
+

@@ -370,3 +370,4 @@ If issues arise:
 *Built with React, Supabase, and love for competition directors everywhere!* 💜🎭📸
 
 
+

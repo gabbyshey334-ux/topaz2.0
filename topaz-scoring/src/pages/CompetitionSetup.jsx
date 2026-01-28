@@ -351,40 +351,40 @@ function CompetitionSetup() {
     
     // Auto-calculate oldest member age with safety checks
     try {
-      const validAges = updatedMembers
-        .map(m => m.age)
-        .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
+    const validAges = updatedMembers
+      .map(m => m.age)
+      .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
+    
+    const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
+    console.log('📊 Valid ages:', validAges);
+    console.log('👴 Oldest age:', oldestAge);
+    
+    // Find matching age division
+    let ageDivisionId = currentEntry.ageDivisionId;
+    let autoDiv = null;
+    
+    if (oldestAge) {
+      const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
+        oldestAge >= div.minAge && oldestAge <= div.maxAge
+      );
       
-      const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
-      console.log('📊 Valid ages:', validAges);
-      console.log('👴 Oldest age:', oldestAge);
-      
-      // Find matching age division
-      let ageDivisionId = currentEntry.ageDivisionId;
-      let autoDiv = null;
-      
-      if (oldestAge) {
-        const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
-          oldestAge >= div.minAge && oldestAge <= div.maxAge
-        );
-        
-        if (matchingDivision) {
-          ageDivisionId = matchingDivision.id;
-          autoDiv = matchingDivision;
-          console.log('✅ Auto-selected division:', matchingDivision.name);
-        }
+      if (matchingDivision) {
+        ageDivisionId = matchingDivision.id;
+        autoDiv = matchingDivision;
+        console.log('✅ Auto-selected division:', matchingDivision.name);
       }
-      
-      // FIXED: Single state update combining all changes
-      setCurrentEntry(prev => ({
-        ...prev,
-        groupMembers: updatedMembers,
-        age: oldestAge || prev.age,
-        ageDivisionId: ageDivisionId
-      }));
-      
-      if (autoDiv) {
-        setAutoSelectedDivision(autoDiv);
+    }
+    
+    // FIXED: Single state update combining all changes
+    setCurrentEntry(prev => ({
+      ...prev,
+      groupMembers: updatedMembers,
+      age: oldestAge || prev.age,
+      ageDivisionId: ageDivisionId
+    }));
+    
+    if (autoDiv) {
+      setAutoSelectedDivision(autoDiv);
       }
     } catch (error) {
       console.error('❌ Error calculating oldest age:', error);
@@ -411,40 +411,40 @@ function CompetitionSetup() {
     
     // Recalculate oldest age after deletion with safety checks
     try {
-      const validAges = updatedMembers
-        .map(m => m.age)
-        .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
+    const validAges = updatedMembers
+      .map(m => m.age)
+      .filter(a => a !== null && a !== undefined && !isNaN(a) && a > 0);
+    
+    const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
+    console.log('👴 New oldest age after delete:', oldestAge);
+    
+    // Find matching age division
+    let ageDivisionId = currentEntry.ageDivisionId;
+    let autoDiv = null;
+    
+    if (oldestAge) {
+      const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
+        oldestAge >= div.minAge && oldestAge <= div.maxAge
+      );
       
-      const oldestAge = validAges.length > 0 ? Math.max(...validAges) : '';
-      console.log('👴 New oldest age after delete:', oldestAge);
-      
-      // Find matching age division
-      let ageDivisionId = currentEntry.ageDivisionId;
-      let autoDiv = null;
-      
-      if (oldestAge) {
-        const matchingDivision = FIXED_AGE_DIVISIONS.find(div => 
-          oldestAge >= div.minAge && oldestAge <= div.maxAge
-        );
-        
-        if (matchingDivision) {
-          ageDivisionId = matchingDivision.id;
-          autoDiv = matchingDivision;
-        }
+      if (matchingDivision) {
+        ageDivisionId = matchingDivision.id;
+        autoDiv = matchingDivision;
       }
-      
-      // FIXED: Single state update combining all changes
-      setCurrentEntry(prev => ({
-        ...prev,
-        groupMembers: updatedMembers,
-        age: oldestAge || '',
-        ageDivisionId: ageDivisionId
-      }));
-      
-      if (autoDiv) {
-        setAutoSelectedDivision(autoDiv);
-      } else if (!oldestAge) {
-        setAutoSelectedDivision(null);
+    }
+    
+    // FIXED: Single state update combining all changes
+    setCurrentEntry(prev => ({
+      ...prev,
+      groupMembers: updatedMembers,
+      age: oldestAge || '',
+      ageDivisionId: ageDivisionId
+    }));
+    
+    if (autoDiv) {
+      setAutoSelectedDivision(autoDiv);
+    } else if (!oldestAge) {
+      setAutoSelectedDivision(null);
       }
     } catch (error) {
       console.error('❌ Error recalculating age after delete:', error);
@@ -482,7 +482,9 @@ function CompetitionSetup() {
       age: currentEntry.age,
       isGroup: currentEntry.type === 'group',
       groupMembers: currentEntry.groupMembers,
-      memberCount: currentEntry.groupMembers.length
+      memberCount: currentEntry.groupMembers.length,
+      studioName: currentEntry.studioName,
+      teacherName: currentEntry.teacherName
     });
 
     // Validation
@@ -848,11 +850,13 @@ function CompetitionSetup() {
           name: entry.name,
           type: entry.type,
           isGroup: entry.type === 'group',
-          groupMembers: cleanedGroupMembers
+          groupMembers: cleanedGroupMembers,
+          studioName: entry.studioName,
+          teacherName: entry.teacherName
         });
 
         // Create entry
-        const entryResult = await createEntry({
+        const entryData = {
           competition_id: competitionId,
           entry_number: entry.number,
           competitor_name: entry.name,
@@ -866,13 +870,27 @@ function CompetitionSetup() {
           photo_url: photoUrl,
           studio_name: entry.studioName || null,
           teacher_name: entry.teacherName || null
-        });
+        };
+        
+        console.log('📤 Entry data being sent to database:', entryData);
+        
+        const entryResult = await createEntry(entryData);
 
         if (!entryResult.success) {
+          console.error('❌ Entry save failed:', {
+            entryName: entry.name,
+            error: entryResult.error,
+            entryData: entryData
+          });
           throw new Error(entryResult.error);
         }
 
-        console.log('✅ Entry saved:', entry.name);
+        console.log('✅ Entry saved successfully:', {
+          name: entry.name,
+          id: entryResult.data?.id,
+          studio: entryResult.data?.studio_name,
+          teacher: entryResult.data?.teacher_name
+        });
       }
 
       // Success!
@@ -1179,8 +1197,8 @@ function CompetitionSetup() {
                               <div className="mt-3">
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                                   Variety Level:
-                                </label>
-                                <select
+                  </label>
+                  <select
                                   value={varietyLevel}
                                   onChange={(e) => handleUpdateVarietyLevel(category.name, e.target.value)}
                                   className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none text-sm"
@@ -1190,8 +1208,8 @@ function CompetitionSetup() {
                                       {getVarietyDescription(variety)}
                                     </option>
                                   ))}
-                                </select>
-                              </div>
+                  </select>
+                </div>
                             )}
                             
                             {/* Display Name Preview */}
@@ -1250,19 +1268,19 @@ function CompetitionSetup() {
                               <div className="mt-3">
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                                   Variety Level:
-                                </label>
-                                <select
+                  </label>
+                  <select
                                   value={varietyLevel}
                                   onChange={(e) => handleUpdateVarietyLevel(category.name, e.target.value)}
                                   className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-amber-500 focus:outline-none text-sm"
-                                >
-                                  {varietyOptions.map(variety => (
-                                    <option key={variety} value={variety}>
-                                      {getVarietyDescription(variety)}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
+                  >
+                    {varietyOptions.map(variety => (
+                      <option key={variety} value={variety}>
+                        {getVarietyDescription(variety)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                             )}
                             
                             {/* Display Name Preview */}
@@ -1272,9 +1290,9 @@ function CompetitionSetup() {
                                 <span className="text-amber-700 font-semibold">
                                   {generateCategoryDisplayName(category.name, varietyLevel)}
                                 </span>
-                              </div>
+                </div>
                             )}
-                          </div>
+              </div>
                         </div>
                       </div>
                     );
@@ -1573,8 +1591,8 @@ function CompetitionSetup() {
                     const key = `${cat.name}_${cat.varietyLevel}`;
                     return (
                       <option key={key} value={key}>
-                        {cat.displayName}
-                      </option>
+                      {cat.displayName}
+                    </option>
                     );
                   })}
                 </select>

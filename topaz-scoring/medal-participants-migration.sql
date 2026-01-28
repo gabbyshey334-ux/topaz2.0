@@ -59,3 +59,4 @@ COMMENT ON COLUMN medal_awards.points_awarded IS 'Points awarded for this specif
 -- SELECT * FROM medal_participants ORDER BY total_points DESC LIMIT 20;
 
 
+

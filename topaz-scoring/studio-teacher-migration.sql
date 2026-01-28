@@ -12,3 +12,4 @@ ADD COLUMN IF NOT EXISTS teacher_name TEXT;
 -- AND column_name IN ('studio_name', 'teacher_name');
 
 
+
