@@ -527,3 +527,369 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     return { success: false, error: error.message };
   }
 };
+
+/**
+ * Generate a single scorecard page in an existing PDF document
+ * @param {jsPDF} doc - The PDF document object
+ * @param {Object} entry - Entry data
+ * @param {Array} entryScores - Array of scores for this entry
+ * @param {Object} competition - Competition data
+ * @param {Object} category - Category data
+ * @param {Object} ageDivision - Age division data
+ * @param {boolean} isFirst - Whether this is the first page (no page break needed)
+ */
+const addScorecardPage = (doc, entry, entryScores, competition, category, ageDivision, isFirst = false) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
+  // Add new page if not first
+  if (!isFirst) {
+    doc.addPage();
+  }
+  
+  // Championship Colors
+  const tealColor = [20, 184, 166];
+  const cyanColor = [6, 182, 212];
+  const goldColor = [251, 191, 36];
+  const silverColor = [209, 213, 219];
+  const bronzeColor = [251, 146, 60];
+  const darkGray = [55, 65, 81];
+  const lightGray = [243, 244, 246];
+  
+  let yPos = 0;
+  
+  // CHAMPIONSHIP HEADER
+  doc.setFillColor(...cyanColor);
+  doc.rect(0, 0, pageWidth / 2, 45, 'F');
+  doc.setFillColor(...tealColor);
+  doc.rect(pageWidth / 2, 0, pageWidth / 2, 45, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(28);
+  doc.setFont('helvetica', 'bold');
+  doc.text('TOPAZ 2.0', pageWidth / 2, 15, { align: 'center' });
+  
+  doc.setFontSize(14);
+  doc.text('DANCE COMPETITION', pageWidth / 2, 24, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Official Score Sheet', pageWidth / 2, 31, { align: 'center' });
+  doc.text('Heritage Since 1972', pageWidth / 2, 37, { align: 'center' });
+  
+  yPos = 55;
+  
+  // COMPETITION INFO CARD
+  doc.setFillColor(...lightGray);
+  doc.roundedRect(14, yPos, pageWidth - 28, 28, 3, 3, 'F');
+  yPos += 8;
+  
+  doc.setTextColor(...darkGray);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(competition?.name || 'Competition', 18, yPos);
+  yPos += 7;
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  if (competition?.date) {
+    const dateStr = new Date(competition.date).toLocaleDateString('en-US', { 
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    });
+    doc.text(dateStr, 18, yPos);
+  }
+  if (competition?.venue) {
+    doc.text(` • ${competition.venue}`, 80, yPos);
+  }
+  yPos += 6;
+  
+  doc.setTextColor(100, 100, 100);
+  doc.text(`${competition?.judges_count || 0} Judges • Entry #${entry?.entry_number}`, 18, yPos);
+  
+  yPos += 15;
+  
+  // COMPETITOR INFO SECTION
+  const rank = entry.rank || null;
+  const averageScore = entry.averageScore || null;
+  
+  let headerColor = tealColor;
+  let medalEmoji = '';
+  if (rank === 1) {
+    headerColor = goldColor;
+    medalEmoji = '🥇';
+  } else if (rank === 2) {
+    headerColor = silverColor;
+    medalEmoji = '🥈';
+  } else if (rank === 3) {
+    headerColor = bronzeColor;
+    medalEmoji = '🥉';
+  }
+  
+  doc.setFillColor(...headerColor);
+  doc.roundedRect(14, yPos, pageWidth - 28, 45, 3, 3, 'F');
+  
+  if (rank) {
+    doc.setFillColor(255, 255, 255);
+    doc.circle(28, yPos + 22, 12, 'F');
+    
+    doc.setTextColor(...headerColor);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(rank.toString(), 28, yPos + 25, { align: 'center' });
+    
+    doc.setFontSize(6);
+    const suffix = rank === 1 ? 'ST' : rank === 2 ? 'ND' : rank === 3 ? 'RD' : 'TH';
+    doc.text(suffix, 28, yPos + 29, { align: 'center' });
+  }
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  const nameX = rank ? 45 : 18;
+  const nameText = entry.age ? 
+    `${entry.competitor_name || entry.name} (Age ${entry.age})` : 
+    (entry.competitor_name || entry.name);
+  doc.text(nameText, nameX, yPos + 15);
+  
+  if (entry.studio_name || entry.teacher_name) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    let studioTeacherText = '';
+    if (entry.studio_name && entry.teacher_name) {
+      studioTeacherText = `${entry.studio_name} • ${entry.teacher_name}`;
+    } else if (entry.studio_name) {
+      studioTeacherText = entry.studio_name;
+    } else {
+      studioTeacherText = entry.teacher_name;
+    }
+    doc.text(studioTeacherText, nameX, yPos + 20);
+  }
+  
+  if (medalEmoji) {
+    doc.setFontSize(16);
+    doc.text(medalEmoji, pageWidth - 25, yPos + 15);
+  }
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  let badgeY = entry.studio_name || entry.teacher_name ? yPos + 30 : yPos + 25;
+  let badgeX = nameX;
+  
+  if (category) {
+    doc.text(`${category.name}`, badgeX, badgeY);
+    badgeX += doc.getTextWidth(category.name) + 10;
+  }
+  
+  if (ageDivision) {
+    doc.text(`• ${ageDivision.name}`, badgeX, badgeY);
+    badgeX += doc.getTextWidth(`• ${ageDivision.name}`) + 10;
+  }
+  
+  if (entry.ability_level) {
+    doc.text(`• ${entry.ability_level}`, badgeX, badgeY);
+  }
+  
+  if (averageScore) {
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...darkGray);
+    const scoreY = entry.studio_name || entry.teacher_name ? badgeY + 3 : yPos + 28;
+    doc.text(`Average: ${averageScore.toFixed(2)} / 100`, nameX, scoreY);
+  }
+  
+  yPos += 55;
+  
+  // GROUP MEMBERS SECTION
+  if (entry.group_members && Array.isArray(entry.group_members) && entry.group_members.length > 0) {
+    const memberCount = entry.group_members.length;
+    const boxHeight = 12 + (memberCount * 5) + 8;
+    
+    doc.setFillColor(...lightGray);
+    doc.roundedRect(14, yPos, pageWidth - 28, boxHeight, 3, 3, 'F');
+    
+    yPos += 8;
+    
+    doc.setTextColor(...darkGray);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('GROUP MEMBERS:', 18, yPos);
+    
+    yPos += 6;
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    
+    entry.group_members.forEach((member, index) => {
+      const memberText = member.age 
+        ? `• ${member.name} (Age ${member.age})`
+        : `• ${member.name}`;
+      doc.text(memberText, 20, yPos);
+      yPos += 5;
+    });
+    
+    yPos += 10;
+  }
+  
+  // DETAILED SCORES TABLE
+  doc.setTextColor(...darkGray);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Detailed Score Breakdown', 14, yPos);
+  yPos += 8;
+  
+  if (entryScores.length === 0) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(100, 100, 100);
+    doc.text('No scores available for this entry', 14, yPos);
+  } else {
+    const tableData = [];
+    
+    entryScores.forEach(score => {
+      const judgeName = competition?.judge_names?.[score.judge_number - 1] || `Judge ${score.judge_number}`;
+      tableData.push([
+        judgeName,
+        `${Number(score.technique).toFixed(1)} / 25`,
+        `${Number(score.creativity).toFixed(1)} / 25`,
+        `${Number(score.presentation).toFixed(1)} / 25`,
+        `${Number(score.appearance).toFixed(1)} / 25`,
+        `${Number(score.total_score).toFixed(1)} / 100`
+      ]);
+    });
+    
+    const avgTechnique = entryScores.reduce((sum, s) => sum + Number(s.technique), 0) / entryScores.length;
+    const avgCreativity = entryScores.reduce((sum, s) => sum + Number(s.creativity), 0) / entryScores.length;
+    const avgPresentation = entryScores.reduce((sum, s) => sum + Number(s.presentation), 0) / entryScores.length;
+    const avgAppearance = entryScores.reduce((sum, s) => sum + Number(s.appearance), 0) / entryScores.length;
+    const avgTotal = entryScores.reduce((sum, s) => sum + Number(s.total_score), 0) / entryScores.length;
+    
+    tableData.push([
+      'AVERAGE',
+      `${avgTechnique.toFixed(2)} / 25`,
+      `${avgCreativity.toFixed(2)} / 25`,
+      `${avgPresentation.toFixed(2)} / 25`,
+      `${avgAppearance.toFixed(2)} / 25`,
+      `${avgTotal.toFixed(2)} / 100`
+    ]);
+    
+    doc.autoTable({
+      startY: yPos,
+      head: [['Judge', 'Technique', 'Creativity', 'Presentation', 'Appearance', 'Total']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: {
+        fillColor: tealColor,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 9,
+        halign: 'center',
+        cellPadding: 4
+      },
+      bodyStyles: {
+        fontSize: 9,
+        halign: 'center',
+        cellPadding: 3
+      },
+      alternateRowStyles: {
+        fillColor: [249, 250, 251]
+      },
+      columnStyles: {
+        0: { 
+          fontStyle: 'bold',
+          halign: 'left',
+          cellPadding: { left: 6 }
+        }
+      },
+      didParseCell: function(data) {
+        if (data.row.index === entryScores.length) {
+          data.cell.styles.fillColor = headerColor;
+          data.cell.styles.textColor = [255, 255, 255];
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 10;
+        }
+      }
+    });
+  }
+  
+  // FOOTER
+  const footerY = pageHeight - 15;
+  doc.setDrawColor(...tealColor);
+  doc.setLineWidth(0.5);
+  doc.line(14, footerY - 5, pageWidth - 14, footerY - 5);
+  
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  doc.setFont('helvetica', 'normal');
+  doc.text('TOPAZ 2.0 © 2025', 14, footerY);
+  doc.text('Heritage Since 1972', pageWidth / 2, footerY, { align: 'center' });
+  doc.text('Official Competition Results', pageWidth - 14, footerY, { align: 'right' });
+};
+
+/**
+ * Generate a combined PDF with all scorecards
+ * @param {Array} entries - Array of entry objects
+ * @param {Array} allScores - Array of all scores
+ * @param {Array} categories - Array of categories
+ * @param {Array} ageDivisions - Array of age divisions
+ * @param {Object} competition - Competition data
+ * @param {Function} onProgress - Progress callback (current, total)
+ */
+export const generateAllScorecards = async (entries, allScores, categories, ageDivisions, competition, onProgress) => {
+  console.log('🏁 Generating all scorecards...');
+  console.log(`📊 Total entries: ${entries.length}`);
+  
+  try {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    // Filter entries that have scores
+    const scoredEntries = entries.filter(entry => {
+      const entryScores = allScores.filter(s => s.entry_id === entry.id);
+      return entryScores.length > 0;
+    });
+    
+    console.log(`✅ Entries with scores: ${scoredEntries.length}`);
+    
+    if (scoredEntries.length === 0) {
+      return { success: false, error: 'No scored entries found' };
+    }
+    
+    // Generate each scorecard
+    for (let i = 0; i < scoredEntries.length; i++) {
+      const entry = scoredEntries[i];
+      const entryScores = allScores.filter(s => s.entry_id === entry.id);
+      
+      // Find category and age division
+      const category = categories.find(c => c.id === entry.category_id);
+      const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
+      
+      console.log(`📄 Generating scorecard ${i + 1}/${scoredEntries.length}: ${entry.name || entry.competitor_name}`);
+      
+      // Add scorecard page
+      addScorecardPage(doc, entry, entryScores, competition, category, ageDivision, i === 0);
+      
+      // Call progress callback
+      if (onProgress) {
+        onProgress(i + 1, scoredEntries.length);
+      }
+      
+      // Small delay to prevent blocking
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    // Save the combined PDF
+    const safeName = (competition?.name || 'Competition').replace(/[^a-z0-9]/gi, '_');
+    const fileName = `${safeName}_All_Scorecards.pdf`;
+    doc.save(fileName);
+    
+    console.log('✅ All scorecards generated successfully!');
+    return { success: true, count: scoredEntries.length };
+  } catch (error) {
+    console.error('❌ Error generating all scorecards:', error);
+    return { success: false, error: error.message };
+  }
+};

@@ -134,3 +134,4 @@ ORDER BY table_name;
 -- Most common: Column doesn't exist → Run the migration
 -- ============================================
 
+

@@ -16,7 +16,7 @@ import { getCompetitionEntries } from '../supabase/entries';
 import { getCompetitionScores } from '../supabase/scores';
 import { awardMedalPointsForCompetition } from '../supabase/medalParticipants';
 import { subscribeToScores, unsubscribeFromChannel } from '../supabase/realtime';
-import { generateScoreSheet } from '../utils/pdfGenerator';
+import { generateScoreSheet, generateAllScorecards } from '../utils/pdfGenerator';
 import { exportResultsToExcel } from '../utils/excelExport';
 import { 
   groupByExactCombination, 
@@ -51,6 +51,7 @@ function ResultsPage() {
   const [awardingPoints, setAwardingPoints] = useState(false);
   const [showMedalStandings, setShowMedalStandings] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [printProgress, setPrintProgress] = useState({ current: 0, total: 0 });
   const [viewMode, setViewMode] = useState('grouped'); // 'grouped' or 'filtered'
 
   // Redirect if no competitionId
@@ -252,6 +253,40 @@ function ResultsPage() {
     }
   };
 
+  // Generate all scorecards in one PDF
+  const handleGenerateAllScorecards = async () => {
+    if (!window.confirm(`Generate scorecards for all ${entries.length} entries?\n\nThis may take a few minutes.`)) return;
+
+    try {
+      setGeneratingPdf(true);
+      setPrintProgress({ current: 0, total: entries.length });
+      toast.info('Generating all scorecards... Please wait.');
+
+      const result = await generateAllScorecards(
+        entries,
+        scores,
+        categories,
+        ageDivisions,
+        competition,
+        (current, total) => {
+          setPrintProgress({ current, total });
+        }
+      );
+
+      if (result.success) {
+        toast.success(`✅ Generated ${result.count} scorecards successfully!`);
+      } else {
+        throw new Error(result.error || 'Failed to generate scorecards');
+      }
+    } catch (error) {
+      console.error('Error generating all scorecards:', error);
+      toast.error(`Failed to generate scorecards: ${error.message}`);
+    } finally {
+      setGeneratingPdf(false);
+      setPrintProgress({ current: 0, total: 0 });
+    }
+  };
+
   // Helper functions
   const getCategoryName = (categoryId) => {
     return categories.find(c => c.id === categoryId)?.name || 'Unknown';
@@ -428,6 +463,24 @@ function ResultsPage() {
             >
               <span className="text-xl">📊</span>
               <span>Export to Excel</span>
+            </button>
+
+            <button
+              onClick={handleGenerateAllScorecards}
+              disabled={generatingPdf}
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-purple-600 hover:to-indigo-600 hover:scale-105 hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {generatingPdf ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Generating {printProgress.current}/{printProgress.total}...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xl">📄</span>
+                  <span>Print All Scorecards</span>
+                </>
+              )}
             </button>
             
             <button

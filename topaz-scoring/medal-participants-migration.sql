@@ -60,3 +60,4 @@ COMMENT ON COLUMN medal_awards.points_awarded IS 'Points awarded for this specif
 
 
 
+

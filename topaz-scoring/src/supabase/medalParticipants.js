@@ -127,21 +127,27 @@ export const awardPointToParticipant = async (participantName, competitionId, en
 
 /**
  * Award medal points for a single entry (handles solos and groups)
- * @param {Object} entry - Entry object with competitor_name and group_members
+ * @param {Object} entry - Entry object with name and group_members
  * @param {string} competitionId - UUID of competition
  * @returns {Object} - Success status with awards details
  */
 export const awardMedalPointsForEntry = async (entry, competitionId) => {
   try {
+    console.log('🎯 Awarding points for entry:', entry.name || entry.competitor_name);
     const awards = [];
 
-    // Determine if group
-    const isGroup = entry.dance_type && !entry.dance_type.toLowerCase().includes('solo');
+    // Determine if group - check divisionType field (new schema)
+    const divisionType = entry.divisionType || entry.division_type || entry.dance_type || 'Solo';
+    const isGroup = !divisionType.toLowerCase().includes('solo');
+    
+    console.log('   Division type:', divisionType, '| Is group:', isGroup);
 
     if (isGroup && entry.group_members && entry.group_members.length > 0) {
+      console.log(`   📋 Group entry with ${entry.group_members.length} members`);
       // Award point to EACH group member
       for (const member of entry.group_members) {
         if (member.name && member.name.trim()) {
+          console.log(`   🎭 Awarding to group member: ${member.name}`);
           const result = await awardPointToParticipant(
             member.name,
             competitionId,
@@ -157,21 +163,25 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
         }
       }
     } else {
-      // Award point to solo performer
+      // Award point to solo performer (use 'name' field from new schema)
+      const performerName = entry.name || entry.competitor_name;
+      console.log(`   👤 Solo entry - performer: ${performerName}`);
+      
       const result = await awardPointToParticipant(
-        entry.competitor_name,
+        performerName,
         competitionId,
         entry.id
       );
       if (result.success && !result.alreadyAwarded) {
         awards.push({
-          name: entry.competitor_name,
+          name: performerName,
           points: result.data.total_points,
           level: result.data.current_medal_level
         });
       }
     }
 
+    console.log(`   ✅ Total awards for this entry: ${awards.length}`);
     return { success: true, awards };
   } catch (error) {
     console.error('❌ Error awarding medal points for entry:', error);
@@ -186,104 +196,142 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
  */
 export const awardMedalPointsForCompetition = async (competitionId) => {
   try {
+    console.log('🏅 ========================================');
     console.log('🏅 Starting medal point awards for competition:', competitionId);
+    console.log('🏅 ========================================');
 
-    // Get all entries with their scores
+    // Get all medal program entries with their scores
     const { data: entries, error: entriesError } = await supabase
       .from('entries')
       .select(`
         id,
+        name,
         competitor_name,
+        divisionType,
+        division_type,
         dance_type,
         is_medal_program,
         group_members,
-        scores (
-          total_score,
-          average_score
-        )
+        category_id,
+        age_division_id,
+        ability_level
       `)
       .eq('competition_id', competitionId)
       .eq('is_medal_program', true);
 
-    if (entriesError) throw entriesError;
+    if (entriesError) {
+      console.error('❌ Error fetching entries:', entriesError);
+      throw entriesError;
+    }
+
+    console.log(`📊 Total medal program entries: ${entries?.length || 0}`);
 
     if (!entries || entries.length === 0) {
+      console.log('⚠️ No medal program entries found');
       return { success: true, message: 'No medal program entries found', totalAwarded: 0 };
     }
 
-    // Group entries by category/division for ranking
-    // For simplicity, we'll get rankings from scores table
+    // Get all scores for these entries
     const { data: allScores, error: scoresError } = await supabase
       .from('scores')
-      .select(`
-        entry_id,
-        total_score,
-        average_score,
-        entries!inner (
-          id,
-          competitor_name,
-          dance_type,
-          is_medal_program,
-          group_members,
-          category_id,
-          age_division_id,
-          ability_level,
-          dance_type
-        )
-      `)
-      .eq('entries.competition_id', competitionId)
-      .eq('entries.is_medal_program', true)
-      .order('average_score', { ascending: false });
+      .select('*')
+      .eq('competition_id', competitionId);
 
-    if (scoresError) throw scoresError;
+    if (scoresError) {
+      console.error('❌ Error fetching scores:', scoresError);
+      throw scoresError;
+    }
 
-    // Group by category/age/ability/division to determine 1st place
+    console.log(`📈 Total scores found: ${allScores?.length || 0}`);
+
+    // Calculate average score for each entry
+    const entriesWithScores = entries.map(entry => {
+      const entryScores = allScores.filter(s => s.entry_id === entry.id);
+      
+      if (entryScores.length === 0) {
+        console.log(`⚠️ No scores for entry: ${entry.name || entry.competitor_name}`);
+        return { ...entry, averageScore: 0, hasScores: false };
+      }
+
+      const total = entryScores.reduce((sum, score) => sum + (score.total_score || 0), 0);
+      const averageScore = total / entryScores.length;
+      
+      console.log(`📊 Entry "${entry.name || entry.competitor_name}": ${entryScores.length} scores, avg: ${averageScore.toFixed(2)}`);
+      
+      return { ...entry, averageScore, hasScores: true };
+    });
+
+    // Filter out entries without scores
+    const scoredEntries = entriesWithScores.filter(e => e.hasScores && e.averageScore > 0);
+    console.log(`✅ Entries with valid scores: ${scoredEntries.length}`);
+
+    // Group by category/age/ability/divisionType to determine 1st place
     const groupedEntries = {};
     
-    for (const score of allScores) {
-      const entry = score.entries;
-      const key = `${entry.category_id}_${entry.age_division_id}_${entry.ability_level}_${entry.dance_type}`;
+    for (const entry of scoredEntries) {
+      const divisionType = entry.divisionType || entry.division_type || entry.dance_type || 'Solo';
+      const key = `${entry.category_id}_${entry.age_division_id}_${entry.ability_level}_${divisionType}`;
       
       if (!groupedEntries[key]) {
         groupedEntries[key] = [];
       }
       
-      groupedEntries[key].push({
-        ...entry,
-        averageScore: score.average_score
-      });
+      groupedEntries[key].push(entry);
     }
+
+    console.log(`🎯 Total groups formed: ${Object.keys(groupedEntries).length}`);
 
     // Find 1st place in each group
     const firstPlaceEntries = [];
+    let groupIndex = 1;
+    
     for (const key in groupedEntries) {
       const group = groupedEntries[key];
+      console.log(`\n🏆 Group ${groupIndex}/${Object.keys(groupedEntries).length}: ${group.length} entries`);
+      
       // Sort by score descending
       group.sort((a, b) => b.averageScore - a.averageScore);
+      
       // First entry is 1st place
       if (group.length > 0) {
-        firstPlaceEntries.push(group[0]);
+        const winner = group[0];
+        console.log(`   🥇 1st Place: "${winner.name || winner.competitor_name}" with score ${winner.averageScore.toFixed(2)}`);
+        firstPlaceEntries.push(winner);
       }
+      
+      groupIndex++;
     }
 
-    console.log(`Found ${firstPlaceEntries.length} first place medal program entries`);
+    console.log(`\n🎉 Total 1st place winners: ${firstPlaceEntries.length}`);
 
     // Award points for each first place entry
     let totalParticipantsAwarded = 0;
     const awardSummary = [];
 
+    console.log('\n💎 AWARDING MEDAL POINTS:');
+    console.log('═══════════════════════════════════════');
+
     for (const entry of firstPlaceEntries) {
+      const entryName = entry.name || entry.competitor_name;
+      console.log(`\n🎖️ Processing entry: "${entryName}"`);
+      
       const result = await awardMedalPointsForEntry(entry, competitionId);
+      
       if (result.success && result.awards) {
         totalParticipantsAwarded += result.awards.length;
         awardSummary.push({
-          entry: entry.competitor_name,
+          entry: entryName,
           awards: result.awards
         });
+        console.log(`   ✅ Awarded ${result.awards.length} participant(s)`);
+      } else {
+        console.log(`   ⚠️ No awards given (possibly already awarded)`);
       }
     }
 
-    console.log(`✅ Medal points awarded to ${totalParticipantsAwarded} participants`);
+    console.log('\n🏅 ========================================');
+    console.log(`✅ COMPLETE! Medal points awarded to ${totalParticipantsAwarded} participants from ${firstPlaceEntries.length} first-place entries`);
+    console.log('🏅 ========================================\n');
 
     return {
       success: true,
@@ -292,7 +340,9 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
       summary: awardSummary
     };
   } catch (error) {
-    console.error('❌ Error awarding medal points for competition:', error);
+    console.error('❌ ========================================');
+    console.error('❌ CRITICAL ERROR awarding medal points:', error);
+    console.error('❌ ========================================');
     return { success: false, error: error.message };
   }
 };
@@ -421,6 +471,7 @@ export const getParticipantDetails = async (participantName) => {
     return { success: false, error: error.message };
   }
 };
+
 
 
 
