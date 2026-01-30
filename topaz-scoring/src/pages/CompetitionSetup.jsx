@@ -47,8 +47,8 @@ function CompetitionSetup() {
     setJudgeNames(newNames);
   };
 
-  // SECTION 2: Categories (Checkbox selection system)
-  // selectedCategories: { categoryName: { selected: true/false, varietyLevel: 'None'/'Variety A'/etc } }
+  // SECTION 2: Categories (Checkbox selection system with MULTIPLE variety levels)
+  // selectedCategories: { categoryName: { selected: true/false, varietyLevels: ['None', 'Variety A', ...] } }
   const [selectedCategories, setSelectedCategories] = useState({});
 
   // SECTION 3: Age Divisions (FIXED - 4 DIVISIONS)
@@ -186,7 +186,7 @@ function CompetitionSetup() {
   };
 
   // ===================================================================
-  // CATEGORY HANDLERS (Checkbox Selection System)
+  // CATEGORY HANDLERS (Checkbox Selection System - MULTIPLE VARIETY LEVELS)
   // ===================================================================
 
   // Toggle category selection
@@ -195,13 +195,13 @@ function CompetitionSetup() {
       const newSelection = { ...prev };
       
       if (newSelection[categoryName]?.selected) {
-        // Unselect
+        // Unselect - remove entire category
         delete newSelection[categoryName];
       } else {
-        // Select with default variety level
+        // Select with no variety levels initially (user will select them)
         newSelection[categoryName] = {
           selected: true,
-          varietyLevel: 'None'
+          varietyLevels: []
         };
       }
       
@@ -209,27 +209,69 @@ function CompetitionSetup() {
     });
   };
 
-  // Update variety level for a selected category
-  const handleUpdateVarietyLevel = (categoryName, varietyLevel) => {
-    setSelectedCategories(prev => ({
-      ...prev,
-      [categoryName]: {
-        ...prev[categoryName],
-        varietyLevel: varietyLevel
+  // Toggle variety level selection (can select multiple)
+  const handleToggleVarietyLevel = (categoryName, varietyLevel) => {
+    setSelectedCategories(prev => {
+      const currentLevels = prev[categoryName]?.varietyLevels || [];
+      const isCurrentlySelected = currentLevels.includes(varietyLevel);
+      
+      return {
+        ...prev,
+        [categoryName]: {
+          ...prev[categoryName],
+          varietyLevels: isCurrentlySelected
+            ? currentLevels.filter(v => v !== varietyLevel) // Remove if already selected
+            : [...currentLevels, varietyLevel] // Add if not selected
+        }
+      };
+    });
+  };
+
+  // Remove a specific category variation (from the summary pills)
+  const handleRemoveCategoryVariation = (categoryName, varietyLevel) => {
+    setSelectedCategories(prev => {
+      const currentLevels = prev[categoryName]?.varietyLevels || [];
+      const newLevels = currentLevels.filter(v => v !== varietyLevel);
+      
+      if (newLevels.length === 0) {
+        // If no variety levels left, uncheck the category entirely
+        const newSelection = { ...prev };
+        delete newSelection[categoryName];
+        return newSelection;
       }
-    }));
+      
+      return {
+        ...prev,
+        [categoryName]: {
+          ...prev[categoryName],
+          varietyLevels: newLevels
+        }
+      };
+    });
   };
 
   // Get list of selected categories as array (for saving to DB)
+  // Now flattens multiple variety levels into separate category records
   const getSelectedCategoriesArray = () => {
-    return Object.entries(selectedCategories)
+    const result = [];
+    
+    Object.entries(selectedCategories)
       .filter(([_, data]) => data.selected)
-      .map(([name, data]) => ({
-        name,
-        varietyLevel: data.varietyLevel,
-        displayName: generateCategoryDisplayName(name, data.varietyLevel),
-        isSpecialCategory: isSpecialCategory(name)
-      }));
+      .forEach(([name, data]) => {
+        if (data.varietyLevels && data.varietyLevels.length > 0) {
+          // Create a separate entry for each variety level
+          data.varietyLevels.forEach(varietyLevel => {
+            result.push({
+              name,
+              varietyLevel,
+              displayName: generateCategoryDisplayName(name, varietyLevel),
+              isSpecialCategory: isSpecialCategory(name)
+            });
+          });
+        }
+      });
+    
+    return result;
   };
 
   // ===================================================================
@@ -1171,7 +1213,7 @@ function CompetitionSetup() {
                 <div className="space-y-3">
                   {FIXED_CATEGORIES.map(category => {
                     const isSelected = selectedCategories[category.name]?.selected;
-                    const varietyLevel = selectedCategories[category.name]?.varietyLevel || 'None';
+                    const selectedVarietyLevels = selectedCategories[category.name]?.varietyLevels || [];
                     
                     return (
                       <div key={category.name} className="bg-white rounded-lg p-4 border-2 border-gray-200">
@@ -1185,7 +1227,7 @@ function CompetitionSetup() {
                             className="w-5 h-5 mt-0.5 text-teal-600 rounded focus:ring-2 focus:ring-teal-500 cursor-pointer"
                           />
                           
-                          {/* Category Name */}
+                          {/* Category Name & Variety Selections */}
                           <div className="flex-1">
                             <label 
                               htmlFor={`cat-${category.name}`}
@@ -1194,33 +1236,52 @@ function CompetitionSetup() {
                               {category.name}
                             </label>
                             
-                            {/* Variety Level Dropdown (only when selected) */}
+                            {/* Variety Level Checkboxes (only when category selected) */}
                             {isSelected && (
-                              <div className="mt-3">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                  Variety Level:
-                  </label>
-                  <select
-                                  value={varietyLevel}
-                                  onChange={(e) => handleUpdateVarietyLevel(category.name, e.target.value)}
-                                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none text-sm"
-                                >
-                                  {varietyOptions.map(variety => (
-                                    <option key={variety} value={variety}>
-                                      {getVarietyDescription(variety)}
-                                    </option>
-                                  ))}
-                  </select>
-                </div>
-                            )}
-                            
-                            {/* Display Name Preview */}
-                            {isSelected && (
-                              <div className="mt-2 text-sm text-gray-600">
-                                <span className="font-semibold">Will appear as:</span>{' '}
-                                <span className="text-teal-700 font-semibold">
-                                  {generateCategoryDisplayName(category.name, varietyLevel)}
-                                </span>
+                              <div className="mt-3 pl-2 border-l-4 border-teal-200">
+                                <p className="text-sm font-semibold text-gray-700 mb-2">
+                                  Select variety levels (check all that apply):
+                                </p>
+                                <div className="space-y-2">
+                                  {varietyOptions.map(variety => {
+                                    const isVarietySelected = selectedVarietyLevels.includes(variety);
+                                    
+                                    return (
+                                      <div key={variety} className="flex items-start gap-2">
+                                        <input
+                                          type="checkbox"
+                                          id={`variety-${category.name}-${variety}`}
+                                          checked={isVarietySelected}
+                                          onChange={() => handleToggleVarietyLevel(category.name, variety)}
+                                          className="w-4 h-4 mt-0.5 text-teal-600 rounded focus:ring-2 focus:ring-teal-500 cursor-pointer"
+                                        />
+                                        <label
+                                          htmlFor={`variety-${category.name}-${variety}`}
+                                          className="flex-1 text-sm text-gray-700 cursor-pointer hover:text-teal-600"
+                                        >
+                                          <span className="font-medium">{getVarietyDescription(variety)}</span>
+                                          {isVarietySelected && (
+                                            <span className="ml-2 text-xs text-teal-600 font-semibold">
+                                              → "{generateCategoryDisplayName(category.name, variety)}"
+                                            </span>
+                                          )}
+                                        </label>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                
+                                {/* Helper Text */}
+                                {selectedVarietyLevels.length === 0 && (
+                                  <p className="mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                                    ⚠️ Please select at least one variety level
+                                  </p>
+                                )}
+                                {selectedVarietyLevels.length > 0 && (
+                                  <p className="mt-2 text-xs text-teal-600 bg-teal-50 px-2 py-1 rounded">
+                                    ✅ {selectedVarietyLevels.length} variation{selectedVarietyLevels.length > 1 ? 's' : ''} selected
+                                  </p>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1242,7 +1303,7 @@ function CompetitionSetup() {
                 <div className="space-y-3">
                   {SPECIAL_CATEGORIES.map(category => {
                     const isSelected = selectedCategories[category.name]?.selected;
-                    const varietyLevel = selectedCategories[category.name]?.varietyLevel || 'None';
+                    const selectedVarietyLevels = selectedCategories[category.name]?.varietyLevels || [];
                     
                     return (
                       <div key={category.name} className="bg-white rounded-lg p-4 border-2 border-gray-200">
@@ -1252,7 +1313,15 @@ function CompetitionSetup() {
                             type="checkbox"
                             id={`cat-${category.name}`}
                             checked={isSelected || false}
-                            onChange={() => handleToggleCategory(category.name)}
+                            onChange={() => {
+                              handleToggleCategory(category.name);
+                              // Special categories auto-select "None" if just checked
+                              if (!isSelected) {
+                                setTimeout(() => {
+                                  handleToggleVarietyLevel(category.name, 'None');
+                                }, 0);
+                              }
+                            }}
                             className="w-5 h-5 mt-0.5 text-amber-600 rounded focus:ring-2 focus:ring-amber-500 cursor-pointer"
                           />
                           
@@ -1265,34 +1334,16 @@ function CompetitionSetup() {
                               {category.name}
                             </label>
                             
-                            {/* Variety Level Dropdown (only when selected) */}
+                            {/* Special categories info (only when selected) */}
                             {isSelected && (
-                              <div className="mt-3">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                  Variety Level:
-                  </label>
-                  <select
-                                  value={varietyLevel}
-                                  onChange={(e) => handleUpdateVarietyLevel(category.name, e.target.value)}
-                                  className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-amber-500 focus:outline-none text-sm"
-                  >
-                    {varietyOptions.map(variety => (
-                      <option key={variety} value={variety}>
-                        {getVarietyDescription(variety)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                            )}
-                            
-                            {/* Display Name Preview */}
-                            {isSelected && (
-                              <div className="mt-2 text-sm text-gray-600">
-                                <span className="font-semibold">Will appear as:</span>{' '}
-                                <span className="text-amber-700 font-semibold">
-                                  {generateCategoryDisplayName(category.name, varietyLevel)}
-                                </span>
-                </div>
+                              <div className="mt-3 pl-2 border-l-4 border-amber-200">
+                                <p className="text-sm text-gray-700">
+                                  ✓ Added as <span className="font-semibold text-amber-700">"{category.name}"</span>
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Special categories don't have variety level options
+                                </p>
+                              </div>
                             )}
               </div>
                         </div>
@@ -1302,22 +1353,34 @@ function CompetitionSetup() {
                 </div>
               </div>
 
-              {/* Selected Categories Summary */}
+              {/* Selected Categories Summary with Remove Buttons */}
               {getSelectedCategoriesArray().length > 0 && (
                 <div className="bg-teal-50 rounded-xl p-5 border-2 border-teal-200">
                   <p className="text-sm font-semibold text-teal-800 mb-3">
-                    ✅ Selected Categories ({getSelectedCategoriesArray().length}):
+                    ✅ Selected Category Variations ({getSelectedCategoriesArray().length}):
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {getSelectedCategoriesArray().map(cat => (
                       <div
                         key={`${cat.name}_${cat.varietyLevel}`}
-                        className={`inline-flex items-center px-3 py-1 rounded-full border-2 ${categoryColors[cat.name]}`}
+                        className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border-2 ${categoryColors[cat.name]}`}
                       >
                         <span className="font-semibold text-sm">{cat.displayName}</span>
+                        <button
+                          onClick={() => handleRemoveCategoryVariation(cat.name, cat.varietyLevel)}
+                          className="ml-1 hover:bg-red-100 rounded-full p-0.5 transition-colors"
+                          title="Remove this variation"
+                        >
+                          <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
                       </div>
                     ))}
                   </div>
+                  <p className="text-xs text-teal-700 mt-3">
+                    💡 Tip: Click the × to remove individual variations
+                  </p>
                 </div>
               )}
 
