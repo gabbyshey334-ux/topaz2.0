@@ -495,23 +495,25 @@ function ScoringInterface() {
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             {/* Category Filter */}
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                Filter by Category
-              </label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-              >
-                <option value="all">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {categories.length > 0 && (
+              <div>
+                <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                  Filter by Category
+                </label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.display_name || cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Age Division Filter */}
             {ageDivisions.length > 0 && (
