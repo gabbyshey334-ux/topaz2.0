@@ -44,6 +44,7 @@ function ScoringInterface() {
 
   // State - Filters
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedDivisionType, setSelectedDivisionType] = useState('all');
   const [selectedAgeDivision, setSelectedAgeDivision] = useState('all');
   const [selectedAbilityLevel, setSelectedAbilityLevel] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -91,13 +92,21 @@ function ScoringInterface() {
     }
   }, [competitionId, judgeNumber, allEntries, navigate, location.state]);
 
-  // Filter entries by category, age division, ability level, and search
+  // Filter entries by category, division type, age division, ability level, and search
   useEffect(() => {
     let filtered = [...entries];
 
     // Filter by category
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(e => e.category_id === selectedCategory);
+    }
+
+    // Filter by division type
+    if (selectedDivisionType !== 'all') {
+      filtered = filtered.filter(e => {
+        const divisionType = getDivisionType(e);
+        return divisionType === selectedDivisionType;
+      });
     }
 
     // Filter by age division
@@ -122,7 +131,7 @@ function ScoringInterface() {
     setFilteredEntries(filtered);
     setCurrentIndex(0);
     setCurrentEntry(filtered[0] || null);
-  }, [selectedCategory, selectedAgeDivision, selectedAbilityLevel, searchQuery, entries]);
+  }, [selectedCategory, selectedDivisionType, selectedAgeDivision, selectedAbilityLevel, searchQuery, entries]);
 
   // Auto-calculate total
   useEffect(() => {
@@ -493,7 +502,7 @@ function ScoringInterface() {
 
         {/* FILTER & PROGRESS SECTION */}
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {/* Category Filter */}
             {categories.length > 0 && (
               <div>
@@ -514,6 +523,27 @@ function ScoringInterface() {
                 </select>
               </div>
             )}
+
+            {/* Division Type Filter */}
+            <div>
+              <label className="block text-gray-700 font-semibold mb-2 text-sm">
+                Filter by Division Type
+              </label>
+              <select
+                value={selectedDivisionType}
+                onChange={(e) => setSelectedDivisionType(e.target.value)}
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
+              >
+                <option value="all">All Division Types</option>
+                <option value="Solo">Solo</option>
+                <option value="Duo/Trio">Duo/Trio</option>
+                <option value="Small Group">Small Group</option>
+                <option value="Large Group">Large Group</option>
+                <option value="Production">Production</option>
+                <option value="Student Choreography">Student Choreography</option>
+                <option value="Teacher/Student">Teacher/Student</option>
+              </select>
+            </div>
 
             {/* Age Division Filter */}
             {ageDivisions.length > 0 && (

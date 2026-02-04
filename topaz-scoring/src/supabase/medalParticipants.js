@@ -57,45 +57,70 @@ export const awardPointToParticipant = async (participantName, competitionId, en
   try {
     const normalizedName = participantName.trim();
 
+    if (!normalizedName) {
+      console.error('❌ ERROR: Empty participant name');
+      return { success: false, error: 'Participant name is required' };
+    }
+
+    console.log(`      🎯 Awarding to: "${normalizedName}"`);
+
     // Get or create participant
     const participantResult = await getOrCreateParticipant(normalizedName);
     if (!participantResult.success) {
+      console.error(`      ❌ Failed to get/create participant: ${participantResult.error}`);
       throw new Error(participantResult.error);
     }
 
     const participant = participantResult.data;
+    console.log(`      📊 Current status: ${participant.total_points} points, ${participant.current_medal_level} medal`);
 
     // Check if award already exists (prevent duplicates)
-    const { data: existingAward } = await supabase
+    const { data: existingAward, error: checkError } = await supabase
       .from('medal_awards')
-      .select('id')
+      .select('id, awarded_at')
       .eq('competition_id', competitionId)
       .eq('entry_id', entryId)
       .eq('participant_name', normalizedName)
-      .single();
+      .maybeSingle();
+
+    if (checkError) {
+      console.error(`      ❌ Error checking for existing award: ${checkError.message}`);
+      throw checkError;
+    }
 
     if (existingAward) {
-      console.log('⚠️ Award already exists for', normalizedName, 'entry', entryId);
+      console.log(`      ⚠️ DUPLICATE PREVENTED: Award already exists (awarded at ${existingAward.awarded_at})`);
       return { success: true, data: participant, alreadyAwarded: true };
     }
 
     // Create medal award record
-    const { error: awardError } = await supabase
+    console.log(`      💾 Creating award record...`);
+    const { data: newAward, error: awardError } = await supabase
       .from('medal_awards')
       .insert({
         competition_id: competitionId,
         entry_id: entryId,
         participant_name: normalizedName,
         points_awarded: 1
-      });
+      })
+      .select()
+      .single();
 
-    if (awardError) throw awardError;
+    if (awardError) {
+      console.error(`      ❌ Failed to create award record: ${awardError.message}`);
+      throw awardError;
+    }
+    
+    console.log(`      ✅ Award record created: ${newAward.id}`);
 
     // Update participant points
     const newTotalPoints = participant.total_points + 1;
     
     // Determine medal level
     let medalLevel = 'None';
+    let levelUp = false;
+    const oldLevel = participant.current_medal_level;
+    
     if (newTotalPoints >= 50) {
       medalLevel = 'Gold';
     } else if (newTotalPoints >= 35) {
@@ -103,8 +128,13 @@ export const awardPointToParticipant = async (participantName, competitionId, en
     } else if (newTotalPoints >= 25) {
       medalLevel = 'Bronze';
     }
+    
+    if (medalLevel !== oldLevel) {
+      levelUp = true;
+    }
 
     // Update participant
+    console.log(`      💾 Updating participant record...`);
     const { data: updatedParticipant, error: updateError } = await supabase
       .from('medal_participants')
       .update({
@@ -115,12 +145,20 @@ export const awardPointToParticipant = async (participantName, competitionId, en
       .select()
       .single();
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error(`      ❌ Failed to update participant: ${updateError.message}`);
+      throw updateError;
+    }
 
-    console.log(`✅ Awarded point to ${normalizedName}: ${newTotalPoints} points (${medalLevel})`);
-    return { success: true, data: updatedParticipant };
+    if (levelUp) {
+      console.log(`      🎉 LEVEL UP! ${oldLevel} → ${medalLevel}`);
+    }
+    console.log(`      ✅ Point awarded! New total: ${newTotalPoints} points (${medalLevel})`);
+    
+    return { success: true, data: updatedParticipant, levelUp };
   } catch (error) {
-    console.error('❌ Error awarding point:', error);
+    console.error(`      ❌ CRITICAL ERROR awarding point to "${participantName}":`, error.message);
+    console.error(`      Error details:`, error);
     return { success: false, error: error.message };
   }
 };
@@ -133,21 +171,28 @@ export const awardPointToParticipant = async (participantName, competitionId, en
  */
 export const awardMedalPointsForEntry = async (entry, competitionId) => {
   try {
-    console.log('🎯 Awarding points for entry:', entry.name || entry.competitor_name);
+    const entryName = entry.name || entry.competitor_name;
+    console.log(`   🎯 Processing "${entryName}" (ID: ${entry.id})`);
     const awards = [];
 
     // Determine if group - check divisionType field (new schema)
     const divisionType = entry.divisionType || entry.division_type || entry.dance_type || 'Solo';
-    const isGroup = !divisionType.toLowerCase().includes('solo');
+    const isGroup = !divisionType.toLowerCase().includes('solo') && 
+                    !divisionType.toLowerCase().includes('duo') &&
+                    !divisionType.toLowerCase().includes('trio');
     
-    console.log('   Division type:', divisionType, '| Is group:', isGroup);
+    console.log(`      • Division Type: ${divisionType}`);
+    console.log(`      • Is Group Entry: ${isGroup}`);
+    console.log(`      • Group Members: ${entry.group_members ? entry.group_members.length : 0}`);
 
     if (isGroup && entry.group_members && entry.group_members.length > 0) {
-      console.log(`   📋 Group entry with ${entry.group_members.length} members`);
+      console.log(`      📋 GROUP ENTRY: Awarding to ${entry.group_members.length} members`);
+      
       // Award point to EACH group member
+      let memberIdx = 1;
       for (const member of entry.group_members) {
         if (member.name && member.name.trim()) {
-          console.log(`   🎭 Awarding to group member: ${member.name}`);
+          console.log(`\n      👥 Member ${memberIdx}/${entry.group_members.length}: ${member.name}`);
           const result = await awardPointToParticipant(
             member.name,
             competitionId,
@@ -157,35 +202,87 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
             awards.push({
               name: member.name,
               points: result.data.total_points,
-              level: result.data.current_medal_level
+              level: result.data.current_medal_level,
+              levelUp: result.levelUp || false
             });
+          } else if (result.alreadyAwarded) {
+            console.log(`      ⚠️ Already awarded to ${member.name}`);
           }
+          memberIdx++;
+        } else {
+          console.log(`      ⚠️ Skipping group member with empty name`);
+        }
+      }
+    } else if (divisionType.toLowerCase().includes('duo') || divisionType.toLowerCase().includes('trio')) {
+      // Duo/Trio - treat similar to groups
+      console.log(`      👥 DUO/TRIO ENTRY`);
+      
+      if (entry.group_members && entry.group_members.length > 0) {
+        console.log(`      📋 Awarding to ${entry.group_members.length} members`);
+        let memberIdx = 1;
+        for (const member of entry.group_members) {
+          if (member.name && member.name.trim()) {
+            console.log(`\n      👥 Member ${memberIdx}/${entry.group_members.length}: ${member.name}`);
+            const result = await awardPointToParticipant(
+              member.name,
+              competitionId,
+              entry.id
+            );
+            if (result.success && !result.alreadyAwarded) {
+              awards.push({
+                name: member.name,
+                points: result.data.total_points,
+                level: result.data.current_medal_level,
+                levelUp: result.levelUp || false
+              });
+            }
+            memberIdx++;
+          }
+        }
+      } else {
+        // Fallback to competitor_name if no group_members
+        console.log(`      ⚠️ No group_members defined, awarding to entry name`);
+        const result = await awardPointToParticipant(
+          entryName,
+          competitionId,
+          entry.id
+        );
+        if (result.success && !result.alreadyAwarded) {
+          awards.push({
+            name: entryName,
+            points: result.data.total_points,
+            level: result.data.current_medal_level,
+            levelUp: result.levelUp || false
+          });
         }
       }
     } else {
-      // Award point to solo performer (use 'name' field from new schema)
-      const performerName = entry.name || entry.competitor_name;
-      console.log(`   👤 Solo entry - performer: ${performerName}`);
+      // Award point to solo performer
+      console.log(`      👤 SOLO ENTRY: "${entryName}"`);
       
       const result = await awardPointToParticipant(
-        performerName,
+        entryName,
         competitionId,
         entry.id
       );
       if (result.success && !result.alreadyAwarded) {
         awards.push({
-          name: performerName,
+          name: entryName,
           points: result.data.total_points,
-          level: result.data.current_medal_level
+          level: result.data.current_medal_level,
+          levelUp: result.levelUp || false
         });
+      } else if (result.alreadyAwarded) {
+        console.log(`      ⚠️ Already awarded to ${entryName}`);
       }
     }
 
-    console.log(`   ✅ Total awards for this entry: ${awards.length}`);
+    console.log(`   ✅ Awards for this entry: ${awards.length}`);
     return { success: true, awards };
   } catch (error) {
-    console.error('❌ Error awarding medal points for entry:', error);
-    return { success: false, error: error.message };
+    console.error(`   ❌ ERROR awarding medal points for entry:`, error.message);
+    console.error(`   Error details:`, error);
+    return { success: false, error: error.message, awards: [] };
   }
 };
 
@@ -197,10 +294,13 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
 export const awardMedalPointsForCompetition = async (competitionId) => {
   try {
     console.log('🏅 ========================================');
-    console.log('🏅 Starting medal point awards for competition:', competitionId);
+    console.log('🏅 MEDAL POINTS AWARD PROCESS STARTING');
     console.log('🏅 ========================================');
+    console.log(`📋 Competition ID: ${competitionId}`);
+    console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
 
     // Get all medal program entries with their scores
+    console.log('\n🔍 Step 1: Fetching medal program entries...');
     const { data: entries, error: entriesError } = await supabase
       .from('entries')
       .select(`
@@ -220,52 +320,88 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
       .eq('is_medal_program', true);
 
     if (entriesError) {
-      console.error('❌ Error fetching entries:', entriesError);
+      console.error('❌ ERROR fetching entries:', entriesError);
+      console.error('❌ Error details:', JSON.stringify(entriesError, null, 2));
       throw entriesError;
     }
 
-    console.log(`📊 Total medal program entries: ${entries?.length || 0}`);
+    console.log(`📊 Total medal program entries found: ${entries?.length || 0}`);
 
     if (!entries || entries.length === 0) {
-      console.log('⚠️ No medal program entries found');
-      return { success: true, message: 'No medal program entries found', totalAwarded: 0 };
+      console.log('⚠️ WARNING: No medal program entries found');
+      console.log('💡 TIP: Make sure entries have is_medal_program = true');
+      return { 
+        success: true, 
+        message: 'No medal program entries found', 
+        totalAwarded: 0,
+        firstPlaceCount: 0
+      };
     }
 
+    // Log sample entry for debugging
+    console.log('\n📝 Sample entry structure:');
+    console.log(JSON.stringify(entries[0], null, 2));
+
     // Get all scores for these entries
+    console.log('\n🔍 Step 2: Fetching scores...');
     const { data: allScores, error: scoresError } = await supabase
       .from('scores')
       .select('*')
       .eq('competition_id', competitionId);
 
     if (scoresError) {
-      console.error('❌ Error fetching scores:', scoresError);
+      console.error('❌ ERROR fetching scores:', scoresError);
+      console.error('❌ Error details:', JSON.stringify(scoresError, null, 2));
       throw scoresError;
     }
 
     console.log(`📈 Total scores found: ${allScores?.length || 0}`);
 
+    if (!allScores || allScores.length === 0) {
+      console.log('⚠️ WARNING: No scores found for this competition');
+      console.log('💡 TIP: Judges must score entries before awarding points');
+      return {
+        success: false,
+        error: 'No scores found. Please ensure judges have scored the competition.',
+        totalAwarded: 0,
+        firstPlaceCount: 0
+      };
+    }
+
     // Calculate average score for each entry
+    console.log('\n📊 Step 3: Calculating average scores...');
     const entriesWithScores = entries.map(entry => {
       const entryScores = allScores.filter(s => s.entry_id === entry.id);
       
       if (entryScores.length === 0) {
-        console.log(`⚠️ No scores for entry: ${entry.name || entry.competitor_name}`);
+        console.log(`   ⚠️ No scores for: ${entry.name || entry.competitor_name}`);
         return { ...entry, averageScore: 0, hasScores: false };
       }
 
       const total = entryScores.reduce((sum, score) => sum + (score.total_score || 0), 0);
       const averageScore = total / entryScores.length;
       
-      console.log(`📊 Entry "${entry.name || entry.competitor_name}": ${entryScores.length} scores, avg: ${averageScore.toFixed(2)}`);
+      console.log(`   📊 "${entry.name || entry.competitor_name}": ${entryScores.length} judge(s), avg: ${averageScore.toFixed(2)}`);
       
       return { ...entry, averageScore, hasScores: true };
     });
 
     // Filter out entries without scores
     const scoredEntries = entriesWithScores.filter(e => e.hasScores && e.averageScore > 0);
-    console.log(`✅ Entries with valid scores: ${scoredEntries.length}`);
+    console.log(`   ✅ Entries with valid scores: ${scoredEntries.length}`);
+
+    if (scoredEntries.length === 0) {
+      console.log('⚠️ WARNING: No entries have scores');
+      return {
+        success: false,
+        error: 'No scored entries found. Please ensure judges have completed scoring.',
+        totalAwarded: 0,
+        firstPlaceCount: 0
+      };
+    }
 
     // Group by category/age/ability/divisionType to determine 1st place
+    console.log('\n🎯 Step 4: Grouping entries by category combination...');
     const groupedEntries = {};
     
     for (const entry of scoredEntries) {
@@ -273,64 +409,112 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
       const key = `${entry.category_id}_${entry.age_division_id}_${entry.ability_level}_${divisionType}`;
       
       if (!groupedEntries[key]) {
-        groupedEntries[key] = [];
+        groupedEntries[key] = {
+          category_id: entry.category_id,
+          age_division_id: entry.age_division_id,
+          ability_level: entry.ability_level,
+          divisionType: divisionType,
+          entries: []
+        };
       }
       
-      groupedEntries[key].push(entry);
+      groupedEntries[key].entries.push(entry);
     }
 
-    console.log(`🎯 Total groups formed: ${Object.keys(groupedEntries).length}`);
+    const groupCount = Object.keys(groupedEntries).length;
+    console.log(`   🎯 Total groups formed: ${groupCount}`);
+    
+    // Log each group
+    let groupIdx = 1;
+    for (const key in groupedEntries) {
+      const group = groupedEntries[key];
+      console.log(`   Group ${groupIdx}/${groupCount}: ${group.entries.length} entries (${group.divisionType}, ${group.ability_level})`);
+      groupIdx++;
+    }
 
     // Find 1st place in each group
+    console.log('\n🏆 Step 5: Identifying 1st place winners...');
     const firstPlaceEntries = [];
-    let groupIndex = 1;
+    let winnerIdx = 1;
     
     for (const key in groupedEntries) {
       const group = groupedEntries[key];
-      console.log(`\n🏆 Group ${groupIndex}/${Object.keys(groupedEntries).length}: ${group.length} entries`);
+      console.log(`\n   🏆 Group ${winnerIdx}: ${group.entries.length} competitors`);
       
       // Sort by score descending
-      group.sort((a, b) => b.averageScore - a.averageScore);
+      group.entries.sort((a, b) => b.averageScore - a.averageScore);
       
       // First entry is 1st place
-      if (group.length > 0) {
-        const winner = group[0];
-        console.log(`   🥇 1st Place: "${winner.name || winner.competitor_name}" with score ${winner.averageScore.toFixed(2)}`);
+      if (group.entries.length > 0) {
+        const winner = group.entries[0];
+        const winnerName = winner.name || winner.competitor_name;
+        console.log(`      🥇 1st Place: "${winnerName}" - Score: ${winner.averageScore.toFixed(2)}`);
+        console.log(`         • Category: ${winner.category_id}`);
+        console.log(`         • Age Division: ${winner.age_division_id}`);
+        console.log(`         • Ability: ${winner.ability_level}`);
+        console.log(`         • Division Type: ${group.divisionType}`);
+        console.log(`         • Is Group: ${!group.divisionType.toLowerCase().includes('solo')}`);
+        if (winner.group_members && winner.group_members.length > 0) {
+          console.log(`         • Group Members: ${winner.group_members.length}`);
+          winner.group_members.forEach((m, idx) => {
+            console.log(`            ${idx + 1}. ${m.name} (age ${m.age || 'N/A'})`);
+          });
+        }
         firstPlaceEntries.push(winner);
       }
       
-      groupIndex++;
+      winnerIdx++;
     }
 
-    console.log(`\n🎉 Total 1st place winners: ${firstPlaceEntries.length}`);
+    console.log(`\n   ✅ Total 1st place winners: ${firstPlaceEntries.length}`);
+
+    if (firstPlaceEntries.length === 0) {
+      console.log('⚠️ WARNING: No 1st place winners identified');
+      return {
+        success: false,
+        error: 'No 1st place winners found.',
+        totalAwarded: 0,
+        firstPlaceCount: 0
+      };
+    }
 
     // Award points for each first place entry
+    console.log('\n💎 Step 6: AWARDING MEDAL POINTS');
+    console.log('═════════════════════════════════════════════════');
     let totalParticipantsAwarded = 0;
+    let totalPointsDistributed = 0;
     const awardSummary = [];
-
-    console.log('\n💎 AWARDING MEDAL POINTS:');
-    console.log('═══════════════════════════════════════');
 
     for (const entry of firstPlaceEntries) {
       const entryName = entry.name || entry.competitor_name;
       console.log(`\n🎖️ Processing entry: "${entryName}"`);
+      console.log(`   Entry ID: ${entry.id}`);
       
       const result = await awardMedalPointsForEntry(entry, competitionId);
       
-      if (result.success && result.awards) {
+      if (result.success && result.awards && result.awards.length > 0) {
         totalParticipantsAwarded += result.awards.length;
+        totalPointsDistributed += result.awards.length; // 1 point per award
         awardSummary.push({
           entry: entryName,
           awards: result.awards
         });
-        console.log(`   ✅ Awarded ${result.awards.length} participant(s)`);
+        console.log(`   ✅ Successfully awarded ${result.awards.length} participant(s):`);
+        result.awards.forEach((award, idx) => {
+          console.log(`      ${idx + 1}. ${award.name}: Now ${award.points} total points (${award.level})`);
+        });
+      } else if (result.success && (!result.awards || result.awards.length === 0)) {
+        console.log(`   ⚠️ No NEW awards given (points may have already been awarded)`);
       } else {
-        console.log(`   ⚠️ No awards given (possibly already awarded)`);
+        console.log(`   ❌ ERROR awarding points: ${result.error || 'Unknown error'}`);
       }
     }
 
     console.log('\n🏅 ========================================');
-    console.log(`✅ COMPLETE! Medal points awarded to ${totalParticipantsAwarded} participants from ${firstPlaceEntries.length} first-place entries`);
+    console.log(`✅ AWARD PROCESS COMPLETE!`);
+    console.log(`   • Participants awarded: ${totalParticipantsAwarded}`);
+    console.log(`   • Total points distributed: ${totalPointsDistributed}`);
+    console.log(`   • First-place entries: ${firstPlaceEntries.length}`);
     console.log('🏅 ========================================\n');
 
     return {
