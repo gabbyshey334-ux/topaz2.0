@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS entries (
   is_medal_program BOOLEAN DEFAULT FALSE,
   medal_points INTEGER DEFAULT 0 CHECK (medal_points >= 0),
   current_medal_level TEXT DEFAULT 'None' CHECK (current_medal_level IN ('None', 'Bronze', 'Silver', 'Gold')),
+  group_members JSONB DEFAULT NULL,
+  studio_name TEXT DEFAULT NULL,
+  teacher_name TEXT DEFAULT NULL,
   photo_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -98,6 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_age_divisions_competition ON age_divisions(compet
 CREATE INDEX IF NOT EXISTS idx_entries_competition ON entries(competition_id);
 CREATE INDEX IF NOT EXISTS idx_entries_category ON entries(category_id);
 CREATE INDEX IF NOT EXISTS idx_entries_age_division ON entries(age_division_id);
+CREATE INDEX IF NOT EXISTS idx_entries_group_members ON entries USING GIN (group_members);
 CREATE INDEX IF NOT EXISTS idx_scores_competition ON scores(competition_id);
 CREATE INDEX IF NOT EXISTS idx_scores_entry ON scores(entry_id);
 CREATE INDEX IF NOT EXISTS idx_scores_judge ON scores(judge_number);

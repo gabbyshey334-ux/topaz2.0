@@ -320,3 +320,6 @@ If photo upload still doesn't work after following this guide:
 **Deploy Status:** Infrastructure fix (Supabase config), not code deployment.
 
 
+
+
+

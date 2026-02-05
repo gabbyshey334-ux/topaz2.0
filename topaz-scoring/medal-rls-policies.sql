@@ -84,3 +84,6 @@ FROM pg_tables
 WHERE tablename IN ('medal_participants', 'medal_awards')
   AND schemaname = 'public';
 
+
+
+

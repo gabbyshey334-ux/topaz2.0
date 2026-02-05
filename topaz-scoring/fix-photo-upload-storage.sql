@@ -81,3 +81,6 @@ FROM pg_policies
 WHERE tablename = 'objects'
   AND policyname LIKE '%entry photo%';
 
+
+
+
