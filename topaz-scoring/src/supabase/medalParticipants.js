@@ -171,7 +171,7 @@ export const awardPointToParticipant = async (participantName, competitionId, en
  */
 export const awardMedalPointsForEntry = async (entry, competitionId) => {
   try {
-    const entryName = entry.name || entry.competitor_name;
+    const entryName = entry.competitor_name;
     console.log(`   🎯 Processing "${entryName}" (ID: ${entry.id})`);
     const awards = [];
 
@@ -301,14 +301,13 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
 
     // Get all medal program entries with their scores
     console.log('\n🔍 Step 1: Fetching medal program entries...');
+    console.log('📋 Query: SELECT id, competitor_name, dance_type, is_medal_program, group_members, category_id, age_division_id, ability_level FROM entries WHERE competition_id = ? AND is_medal_program = true');
+    
     const { data: entries, error: entriesError } = await supabase
       .from('entries')
       .select(`
         id,
-        name,
         competitor_name,
-        divisionType,
-        division_type,
         dance_type,
         is_medal_program,
         group_members,
@@ -321,11 +320,23 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
 
     if (entriesError) {
       console.error('❌ ERROR fetching entries:', entriesError);
+      console.error('❌ Error code:', entriesError.code);
+      console.error('❌ Error message:', entriesError.message);
       console.error('❌ Error details:', JSON.stringify(entriesError, null, 2));
       throw entriesError;
     }
 
     console.log(`📊 Total medal program entries found: ${entries?.length || 0}`);
+    
+    if (entries && entries.length > 0) {
+      console.log('📋 Sample entry structure:', {
+        id: entries[0].id,
+        competitor_name: entries[0].competitor_name,
+        dance_type: entries[0].dance_type,
+        has_group_members: !!entries[0].group_members,
+        is_medal_program: entries[0].is_medal_program
+      });
+    }
 
     if (!entries || entries.length === 0) {
       console.log('⚠️ WARNING: No medal program entries found');
@@ -374,14 +385,14 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
       const entryScores = allScores.filter(s => s.entry_id === entry.id);
       
       if (entryScores.length === 0) {
-        console.log(`   ⚠️ No scores for: ${entry.name || entry.competitor_name}`);
+        console.log(`   ⚠️ No scores for: ${entry.competitor_name}`);
         return { ...entry, averageScore: 0, hasScores: false };
       }
 
       const total = entryScores.reduce((sum, score) => sum + (score.total_score || 0), 0);
       const averageScore = total / entryScores.length;
       
-      console.log(`   📊 "${entry.name || entry.competitor_name}": ${entryScores.length} judge(s), avg: ${averageScore.toFixed(2)}`);
+      console.log(`   📊 "${entry.competitor_name}": ${entryScores.length} judge(s), avg: ${averageScore.toFixed(2)}`);
       
       return { ...entry, averageScore, hasScores: true };
     });
@@ -447,7 +458,7 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
       // First entry is 1st place
       if (group.entries.length > 0) {
         const winner = group.entries[0];
-        const winnerName = winner.name || winner.competitor_name;
+        const winnerName = winner.competitor_name;
         console.log(`      🥇 1st Place: "${winnerName}" - Score: ${winner.averageScore.toFixed(2)}`);
         console.log(`         • Category: ${winner.category_id}`);
         console.log(`         • Age Division: ${winner.age_division_id}`);
@@ -486,7 +497,7 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
     const awardSummary = [];
 
     for (const entry of firstPlaceEntries) {
-      const entryName = entry.name || entry.competitor_name;
+      const entryName = entry.competitor_name;
       console.log(`\n🎖️ Processing entry: "${entryName}"`);
       console.log(`   Entry ID: ${entry.id}`);
       

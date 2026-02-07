@@ -368,3 +368,4 @@ FROM entries WHERE is_medal_program = true;
 -- END OF VERIFICATION SCRIPT
 -- ============================================================================
 
+

@@ -236,3 +236,4 @@ and you'll have enhanced medal points logging for debugging.
 **GitHub:** https://github.com/gabbyshey334-ux/topaz2.0
 **Your live site:** Will update automatically in ~3 minutes
 
+

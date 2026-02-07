@@ -466,3 +466,4 @@ DELETE FROM medal_awards WHERE competition_id = '<YOUR_COMPETITION_ID>';
 \i medal-tables-rls-policies.sql
 ```
 
+

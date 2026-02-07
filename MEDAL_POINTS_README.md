@@ -324,3 +324,4 @@ Everything you need to implement, test, debug, and use the medal points system i
 
 **Ready to begin? Start with:** `MEDAL_POINTS_QUICKSTART.md` 🚀
 
+

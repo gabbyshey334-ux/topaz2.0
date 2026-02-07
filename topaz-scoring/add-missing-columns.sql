@@ -37,3 +37,4 @@ ORDER BY column_name;
 -- - studio_name (TEXT) - stores the dance studio name
 -- - teacher_name (TEXT) - stores the teacher/choreographer name
 
+
