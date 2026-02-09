@@ -1,11 +1,12 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
 
 /**
  * Generate a professional championship-style score sheet PDF
+ * MANUAL TABLE IMPLEMENTATION - NO AUTOTABLE DEPENDENCY
  */
 export const generateScoreSheet = async (entry, allScores, category, ageDivision, competition) => {
-  console.log('🏁 Initializing PDF generation...');
+  console.log('🏁 Initializing PDF generation (manual table)...');
+  
   try {
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -18,39 +19,34 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     
     console.log('📐 Document setup:', { pageWidth, pageHeight });
     
-    // Championship Colors
-    const tealColor = [20, 184, 166]; // teal-500
-    const cyanColor = [6, 182, 212]; // cyan-500
-    const goldColor = [251, 191, 36]; // yellow-400
-    const silverColor = [209, 213, 219]; // gray-300
-    const bronzeColor = [251, 146, 60]; // orange-400
-    const darkGray = [55, 65, 81]; // gray-700
-    const lightGray = [243, 244, 246]; // gray-100
+    // Colors
+    const tealColor = [20, 184, 166];
+    const cyanColor = [6, 182, 212];
+    const darkGray = [55, 65, 81];
+    const lightGray = [243, 244, 246];
     
     let yPos = 0;
     
     // =============================================================================
-    // CHAMPIONSHIP HEADER
+    // HEADER
     // =============================================================================
     console.log('🏛️ Adding header...');
     
-    // Gradient-style header (simulated with two rectangles)
+    // Gradient header
     doc.setFillColor(...cyanColor);
     doc.rect(0, 0, pageWidth / 2, 45, 'F');
     doc.setFillColor(...tealColor);
     doc.rect(pageWidth / 2, 0, pageWidth / 2, 45, 'F');
     
-    // Main Title
+    // Title
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(28);
     doc.setFont('helvetica', 'bold');
     doc.text('TOPAZ 2.0', pageWidth / 2, 15, { align: 'center' });
     
-    // Championship subtitle
     doc.setFontSize(14);
     doc.text('DANCE COMPETITION', pageWidth / 2, 24, { align: 'center' });
     
-    // Official Score Sheet
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text('Official Score Sheet', pageWidth / 2, 31, { align: 'center' });
@@ -59,9 +55,9 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     yPos = 55;
     
     // =============================================================================
-    // COMPETITION INFO CARD
+    // COMPETITION INFO
     // =============================================================================
-    console.log('📋 Adding competition info card...');
+    console.log('📋 Adding competition info...');
     
     doc.setFillColor(...lightGray);
     doc.roundedRect(14, yPos, pageWidth - 28, 28, 3, 3, 'F');
@@ -86,810 +82,244 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     }
     yPos += 6;
     
-    doc.setTextColor(100, 100, 100);
-    doc.text(`${competition?.judges_count || 0} Judges • Entry #${entry?.entry_number}`, 18, yPos);
+    doc.setFontSize(9);
+    doc.text(`${competition?.judges_count || 0} Judges`, 18, yPos);
     
     yPos += 15;
     
     // =============================================================================
-    // COMPETITOR INFO SECTION (Championship Style)
+    // ENTRY INFORMATION
     // =============================================================================
-    console.log('👤 Adding competitor info section...');
+    console.log('📝 Adding entry information...');
     
-    // Get rank if available (from averageScore context)
-    const rank = entry.rank || null;
-    const averageScore = entry.averageScore || null;
-    
-    // Rank-based styling
-    let headerColor = tealColor;
-    let medalEmoji = '';
-    if (rank === 1) {
-      headerColor = goldColor;
-      medalEmoji = '🥇';
-    } else if (rank === 2) {
-      headerColor = silverColor;
-      medalEmoji = '🥈';
-    } else if (rank === 3) {
-      headerColor = bronzeColor;
-      medalEmoji = '🥉';
-    }
-    
-    // Colored header bar
-    doc.setFillColor(...headerColor);
-    doc.roundedRect(14, yPos, pageWidth - 28, 45, 3, 3, 'F');
-    
-    // Rank badge (if applicable)
-    if (rank) {
-      doc.setFillColor(255, 255, 255);
-      doc.circle(28, yPos + 22, 12, 'F');
-      
-      doc.setTextColor(...headerColor);
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text(rank.toString(), 28, yPos + 25, { align: 'center' });
-      
-      doc.setFontSize(6);
-      const suffix = rank === 1 ? 'ST' : rank === 2 ? 'ND' : rank === 3 ? 'RD' : 'TH';
-      doc.text(suffix, 28, yPos + 29, { align: 'center' });
-    }
-    
-    // Competitor name
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    const nameX = rank ? 45 : 18;
-    const nameText = entry.age ? 
-      `${entry.competitor_name} (Age ${entry.age})` : 
-      entry.competitor_name;
-    doc.text(nameText, nameX, yPos + 15);
-    
-    // Studio and Teacher info (if provided)
-    if (entry.studio_name || entry.teacher_name) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      let studioTeacherText = '';
-      if (entry.studio_name && entry.teacher_name) {
-        studioTeacherText = `${entry.studio_name} • ${entry.teacher_name}`;
-      } else if (entry.studio_name) {
-        studioTeacherText = entry.studio_name;
-      } else {
-        studioTeacherText = entry.teacher_name;
-      }
-      doc.text(studioTeacherText, nameX, yPos + 20);
-    }
-    
-    // Medal emoji for top 3
-    if (medalEmoji) {
-      doc.setFontSize(16);
-      doc.text(medalEmoji, pageWidth - 25, yPos + 15);
-    }
-    
-    // Category badges
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    let badgeY = entry.studio_name || entry.teacher_name ? yPos + 30 : yPos + 25;
-    let badgeX = nameX;
-    
-    // Category
-    if (category) {
-      doc.text(`${category.name}`, badgeX, badgeY);
-      badgeX += doc.getTextWidth(category.name) + 10;
-    }
-    
-    // Age Division
-    if (ageDivision) {
-      doc.text(`• ${ageDivision.name}`, badgeX, badgeY);
-      badgeX += doc.getTextWidth(`• ${ageDivision.name}`) + 10;
-    }
-    
-    // Ability Level
-    if (entry.ability_level) {
-      doc.text(`• ${entry.ability_level}`, badgeX, badgeY);
-    }
-    
-    // Category Rank (if available) - NEW
-    if (entry.categoryRank) {
-      doc.setFontSize(13);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...goldColor);
-      const rankSuffix = entry.categoryRank === 1 ? 'st' : entry.categoryRank === 2 ? 'nd' : entry.categoryRank === 3 ? 'rd' : 'th';
-      const categoryRankY = entry.studio_name || entry.teacher_name ? badgeY + 3 : yPos + 28;
-      doc.text(`🏆 ${entry.categoryRank}${rankSuffix} Place in Category Combination`, nameX, categoryRankY);
-    }
-    
-    // Average score (if available)
-    if (averageScore) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...darkGray);
-      const scoreY = entry.categoryRank ? 
-        (entry.studio_name || entry.teacher_name ? badgeY + 11 : yPos + 36) :
-        (entry.studio_name || entry.teacher_name ? badgeY + 3 : yPos + 28);
-      doc.text(`Average: ${averageScore.toFixed(2)} / 100`, nameX, scoreY);
-    }
-    
-    yPos += 55;
-    
-    // =============================================================================
-    // GROUP MEMBERS SECTION (for group entries)
-    // =============================================================================
-    if (entry.group_members && Array.isArray(entry.group_members) && entry.group_members.length > 0) {
-      console.log('👥 Adding group members section...');
-      
-      // Calculate height needed for group members box
-      const memberCount = entry.group_members.length;
-      const boxHeight = 12 + (memberCount * 5) + 8; // Header + members + padding
-      
-      // Group members box
-      doc.setFillColor(...lightGray);
-      doc.roundedRect(14, yPos, pageWidth - 28, boxHeight, 3, 3, 'F');
-      
-      yPos += 8;
-      
-      // "GROUP MEMBERS" header
-      doc.setTextColor(...darkGray);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('GROUP MEMBERS:', 18, yPos);
-      
-      yPos += 6;
-      
-      // List each member
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 60);
-      
-      entry.group_members.forEach((member, index) => {
-        const memberText = member.age 
-          ? `• ${member.name} (Age ${member.age})`
-          : `• ${member.name}`;
-        doc.text(memberText, 20, yPos);
-        yPos += 5;
-      });
-      
-      yPos += 10;
-    }
-    
-    // =============================================================================
-    // DETAILED SCORES TABLE
-    // =============================================================================
-    console.log('📈 Adding scores table...');
-    
-    doc.setTextColor(...darkGray);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Detailed Score Breakdown', 14, yPos);
+    doc.setFillColor(...lightGray);
+    doc.roundedRect(14, yPos, pageWidth - 28, 35, 3, 3, 'F');
     yPos += 8;
     
-    // Filter scores for this entry
+    doc.setTextColor(...darkGray);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Entry Information', 18, yPos);
+    yPos += 8;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    doc.text(`Entry Number: ${entry.entry_number}`, 18, yPos);
+    doc.text(`Name: ${entry.competitor_name || 'N/A'}`, 100, yPos);
+    yPos += 6;
+    
+    doc.text(`Category: ${category?.name || 'N/A'}`, 18, yPos);
+    doc.text(`Age Division: ${ageDivision?.name || 'N/A'}`, 100, yPos);
+    yPos += 6;
+    
+    doc.text(`Ability Level: ${entry.ability_level || 'N/A'}`, 18, yPos);
+    doc.text(`Division Type: ${entry.dance_type || 'N/A'}`, 100, yPos);
+    yPos += 6;
+    
+    if (entry.studio_name) {
+      doc.text(`Studio: ${entry.studio_name}`, 18, yPos);
+      yPos += 6;
+    }
+    
+    if (entry.teacher_name) {
+      doc.text(`Teacher: ${entry.teacher_name}`, 18, yPos);
+      yPos += 6;
+    }
+    
+    // Medal program info
+    if (entry.is_medal_program) {
+      doc.setFillColor(...tealColor);
+      doc.roundedRect(18, yPos - 4, 60, 5, 2, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`🏆 Medal Program: ${entry.medal_points || 0} Points • ${entry.current_medal_level || 'None'}`, 20, yPos);
+      doc.setTextColor(...darkGray);
+      yPos += 6;
+    }
+    
+    yPos += 10;
+    
+    // =============================================================================
+    // SCORES TABLE - MANUAL IMPLEMENTATION
+    // =============================================================================
+    console.log('📊 Creating scores table manually...');
+    
     const entryScores = allScores.filter(s => s.entry_id === entry.id);
     
     if (entryScores.length === 0) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'italic');
-      doc.setTextColor(100, 100, 100);
-      doc.text('No scores available for this entry', 14, yPos);
-      yPos += 20;
-    } else {
-      // Prepare table data
-      const tableData = [];
-      
-      // Individual judge scores
-      entryScores.forEach(score => {
-        const judgeName = competition?.judge_names?.[score.judge_number - 1] || `Judge ${score.judge_number}`;
-        tableData.push([
-          judgeName,
-          `${Number(score.technique).toFixed(1)} / 25`,
-          `${Number(score.creativity).toFixed(1)} / 25`,
-          `${Number(score.presentation).toFixed(1)} / 25`,
-          `${Number(score.appearance).toFixed(1)} / 25`,
-          `${Number(score.total_score).toFixed(1)} / 100`
-        ]);
-      });
-      
-      // Calculate averages
-      const avgTechnique = entryScores.reduce((sum, s) => sum + Number(s.technique), 0) / entryScores.length;
-      const avgCreativity = entryScores.reduce((sum, s) => sum + Number(s.creativity), 0) / entryScores.length;
-      const avgPresentation = entryScores.reduce((sum, s) => sum + Number(s.presentation), 0) / entryScores.length;
-      const avgAppearance = entryScores.reduce((sum, s) => sum + Number(s.appearance), 0) / entryScores.length;
-      const avgTotal = entryScores.reduce((sum, s) => sum + Number(s.total_score), 0) / entryScores.length;
-      
-      // Add average row
-      tableData.push([
-        'AVERAGE',
-        `${avgTechnique.toFixed(2)} / 25`,
-        `${avgCreativity.toFixed(2)} / 25`,
-        `${avgPresentation.toFixed(2)} / 25`,
-        `${avgAppearance.toFixed(2)} / 25`,
-        `${avgTotal.toFixed(2)} / 100`
-      ]);
-      
-      // Create beautiful table
-      doc.autoTable({
-        startY: yPos,
-        head: [['Judge', 'Technique', 'Creativity', 'Presentation', 'Appearance', 'Total']],
-        body: tableData,
-        theme: 'striped',
-        headStyles: {
-          fillColor: tealColor,
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: 9,
-          halign: 'center',
-          cellPadding: 4
-        },
-        bodyStyles: {
-          fontSize: 9,
-          halign: 'center',
-          cellPadding: 3
-        },
-        alternateRowStyles: {
-          fillColor: [249, 250, 251]
-        },
-        columnStyles: {
-          0: { 
-            fontStyle: 'bold',
-            halign: 'left',
-            cellPadding: { left: 6 }
-          }
-        },
-        didParseCell: function(data) {
-          // Style the average row
-          if (data.row.index === entryScores.length) {
-            data.cell.styles.fillColor = headerColor;
-            data.cell.styles.textColor = [255, 255, 255];
-            data.cell.styles.fontStyle = 'bold';
-            data.cell.styles.fontSize = 10;
-          }
-        }
-      });
-      
-      yPos = doc.lastAutoTable.finalY + 15;
-      
-      // =============================================================================
-      // CATEGORY BREAKDOWN (Per Judge)
-      // =============================================================================
-      console.log('📊 Adding category analysis...');
-      
-      doc.setTextColor(...darkGray);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Category Analysis', 14, yPos);
-      yPos += 8;
-      
-      // Create category comparison table
-      const categoryRows = [
-        ['Technique', ...entryScores.map(s => Number(s.technique).toFixed(1)), avgTechnique.toFixed(2)],
-        ['Creativity', ...entryScores.map(s => Number(s.creativity).toFixed(1)), avgCreativity.toFixed(2)],
-        ['Presentation', ...entryScores.map(s => Number(s.presentation).toFixed(1)), avgPresentation.toFixed(2)],
-        ['Appearance', ...entryScores.map(s => Number(s.appearance).toFixed(1)), avgAppearance.toFixed(2)]
-      ];
-      
-      const categoryHeaders = ['Category', ...entryScores.map(s => {
-        const judgeName = competition?.judge_names?.[s.judge_number - 1];
-        // If it's a real name, use initials or first word, otherwise J#
-        if (judgeName && !judgeName.startsWith('Judge ')) {
-          return judgeName.split(' ')[0].substring(0, 5); // Shorten if too long
-        }
-        return `J${s.judge_number}`;
-      }), 'Avg'];
-      
-      doc.autoTable({
-        startY: yPos,
-        head: [categoryHeaders],
-        body: categoryRows,
-        theme: 'grid',
-        headStyles: {
-          fillColor: cyanColor,
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: 9,
-          halign: 'center'
-        },
-        bodyStyles: {
-          fontSize: 9,
-          halign: 'center'
-        },
-        columnStyles: {
-          0: { 
-            fontStyle: 'bold',
-            halign: 'left',
-            cellPadding: { left: 6 }
-          },
-          [categoryHeaders.length - 1]: {
-            fillColor: lightGray,
-            fontStyle: 'bold',
-            textColor: darkGray
-          }
-        }
-      });
-      
-      yPos = doc.lastAutoTable.finalY + 15;
-      
-      // =============================================================================
-      // JUDGE NOTES SECTION
-      // =============================================================================
-      console.log('📝 Adding judge notes...');
-      
-      const scoresWithNotes = entryScores.filter(s => s.notes && s.notes.trim());
-      if (scoresWithNotes.length > 0) {
-        // Check if we need a new page
-        if (yPos > pageHeight - 80) {
-          doc.addPage();
-          yPos = 20;
-        }
-        
-        doc.setTextColor(...darkGray);
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Judge Comments', 14, yPos);
-        yPos += 8;
-        
-        scoresWithNotes.forEach((score, index) => {
-          // Check if we need a new page for this note
-          if (yPos > pageHeight - 50) {
-            doc.addPage();
-            yPos = 20;
-          }
-          
-          // Note card background
-          const noteText = score.notes.trim();
-          const splitNotes = doc.splitTextToSize(noteText, pageWidth - 38);
-          const noteHeight = (splitNotes.length * 5) + 15;
-          
-          doc.setFillColor(255, 251, 235); // yellow-50
-          doc.roundedRect(14, yPos, pageWidth - 28, noteHeight, 2, 2, 'F');
-          
-          // Judge label
-          const judgeName = competition?.judge_names?.[score.judge_number - 1] || `Judge ${score.judge_number}`;
-          doc.setTextColor(...darkGray);
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          doc.text(`${judgeName}:`, 18, yPos + 6);
-          
-          // Notes text
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(80, 80, 80);
-          doc.text(splitNotes, 18, yPos + 12);
-          
-          yPos += noteHeight + 6;
-        });
-        
-        yPos += 5;
-      }
-      
-      // =============================================================================
-      // MEDAL PROGRAM INFO (if applicable)
-      // =============================================================================
-      
-      if (entry.medal_points > 0 || entry.current_medal_level !== 'None') {
-        console.log('🏅 Adding medal program info...');
-        // Check if we need a new page
-        if (yPos > pageHeight - 40) {
-          doc.addPage();
-          yPos = 20;
-        }
-        
-        doc.setFillColor(254, 243, 199); // yellow-100
-        doc.roundedRect(14, yPos, pageWidth - 28, 25, 3, 3, 'F');
-        yPos += 8;
-        
-        doc.setTextColor(146, 64, 14); // yellow-900
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Medal Program Status', 18, yPos);
-        yPos += 8;
-        
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        const medalText = entry.current_medal_level && entry.current_medal_level !== 'None'
-          ? `Current Level: ${entry.current_medal_level} • Season Points: ${entry.medal_points || 0}`
-          : `Season Points: ${entry.medal_points || 0}`;
-        doc.text(medalText, 18, yPos);
-        
-        yPos += 15;
-      }
+      doc.setFontSize(12);
+      doc.setTextColor(200, 0, 0);
+      doc.text('No scores available for this entry', pageWidth / 2, yPos, { align: 'center' });
+      doc.save(`Entry-${entry.entry_number}-ScoreSheet.pdf`);
+      return { success: true };
     }
     
-    // =============================================================================
-    // FOOTER (Championship Style)
-    // =============================================================================
-    console.log('🦶 Adding footer...');
+    // Table header
+    doc.setFillColor(...tealColor);
+    doc.roundedRect(14, yPos, pageWidth - 28, 8, 2, 2, 'F');
     
-    const footerY = pageHeight - 15;
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
     
-    // Footer line
-    doc.setDrawColor(...tealColor);
-    doc.setLineWidth(0.5);
-    doc.line(14, footerY - 5, pageWidth - 14, footerY - 5);
+    const colWidths = [25, 30, 30, 35, 30, 30];
+    const colPositions = [18];
+    for (let i = 1; i < colWidths.length; i++) {
+      colPositions.push(colPositions[i - 1] + colWidths[i - 1]);
+    }
     
-    // Footer text
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
+    doc.text('Judge', colPositions[0], yPos + 6);
+    doc.text('Technique', colPositions[1], yPos + 6);
+    doc.text('Creativity', colPositions[2], yPos + 6);
+    doc.text('Presentation', colPositions[3], yPos + 6);
+    doc.text('Appearance', colPositions[4], yPos + 6);
+    doc.text('Total', colPositions[5], yPos + 6);
+    
+    yPos += 9;
+    
+    // Table rows
+    doc.setTextColor(...darkGray);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text('TOPAZ 2.0 © 2025', 14, footerY);
-    doc.text('Heritage Since 1972', pageWidth / 2, footerY, { align: 'center' });
-    doc.text('Official Competition Results', pageWidth - 14, footerY, { align: 'right' });
+    
+    let rowIndex = 0;
+    entryScores.forEach(score => {
+      // Alternate row colors
+      if (rowIndex % 2 === 0) {
+        doc.setFillColor(...lightGray);
+        doc.rect(14, yPos - 3, pageWidth - 28, 7, 'F');
+      }
+      
+      // Judge name
+      const judgeName = competition?.judge_names?.[score.judge_number - 1];
+      const judgeLabel = judgeName || `Judge ${score.judge_number}`;
+      doc.setFont('helvetica', 'bold');
+      doc.text(judgeLabel, colPositions[0], yPos + 4);
+      
+      // Scores
+      doc.setFont('helvetica', 'normal');
+      doc.text(score.technique?.toFixed(2) || '0.00', colPositions[1], yPos + 4, { align: 'right' });
+      doc.text(score.creativity?.toFixed(2) || '0.00', colPositions[2], yPos + 4, { align: 'right' });
+      doc.text(score.presentation?.toFixed(2) || '0.00', colPositions[3], yPos + 4, { align: 'right' });
+      doc.text(score.appearance?.toFixed(2) || '0.00', colPositions[4], yPos + 4, { align: 'right' });
+      doc.text(score.total_score?.toFixed(2) || '0.00', colPositions[5], yPos + 4, { align: 'right' });
+      
+      // Row separator
+      doc.setDrawColor(200, 200, 200);
+      doc.line(14, yPos + 1, pageWidth - 14, yPos + 1);
+      
+      yPos += 7;
+      rowIndex++;
+    });
+    
+    // Calculate averages
+    const avgTechnique = entryScores.reduce((sum, s) => sum + Number(s.technique || 0), 0) / entryScores.length;
+    const avgCreativity = entryScores.reduce((sum, s) => sum + Number(s.creativity || 0), 0) / entryScores.length;
+    const avgPresentation = entryScores.reduce((sum, s) => sum + Number(s.presentation || 0), 0) / entryScores.length;
+    const avgAppearance = entryScores.reduce((sum, s) => sum + Number(s.appearance || 0), 0) / entryScores.length;
+    const avgTotal = entryScores.reduce((sum, s) => sum + Number(s.total_score || 0), 0) / entryScores.length;
+    
+    // Average row
+    yPos += 2;
+    doc.setFillColor(...cyanColor);
+    doc.roundedRect(14, yPos - 3, pageWidth - 28, 8, 2, 2, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('AVERAGE', colPositions[0], yPos + 4);
+    doc.text(avgTechnique.toFixed(2), colPositions[1], yPos + 4, { align: 'right' });
+    doc.text(avgCreativity.toFixed(2), colPositions[2], yPos + 4, { align: 'right' });
+    doc.text(avgPresentation.toFixed(2), colPositions[3], yPos + 4, { align: 'right' });
+    doc.text(avgAppearance.toFixed(2), colPositions[4], yPos + 4, { align: 'right' });
+    doc.text(avgTotal.toFixed(2), colPositions[5], yPos + 4, { align: 'right' });
+    
+    yPos += 15;
+    
+    // =============================================================================
+    // TOTAL SCORE SUMMARY
+    // =============================================================================
+    console.log('🏆 Adding total score summary...');
+    
+    doc.setFillColor(...lightGray);
+    doc.roundedRect(14, yPos, pageWidth - 28, 15, 3, 3, 'F');
+    yPos += 8;
+    
+    doc.setTextColor(...darkGray);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TOTAL SCORE', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
+    
+    doc.setFontSize(24);
+    doc.setTextColor(...tealColor);
+    doc.text(`${avgTotal.toFixed(2)} / 100`, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
+    
+    // =============================================================================
+    // FOOTER
+    // =============================================================================
+    const footerY = pageHeight - 15;
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.setFont('helvetica', 'normal');
+    doc.text('TOPAZ 2.0 Dance Competition • Heritage Since 1972', pageWidth / 2, footerY, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, footerY + 5, { align: 'center' });
     
     // =============================================================================
     // SAVE PDF
     // =============================================================================
-    console.log('💾 Saving PDF file...');
+    console.log('💾 Saving PDF...');
     
-    const safeName = (entry?.competitor_name || 'Competitor').replace(/[^a-z0-9]/gi, '_');
-    const fileName = `TOPAZ_ScoreSheet_Entry${entry?.entry_number || 0}_${safeName}.pdf`;
+    const fileName = `Entry-${entry.entry_number}-${entry.competitor_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'ScoreSheet'}-${competition?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Competition'}.pdf`;
     doc.save(fileName);
     
-    console.log('✅ PDF generation complete!');
-    return { success: true };
+    console.log('✅ PDF generated successfully:', fileName);
+    return { success: true, fileName };
+    
   } catch (error) {
-    console.error('❌ PDF generation failed:', error);
-    return { success: false, error: error.message };
+    console.error('❌ PDF generation error:', error);
+    throw error;
   }
 };
 
 /**
- * Generate a single scorecard page in an existing PDF document
- * @param {jsPDF} doc - The PDF document object
- * @param {Object} entry - Entry data
- * @param {Array} entryScores - Array of scores for this entry
- * @param {Object} competition - Competition data
- * @param {Object} category - Category data
- * @param {Object} ageDivision - Age division data
- * @param {boolean} isFirst - Whether this is the first page (no page break needed)
- */
-const addScorecardPage = (doc, entry, entryScores, competition, category, ageDivision, isFirst = false) => {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  
-  // Add new page if not first
-  if (!isFirst) {
-    doc.addPage();
-  }
-  
-  // Championship Colors
-  const tealColor = [20, 184, 166];
-  const cyanColor = [6, 182, 212];
-  const goldColor = [251, 191, 36];
-  const silverColor = [209, 213, 219];
-  const bronzeColor = [251, 146, 60];
-  const darkGray = [55, 65, 81];
-  const lightGray = [243, 244, 246];
-  
-  let yPos = 0;
-  
-  // CHAMPIONSHIP HEADER
-  doc.setFillColor(...cyanColor);
-  doc.rect(0, 0, pageWidth / 2, 45, 'F');
-  doc.setFillColor(...tealColor);
-  doc.rect(pageWidth / 2, 0, pageWidth / 2, 45, 'F');
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(28);
-  doc.setFont('helvetica', 'bold');
-  doc.text('TOPAZ 2.0', pageWidth / 2, 15, { align: 'center' });
-  
-  doc.setFontSize(14);
-  doc.text('DANCE COMPETITION', pageWidth / 2, 24, { align: 'center' });
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Official Score Sheet', pageWidth / 2, 31, { align: 'center' });
-  doc.text('Heritage Since 1972', pageWidth / 2, 37, { align: 'center' });
-  
-  yPos = 55;
-  
-  // COMPETITION INFO CARD
-  doc.setFillColor(...lightGray);
-  doc.roundedRect(14, yPos, pageWidth - 28, 28, 3, 3, 'F');
-  yPos += 8;
-  
-  doc.setTextColor(...darkGray);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text(competition?.name || 'Competition', 18, yPos);
-  yPos += 7;
-  
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  if (competition?.date) {
-    const dateStr = new Date(competition.date).toLocaleDateString('en-US', { 
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-    });
-    doc.text(dateStr, 18, yPos);
-  }
-  if (competition?.venue) {
-    doc.text(` • ${competition.venue}`, 80, yPos);
-  }
-  yPos += 6;
-  
-  doc.setTextColor(100, 100, 100);
-  doc.text(`${competition?.judges_count || 0} Judges • Entry #${entry?.entry_number}`, 18, yPos);
-  
-  yPos += 15;
-  
-  // COMPETITOR INFO SECTION
-  const rank = entry.rank || null;
-  const averageScore = entry.averageScore || null;
-  
-  let headerColor = tealColor;
-  let medalEmoji = '';
-  if (rank === 1) {
-    headerColor = goldColor;
-    medalEmoji = '🥇';
-  } else if (rank === 2) {
-    headerColor = silverColor;
-    medalEmoji = '🥈';
-  } else if (rank === 3) {
-    headerColor = bronzeColor;
-    medalEmoji = '🥉';
-  }
-  
-  doc.setFillColor(...headerColor);
-  doc.roundedRect(14, yPos, pageWidth - 28, 45, 3, 3, 'F');
-  
-  if (rank) {
-    doc.setFillColor(255, 255, 255);
-    doc.circle(28, yPos + 22, 12, 'F');
-    
-    doc.setTextColor(...headerColor);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(rank.toString(), 28, yPos + 25, { align: 'center' });
-    
-    doc.setFontSize(6);
-    const suffix = rank === 1 ? 'ST' : rank === 2 ? 'ND' : rank === 3 ? 'RD' : 'TH';
-    doc.text(suffix, 28, yPos + 29, { align: 'center' });
-  }
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  const nameX = rank ? 45 : 18;
-  const nameText = entry.age ? 
-    `${entry.competitor_name || entry.name} (Age ${entry.age})` : 
-    (entry.competitor_name || entry.name);
-  doc.text(nameText, nameX, yPos + 15);
-  
-  if (entry.studio_name || entry.teacher_name) {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    let studioTeacherText = '';
-    if (entry.studio_name && entry.teacher_name) {
-      studioTeacherText = `${entry.studio_name} • ${entry.teacher_name}`;
-    } else if (entry.studio_name) {
-      studioTeacherText = entry.studio_name;
-    } else {
-      studioTeacherText = entry.teacher_name;
-    }
-    doc.text(studioTeacherText, nameX, yPos + 20);
-  }
-  
-  if (medalEmoji) {
-    doc.setFontSize(16);
-    doc.text(medalEmoji, pageWidth - 25, yPos + 15);
-  }
-  
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  let badgeY = entry.studio_name || entry.teacher_name ? yPos + 30 : yPos + 25;
-  let badgeX = nameX;
-  
-  if (category) {
-    doc.text(`${category.name}`, badgeX, badgeY);
-    badgeX += doc.getTextWidth(category.name) + 10;
-  }
-  
-  if (ageDivision) {
-    doc.text(`• ${ageDivision.name}`, badgeX, badgeY);
-    badgeX += doc.getTextWidth(`• ${ageDivision.name}`) + 10;
-  }
-  
-  if (entry.ability_level) {
-    doc.text(`• ${entry.ability_level}`, badgeX, badgeY);
-  }
-  
-  if (averageScore) {
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...darkGray);
-    const scoreY = entry.studio_name || entry.teacher_name ? badgeY + 3 : yPos + 28;
-    doc.text(`Average: ${averageScore.toFixed(2)} / 100`, nameX, scoreY);
-  }
-  
-  yPos += 55;
-  
-  // GROUP MEMBERS SECTION
-  if (entry.group_members && Array.isArray(entry.group_members) && entry.group_members.length > 0) {
-    const memberCount = entry.group_members.length;
-    const boxHeight = 12 + (memberCount * 5) + 8;
-    
-    doc.setFillColor(...lightGray);
-    doc.roundedRect(14, yPos, pageWidth - 28, boxHeight, 3, 3, 'F');
-    
-    yPos += 8;
-    
-    doc.setTextColor(...darkGray);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('GROUP MEMBERS:', 18, yPos);
-    
-    yPos += 6;
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-    
-    entry.group_members.forEach((member, index) => {
-      const memberText = member.age 
-        ? `• ${member.name} (Age ${member.age})`
-        : `• ${member.name}`;
-      doc.text(memberText, 20, yPos);
-      yPos += 5;
-    });
-    
-    yPos += 10;
-  }
-  
-  // DETAILED SCORES TABLE
-  doc.setTextColor(...darkGray);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Detailed Score Breakdown', 14, yPos);
-  yPos += 8;
-  
-  if (entryScores.length === 0) {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(100, 100, 100);
-    doc.text('No scores available for this entry', 14, yPos);
-  } else {
-    const tableData = [];
-    
-    entryScores.forEach(score => {
-      const judgeName = competition?.judge_names?.[score.judge_number - 1] || `Judge ${score.judge_number}`;
-      tableData.push([
-        judgeName,
-        `${Number(score.technique).toFixed(1)} / 25`,
-        `${Number(score.creativity).toFixed(1)} / 25`,
-        `${Number(score.presentation).toFixed(1)} / 25`,
-        `${Number(score.appearance).toFixed(1)} / 25`,
-        `${Number(score.total_score).toFixed(1)} / 100`
-      ]);
-    });
-    
-    const avgTechnique = entryScores.reduce((sum, s) => sum + Number(s.technique), 0) / entryScores.length;
-    const avgCreativity = entryScores.reduce((sum, s) => sum + Number(s.creativity), 0) / entryScores.length;
-    const avgPresentation = entryScores.reduce((sum, s) => sum + Number(s.presentation), 0) / entryScores.length;
-    const avgAppearance = entryScores.reduce((sum, s) => sum + Number(s.appearance), 0) / entryScores.length;
-    const avgTotal = entryScores.reduce((sum, s) => sum + Number(s.total_score), 0) / entryScores.length;
-    
-    tableData.push([
-      'AVERAGE',
-      `${avgTechnique.toFixed(2)} / 25`,
-      `${avgCreativity.toFixed(2)} / 25`,
-      `${avgPresentation.toFixed(2)} / 25`,
-      `${avgAppearance.toFixed(2)} / 25`,
-      `${avgTotal.toFixed(2)} / 100`
-    ]);
-    
-    doc.autoTable({
-      startY: yPos,
-      head: [['Judge', 'Technique', 'Creativity', 'Presentation', 'Appearance', 'Total']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: {
-        fillColor: tealColor,
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        fontSize: 9,
-        halign: 'center',
-        cellPadding: 4
-      },
-      bodyStyles: {
-        fontSize: 9,
-        halign: 'center',
-        cellPadding: 3
-      },
-      alternateRowStyles: {
-        fillColor: [249, 250, 251]
-      },
-      columnStyles: {
-        0: { 
-          fontStyle: 'bold',
-          halign: 'left',
-          cellPadding: { left: 6 }
-        }
-      },
-      didParseCell: function(data) {
-        if (data.row.index === entryScores.length) {
-          data.cell.styles.fillColor = headerColor;
-          data.cell.styles.textColor = [255, 255, 255];
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fontSize = 10;
-        }
-      }
-    });
-  }
-  
-  // FOOTER
-  const footerY = pageHeight - 15;
-  doc.setDrawColor(...tealColor);
-  doc.setLineWidth(0.5);
-  doc.line(14, footerY - 5, pageWidth - 14, footerY - 5);
-  
-  doc.setFontSize(8);
-  doc.setTextColor(100, 100, 100);
-  doc.setFont('helvetica', 'normal');
-  doc.text('TOPAZ 2.0 © 2025', 14, footerY);
-  doc.text('Heritage Since 1972', pageWidth / 2, footerY, { align: 'center' });
-  doc.text('Official Competition Results', pageWidth - 14, footerY, { align: 'right' });
-};
-
-/**
- * Generate a combined PDF with all scorecards
- * @param {Array} entries - Array of entry objects
- * @param {Array} allScores - Array of all scores
- * @param {Array} categories - Array of categories
- * @param {Array} ageDivisions - Array of age divisions
- * @param {Object} competition - Competition data
- * @param {Function} onProgress - Progress callback (current, total)
+ * Generate all scorecards for a competition
  */
 export const generateAllScorecards = async (entries, allScores, categories, ageDivisions, competition, onProgress) => {
   console.log('🏁 Generating all scorecards...');
-  console.log(`📊 Total entries: ${entries.length}`);
   
   try {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    });
+    let generated = 0;
+    const total = entries.length;
     
-    // Filter entries that have scores
-    const scoredEntries = entries.filter(entry => {
+    for (const entry of entries) {
       const entryScores = allScores.filter(s => s.entry_id === entry.id);
-      return entryScores.length > 0;
-    });
-    
-    console.log(`✅ Entries with scores: ${scoredEntries.length}`);
-    
-    if (scoredEntries.length === 0) {
-      return { success: false, error: 'No scored entries found' };
-    }
-    
-    // Generate each scorecard
-    for (let i = 0; i < scoredEntries.length; i++) {
-      const entry = scoredEntries[i];
-      const entryScores = allScores.filter(s => s.entry_id === entry.id);
+      if (entryScores.length === 0) {
+        console.log(`⏭️  Skipping entry ${entry.entry_number} (no scores)`);
+        continue;
+      }
       
-      // Find category and age division
       const category = categories.find(c => c.id === entry.category_id);
       const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
       
-      console.log(`📄 Generating scorecard ${i + 1}/${scoredEntries.length}: ${entry.name || entry.competitor_name}`);
+      await generateScoreSheet(entry, entryScores, category, ageDivision, competition);
       
-      // Add scorecard page
-      addScorecardPage(doc, entry, entryScores, competition, category, ageDivision, i === 0);
-      
-      // Call progress callback
+      generated++;
       if (onProgress) {
-        onProgress(i + 1, scoredEntries.length);
+        onProgress({ current: generated, total });
       }
       
-      // Small delay to prevent blocking
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Small delay to prevent browser from blocking
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    // Save the combined PDF
-    const safeName = (competition?.name || 'Competition').replace(/[^a-z0-9]/gi, '_');
-    const fileName = `${safeName}_All_Scorecards.pdf`;
-    doc.save(fileName);
-    
-    console.log('✅ All scorecards generated successfully!');
-    return { success: true, count: scoredEntries.length };
+    console.log(`✅ Generated ${generated} scorecards`);
+    return { success: true, count: generated };
   } catch (error) {
-    console.error('❌ Error generating all scorecards:', error);
+    console.error('❌ Error generating scorecards:', error);
     return { success: false, error: error.message };
   }
 };

@@ -164,6 +164,139 @@ export const awardPointToParticipant = async (participantName, competitionId, en
 };
 
 /**
+ * Update a specific entry's medal_points directly
+ * @param {string} entryId - UUID of entry to update
+ * @param {number} totalPoints - New total points
+ * @param {string} medalLevel - New medal level
+ * @returns {Object} - Success status
+ */
+const updateEntryMedalPointsDirectly = async (entryId, totalPoints, medalLevel) => {
+  try {
+    const { error } = await supabase
+      .from('entries')
+      .update({
+        medal_points: totalPoints,
+        current_medal_level: medalLevel
+      })
+      .eq('id', entryId);
+
+    if (error) {
+      console.error(`      ⚠️ Error updating entry ${entryId}: ${error.message}`);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`      ✅ Updated entry ${entryId}: ${totalPoints} points (${medalLevel})`);
+    return { success: true };
+  } catch (error) {
+    console.error(`      ⚠️ Error in updateEntryMedalPointsDirectly: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Update solo entries' medal_points when a group member wins
+ * Finds all solo entries matching the participant name and awards them 1 point
+ * @param {string} participantName - Name of the group member
+ * @param {string} competitionId - UUID of competition (to search within same competition)
+ * @returns {Object} - Success status with count of updated entries
+ */
+const updateSoloEntryMedalPoints = async (participantName, competitionId) => {
+  try {
+    const normalizedName = participantName.trim();
+    
+    if (!normalizedName) {
+      console.log(`      ⚠️ Empty participant name, skipping solo entry update`);
+      return { success: true, updated: 0 };
+    }
+
+    console.log(`      🔍 Searching for solo entries for: "${normalizedName}"`);
+
+    // Find all solo entries with this competitor name in the same competition
+    // Solo entries are those where dance_type contains "Solo" or doesn't contain "Group"
+    const { data: soloEntries, error: searchError } = await supabase
+      .from('entries')
+      .select('id, entry_number, competitor_name, medal_points, current_medal_level, dance_type, is_medal_program')
+      .eq('competition_id', competitionId)
+      .eq('competitor_name', normalizedName)
+      .eq('is_medal_program', true);
+
+    if (searchError) {
+      console.error(`      ⚠️ Error searching for solo entries: ${searchError.message}`);
+      return { success: false, error: searchError.message, updated: 0 };
+    }
+
+    if (!soloEntries || soloEntries.length === 0) {
+      console.log(`      ℹ️ No solo entries found for "${normalizedName}" (this is OK - they may only compete in groups)`);
+      return { success: true, updated: 0 };
+    }
+
+    // Filter to only actual solo entries (not groups)
+    const actualSolos = soloEntries.filter(entry => {
+      const divisionType = entry.dance_type || '';
+      const isSolo = divisionType.toLowerCase().includes('solo') || 
+                     (!divisionType.toLowerCase().includes('group') && 
+                      !divisionType.toLowerCase().includes('duo') && 
+                      !divisionType.toLowerCase().includes('trio') &&
+                      !divisionType.toLowerCase().includes('production'));
+      return isSolo;
+    });
+
+    if (actualSolos.length === 0) {
+      console.log(`      ℹ️ No actual solo entries found for "${normalizedName}" (only group entries exist)`);
+      return { success: true, updated: 0 };
+    }
+
+    console.log(`      ✅ Found ${actualSolos.length} solo entry/entries for "${normalizedName}"`);
+
+    // Get participant's current total points (already updated by awardPointToParticipant)
+    const { data: participant, error: participantError } = await supabase
+      .from('medal_participants')
+      .select('total_points, current_medal_level')
+      .eq('participant_name', normalizedName)
+      .maybeSingle();
+
+    if (participantError || !participant) {
+      console.log(`      ⚠️ Could not find participant record for "${normalizedName}", using entry points + 1`);
+    }
+
+    // Update each solo entry to match participant's total
+    let updatedCount = 0;
+    for (const soloEntry of actualSolos) {
+      const currentPoints = soloEntry.medal_points || 0;
+      
+      // Use participant's total if available, otherwise add 1 to entry's current
+      const newPoints = participant ? participant.total_points : (currentPoints + 1);
+      const medalLevel = participant ? participant.current_medal_level : (
+        newPoints >= 50 ? 'Gold' : 
+        newPoints >= 35 ? 'Silver' : 
+        newPoints >= 25 ? 'Bronze' : 'None'
+      );
+
+      const { error: updateError } = await supabase
+        .from('entries')
+        .update({
+          medal_points: newPoints,
+          current_medal_level: medalLevel
+        })
+        .eq('id', soloEntry.id);
+
+      if (updateError) {
+        console.error(`      ⚠️ Error updating solo entry ${soloEntry.id}: ${updateError.message}`);
+      } else {
+        const entryLabel = soloEntry.entry_number ? `#${soloEntry.entry_number}` : `ID:${soloEntry.id}`;
+        console.log(`      ✅ Updated solo entry ${entryLabel}: ${currentPoints} → ${newPoints} points (${medalLevel})`);
+        updatedCount++;
+      }
+    }
+
+    return { success: true, updated: updatedCount };
+  } catch (error) {
+    console.error(`      ⚠️ Error in updateSoloEntryMedalPoints: ${error.message}`);
+    return { success: false, error: error.message, updated: 0 };
+  }
+};
+
+/**
  * Award medal points for a single entry (handles solos and groups)
  * @param {Object} entry - Entry object with name and group_members
  * @param {string} competitionId - UUID of competition
@@ -193,11 +326,14 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
       for (const member of entry.group_members) {
         if (member.name && member.name.trim()) {
           console.log(`\n      👥 Member ${memberIdx}/${entry.group_members.length}: ${member.name}`);
+          
+          // 1. Award to medal_participants table (existing system)
           const result = await awardPointToParticipant(
             member.name,
             competitionId,
             entry.id
           );
+          
           if (result.success && !result.alreadyAwarded) {
             awards.push({
               name: member.name,
@@ -205,6 +341,9 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
               level: result.data.current_medal_level,
               levelUp: result.levelUp || false
             });
+            
+            // 2. ALSO update solo entries for this member (NEW)
+            await updateSoloEntryMedalPoints(member.name, competitionId);
           } else if (result.alreadyAwarded) {
             console.log(`      ⚠️ Already awarded to ${member.name}`);
           }
@@ -235,6 +374,9 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
                 level: result.data.current_medal_level,
                 levelUp: result.levelUp || false
               });
+              
+              // ALSO update solo entries for this member
+              await updateSoloEntryMedalPoints(member.name, competitionId);
             }
             memberIdx++;
           }
@@ -272,6 +414,12 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
           level: result.data.current_medal_level,
           levelUp: result.levelUp || false
         });
+        
+        // ALSO update this specific solo entry's medal_points field
+        // Use participant's total_points (season-long) to keep entries in sync
+        if (entry.is_medal_program) {
+          await updateEntryMedalPointsDirectly(entry.id, result.data.total_points, result.data.current_medal_level);
+        }
       } else if (result.alreadyAwarded) {
         console.log(`      ⚠️ Already awarded to ${entryName}`);
       }

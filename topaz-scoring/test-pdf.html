@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test jsPDF AutoTable</title>
+</head>
+<body>
+    <h1>jsPDF AutoTable Test</h1>
+    <button id="testBtn" style="padding: 20px; font-size: 18px; cursor: pointer;">
+        🖨 Generate Test PDF
+    </button>
+    <div id="status" style="margin-top: 20px; padding: 20px; background: #f0f0f0;"></div>
+
+    <script type="module">
+        // Test jsPDF v3.x with autotable
+        import { jsPDF } from 'https://cdn.jsdelivr.net/npm/jspdf@3.0.4/+esm';
+        import 'https://cdn.jsdelivr.net/npm/jspdf-autotable@5.0.2/+esm';
+
+        const statusDiv = document.getElementById('status');
+        
+        function log(message) {
+            console.log(message);
+            statusDiv.innerHTML += `<div>${message}</div>`;
+        }
+
+        document.getElementById('testBtn').addEventListener('click', () => {
+            try {
+                log('✅ Starting test...');
+                
+                // Create PDF instance
+                const doc = new jsPDF();
+                log('✅ jsPDF instance created');
+                
+                // Check if autoTable exists
+                if (typeof doc.autoTable === 'function') {
+                    log('✅ autoTable method exists!');
+                } else {
+                    log('❌ autoTable method does NOT exist!');
+                    log('Type of autoTable: ' + typeof doc.autoTable);
+                    return;
+                }
+                
+                // Add some text
+                doc.text('TOPAZ Score Sheet Test', 10, 10);
+                log('✅ Added text');
+                
+                // Add table
+                doc.autoTable({
+                    head: [['Judge', 'Technique', 'Creativity', 'Presentation', 'Appearance', 'Total']],
+                    body: [
+                        ['Judge 1', '22.5', '23.0', '24.0', '23.5', '93.0'],
+                        ['Judge 2', '23.0', '22.5', '23.5', '24.0', '93.0'],
+                        ['Judge 3', '23.5', '23.5', '24.0', '23.0', '94.0']
+                    ],
+                    startY: 20,
+                    theme: 'grid',
+                    headStyles: { fillColor: [20, 184, 166] },
+                });
+                log('✅ autoTable executed successfully!');
+                
+                // Save PDF
+                doc.save('test-score-sheet.pdf');
+                log('✅ PDF saved! Check your downloads.');
+                
+            } catch (error) {
+                log('❌ ERROR: ' + error.message);
+                console.error('Full error:', error);
+            }
+        });
+        
+        log('🚀 Test page loaded. Click the button to test PDF generation.');
+    </script>
+</body>
+</html>
+

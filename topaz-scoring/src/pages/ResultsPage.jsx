@@ -9,6 +9,7 @@ import CategoryBadge from '../components/CategoryBadge';
 import AbilityBadge from '../components/AbilityBadge';
 import MedalBadge, { getMedalProgress } from '../components/MedalBadge';
 import MedalLeaderboard from '../components/MedalLeaderboard';
+import EditCompetitionModal from '../components/EditCompetitionModal';
 import { getCompetition } from '../supabase/competitions';
 import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
@@ -18,6 +19,8 @@ import { awardMedalPointsForCompetition } from '../supabase/medalParticipants';
 import { subscribeToScores, unsubscribeFromChannel } from '../supabase/realtime';
 import { generateScoreSheet, generateAllScorecards } from '../utils/pdfGenerator';
 import { exportResultsToExcel } from '../utils/excelExport';
+import { exportComprehensiveExcel, exportToJSON } from '../utils/comprehensiveExport';
+import { getSeasonLeaderboard } from '../supabase/medalParticipants';
 import { 
   groupByExactCombination, 
   calculateRankingsPerGroup, 
@@ -53,6 +56,9 @@ function ResultsPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [printProgress, setPrintProgress] = useState({ current: 0, total: 0 });
   const [viewMode, setViewMode] = useState('grouped'); // 'grouped' or 'filtered'
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [medalLeaderboardData, setMedalLeaderboardData] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   // Redirect if no competitionId
   useEffect(() => {
@@ -62,38 +68,57 @@ function ResultsPage() {
     }
   }, [competitionId, navigate]);
 
+  // Load data function (extracted for reuse)
+  const loadAllData = async () => {
+    if (!competitionId) return;
+
+    try {
+      setLoading(true);
+      const [compResult, catsResult, divsResult, entriesResult, scoresResult] = await Promise.all([
+        getCompetition(competitionId),
+        getCompetitionCategories(competitionId),
+        getCompetitionAgeDivisions(competitionId),
+        getCompetitionEntries(competitionId),
+        getCompetitionScores(competitionId)
+      ]);
+
+      if (!compResult.success) throw new Error(compResult.error);
+
+      setCompetition(compResult.data);
+      setCategories(catsResult.success ? catsResult.data : []);
+      setAgeDivisions(divsResult.success ? divsResult.data : []);
+      setEntries(entriesResult.success ? entriesResult.data : []);
+      setScores(scoresResult.success ? scoresResult.data : []);
+      
+      // Load medal leaderboard data if available
+      try {
+        const medalResult = await getSeasonLeaderboard(100);
+        if (medalResult.success && medalResult.data) {
+          setMedalLeaderboardData(medalResult.data);
+        }
+      } catch (medalError) {
+        console.log('Medal data not available:', medalError);
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading results:', error);
+      toast.error(`Failed to load results: ${error.message}`);
+      setLoading(false);
+    }
+  };
+
   // Load data
   useEffect(() => {
-    const loadAllData = async () => {
-      if (!competitionId) return;
-
-      try {
-        setLoading(true);
-        const [compResult, catsResult, divsResult, entriesResult, scoresResult] = await Promise.all([
-          getCompetition(competitionId),
-          getCompetitionCategories(competitionId),
-          getCompetitionAgeDivisions(competitionId),
-          getCompetitionEntries(competitionId),
-          getCompetitionScores(competitionId)
-        ]);
-
-        if (!compResult.success) throw new Error(compResult.error);
-
-        setCompetition(compResult.data);
-        setCategories(catsResult.success ? catsResult.data : []);
-        setAgeDivisions(divsResult.success ? divsResult.data : []);
-        setEntries(entriesResult.success ? entriesResult.data : []);
-        setScores(scoresResult.success ? scoresResult.data : []);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error loading results:', error);
-        toast.error(`Failed to load results: ${error.message}`);
-        setLoading(false);
-      }
-    };
-
     loadAllData();
   }, [competitionId]);
+
+  // Handle competition update
+  const handleCompetitionUpdated = (updatedCompetition) => {
+    setCompetition(updatedCompetition);
+    // Reload categories in case they changed
+    loadAllData();
+  };
 
   // Real-time updates
   useEffect(() => {
@@ -369,6 +394,65 @@ function ResultsPage() {
     toast.success('Results exported to Excel!');
   };
 
+  const handleComprehensiveExcelExport = async () => {
+    if (!competition || !entries.length) {
+      toast.error('No data to export');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const result = await exportComprehensiveExcel(
+        competition,
+        categories,
+        ageDivisions,
+        entries,
+        scores,
+        rankedResults,
+        medalLeaderboardData
+      );
+
+      if (result.success) {
+        toast.success(`Complete results exported to ${result.fileName}!`);
+      } else {
+        throw new Error(result.error || 'Export failed');
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(`Export failed: ${error.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleJSONExport = () => {
+    if (!competition || !entries.length) {
+      toast.error('No data to export');
+      return;
+    }
+
+    try {
+      const result = exportToJSON(
+        competition,
+        categories,
+        ageDivisions,
+        entries,
+        scores,
+        rankedResults,
+        medalLeaderboardData
+      );
+
+      if (result.success) {
+        toast.success(`JSON data exported to ${result.fileName}!`);
+      } else {
+        throw new Error(result.error || 'Export failed');
+      }
+    } catch (error) {
+      console.error('JSON export error:', error);
+      toast.error(`JSON export failed: ${error.message}`);
+    }
+  };
+
   const handlePrintAll = () => {
     window.print();
   };
@@ -450,6 +534,14 @@ function ResultsPage() {
           {/* ACTION BUTTONS */}
           <div className="flex flex-wrap items-center justify-center gap-4 mb-12">
             <button
+              onClick={() => setShowEditModal(true)}
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-purple-600 hover:to-purple-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
+            >
+              <span className="text-xl">⚙️</span>
+              <span>Edit Competition</span>
+            </button>
+
+            <button
               onClick={handlePrintAll}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-blue-600 hover:to-blue-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
@@ -464,6 +556,35 @@ function ResultsPage() {
               <span className="text-xl">📊</span>
               <span>Export to Excel</span>
             </button>
+
+            {/* Comprehensive Export Section */}
+            <div className="w-full border-t-2 border-gray-200 pt-6 mt-6">
+              <h3 className="text-xl font-bold text-gray-700 mb-4 text-center">
+                📦 Complete Results Package
+              </h3>
+              <div className="flex flex-wrap items-center justify-center gap-4">
+                <button
+                  onClick={handleComprehensiveExcelExport}
+                  disabled={exporting || !competition}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl shadow-lg hover:from-emerald-600 hover:to-emerald-700 hover:scale-105 hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="text-lg">📊</span>
+                  <span>{exporting ? 'Exporting...' : 'Download Excel (Full Data)'}</span>
+                </button>
+
+                <button
+                  onClick={handleJSONExport}
+                  disabled={!competition}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:from-indigo-600 hover:to-indigo-700 hover:scale-105 hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="text-lg">📄</span>
+                  <span>Download JSON (For Website)</span>
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 text-center mt-3">
+                Excel includes all data across multiple sheets • JSON format for website integration
+              </p>
+            </div>
 
             <button
               onClick={handleGenerateAllScorecards}

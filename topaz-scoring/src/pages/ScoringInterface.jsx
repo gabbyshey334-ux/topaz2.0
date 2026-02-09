@@ -92,6 +92,18 @@ function ScoringInterface() {
     }
   }, [competitionId, judgeNumber, allEntries, navigate, location.state]);
 
+  // Debug: Log all unique division types in entries
+  useEffect(() => {
+    if (entries.length > 0) {
+      const uniqueTypes = [...new Set(entries.map(e => {
+        const raw = e.dance_type || 'Solo';
+        const normalized = getDivisionType(e);
+        return `${raw} -> ${normalized}`;
+      }))];
+      console.log('📊 All unique division types in entries:', uniqueTypes);
+    }
+  }, [entries]);
+
   // Filter entries by category, division type, age division, ability level, and search
   useEffect(() => {
     let filtered = [...entries];
@@ -103,10 +115,31 @@ function ScoringInterface() {
 
     // Filter by division type
     if (selectedDivisionType !== 'all') {
-      filtered = filtered.filter(e => {
-        const divisionType = getDivisionType(e);
-        return divisionType === selectedDivisionType;
+      const normalizedFilter = normalizeDivisionType(selectedDivisionType);
+      console.log('🔍 Division Type Filter:', {
+        filterValue: selectedDivisionType,
+        normalizedFilter: normalizedFilter,
+        totalEntries: filtered.length
       });
+      
+      filtered = filtered.filter(e => {
+        const entryDivisionType = getDivisionType(e);
+        const matches = entryDivisionType === normalizedFilter;
+        
+        // Log first few entries for debugging
+        if (filtered.indexOf(e) < 3) {
+          console.log(`  Entry #${e.entry_number}:`, {
+            dance_type: e.dance_type,
+            extracted: entryDivisionType,
+            filter: normalizedFilter,
+            matches: matches
+          });
+        }
+        
+        return matches;
+      });
+      
+      console.log(`✅ After division type filter: ${filtered.length} entries`);
     }
 
     // Filter by age division
@@ -376,11 +409,53 @@ function ScoringInterface() {
     return entry.dance_type && entry.dance_type.includes('group');
   };
 
-  // Get division type
+  /**
+   * Get division type from entry - normalizes to standard format
+   * Handles variations like:
+   * - "Small Group (4-10)" -> "Small Group"
+   * - "Large Group (11+)" -> "Large Group"
+   * - "Duo/Trio" -> "Duo/Trio"
+   * - "Solo" -> "Solo"
+   * Also handles pipe-separated values: "Solo | Variety A" -> "Solo"
+   */
   const getDivisionType = (entry) => {
     if (!entry.dance_type) return 'Solo';
-    const match = entry.dance_type.match(/^([^|]+)/);
-    return match ? match[1].trim() : 'Solo';
+    
+    // Extract division type (before pipe if present)
+    let divisionType = entry.dance_type;
+    const pipeIndex = divisionType.indexOf('|');
+    if (pipeIndex > -1) {
+      divisionType = divisionType.substring(0, pipeIndex);
+    }
+    
+    // Remove counts in parentheses: "Small Group (4-10)" -> "Small Group"
+    divisionType = divisionType.replace(/\s*\([^)]*\)\s*$/, '');
+    
+    // Trim whitespace
+    divisionType = divisionType.trim();
+    
+    // Normalize to standard values (case-insensitive matching)
+    const lower = divisionType.toLowerCase();
+    
+    if (lower.includes('small group')) return 'Small Group';
+    if (lower.includes('large group')) return 'Large Group';
+    if (lower.includes('duo') || lower.includes('trio')) {
+      // Handle both "Duo/Trio" and "Duo/Trio (2-3)"
+      return 'Duo/Trio';
+    }
+    if (lower.includes('production')) return 'Production';
+    if (lower.includes('student choreography')) return 'Student Choreography';
+    if (lower.includes('teacher') && lower.includes('student')) return 'Teacher/Student';
+    if (lower.includes('solo')) return 'Solo';
+    
+    // Return as-is if no match (shouldn't happen, but fallback)
+    return divisionType || 'Solo';
+  };
+  
+  // Normalize filter value for comparison
+  const normalizeDivisionType = (value) => {
+    if (!value || value === 'all') return value;
+    return value.trim();
   };
 
   if (loading) {

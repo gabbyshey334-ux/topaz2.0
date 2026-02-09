@@ -325,8 +325,15 @@ export const extractVarietyLevel = (description) => {
 };
 
 /**
- * Group entries by exact combination of Category + Variety + Age Division + Ability Level + Division Type
- * Each group represents a separate competition with its own rankings
+ * Group entries by exact combination
+ * CRITICAL CHANGE: Variety levels compete ACROSS categories, not within them
+ * - Variety A/B/C/D/E: All compete together regardless of base category
+ * - Straight categories (None variety): Compete within their category
+ * 
+ * Grouping:
+ * - Variety levels: Variety{Level}|Age|Ability|DivisionType (no category)
+ * - Straight: Category|Age|Ability|DivisionType (with category)
+ * 
  * @param {Array} entries - Array of entry objects with averageScore
  * @param {Array} categories - Array of category objects
  * @param {Array} ageDivisions - Array of age division objects
@@ -353,18 +360,34 @@ export const groupByExactCombination = (entries, categories = [], ageDivisions =
     // Get division type (Solo, Duo/Trio, Small Group, etc.)
     const divisionType = entry.dance_type || 'Solo';
     
-    // Create unique key for this exact combination (NOW INCLUDING DIVISION TYPE)
-    const key = `${categoryName}|${varietyLevel}|${ageDivisionName}|${abilityLevel}|${divisionType}`;
+    // CRITICAL CHANGE: Create grouping key based on variety level
+    let key;
+    let displayName;
+    
+    if (varietyLevel !== 'None') {
+      // Variety levels compete ACROSS categories
+      // Key: Variety{Level}|Age|Ability|DivisionType
+      key = `Variety${varietyLevel}|${ageDivisionName}|${abilityLevel}|${divisionType}`;
+      displayName = `${varietyLevel} - ${ageDivisionName} - ${abilityLevel} - ${divisionType}`;
+    } else {
+      // Straight categories compete WITHIN their category
+      // Key: Category|Age|Ability|DivisionType
+      key = `${categoryName}|${ageDivisionName}|${abilityLevel}|${divisionType}`;
+      displayName = `${categoryName} - ${ageDivisionName} - ${abilityLevel} - ${divisionType}`;
+    }
     
     if (!groups[key]) {
       groups[key] = {
-        category: categoryName,
+        key: key,
+        displayName: displayName,
+        category: categoryName, // Keep for reference, but not used in grouping for varieties
         categoryId: entry.category_id,
         variety: varietyLevel,
         ageDivision: ageDivisionName,
         ageDivisionId: entry.age_division_id,
         abilityLevel: abilityLevel,
         divisionType: divisionType,
+        isVarietyGroup: varietyLevel !== 'None', // Flag to indicate cross-category grouping
         entries: []
       };
     }
