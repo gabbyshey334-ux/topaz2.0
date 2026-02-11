@@ -439,9 +439,11 @@ function ScoringInterface() {
     
     if (lower.includes('small group')) return 'Small Group';
     if (lower.includes('large group')) return 'Large Group';
-    if (lower.includes('duo') || lower.includes('trio')) {
-      // Handle both "Duo/Trio" and "Duo/Trio (2-3)"
-      return 'Duo/Trio';
+    if (lower.includes('duo') && !lower.includes('trio')) {
+      return 'Duo';
+    }
+    if (lower.includes('trio')) {
+      return 'Trio';
     }
     if (lower.includes('production')) return 'Production';
     if (lower.includes('student choreography')) return 'Student Choreography';
@@ -611,7 +613,8 @@ function ScoringInterface() {
               >
                 <option value="all">All Division Types</option>
                 <option value="Solo">Solo</option>
-                <option value="Duo/Trio">Duo/Trio</option>
+                <option value="Duo">Duo</option>
+                <option value="Trio">Trio</option>
                 <option value="Small Group">Small Group</option>
                 <option value="Large Group">Large Group</option>
                 <option value="Production">Production</option>

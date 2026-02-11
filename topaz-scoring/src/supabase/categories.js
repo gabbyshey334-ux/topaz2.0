@@ -15,7 +15,8 @@ export const createCategory = async (categoryData) => {
         competition_id: categoryData.competition_id,
         name: categoryData.name,
         description: categoryData.description || null,
-        is_special_category: categoryData.is_special_category || false
+        is_special_category: categoryData.is_special_category || false,
+        type: categoryData.type || 'dance' // NEW: category type (dance, variety, special)
       }])
       .select()
       .single();

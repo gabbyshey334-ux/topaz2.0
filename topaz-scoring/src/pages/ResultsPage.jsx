@@ -30,6 +30,17 @@ import {
   getDivisionTypeDisplayName
 } from '../utils/calculations';
 
+// Helper function to check if a category is special (should not get awards/medals)
+const isSpecialCategory = (category) => {
+  if (!category) return false;
+  const categoryName = category.name || '';
+  return categoryName === 'Production' || 
+         categoryName === 'Student Choreography' || 
+         categoryName === 'Teacher/Student' ||
+         category.is_special_category === true ||
+         category.type === 'special';
+};
+
 function ResultsPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -135,7 +146,7 @@ function ResultsPage() {
     return () => unsubscribeFromChannel(channel);
   }, [competitionId]);
 
-  // Calculate ranked results
+  // Calculate ranked results (EXCLUDE SPECIAL CATEGORIES from rankings)
   const rankedResults = useMemo(() => {
     if (entries.length === 0 || scores.length === 0) return [];
 
@@ -146,34 +157,70 @@ function ResultsPage() {
       }
 
       const avgScore = entryScores.reduce((sum, s) => sum + s.total_score, 0) / entryScores.length;
+      const category = categories.find(c => c.id === entry.category_id);
+      
       return {
         ...entry,
         averageScore: parseFloat(avgScore.toFixed(2)),
         judgeCount: entryScores.length,
         hasScores: true,
-        scores: entryScores
+        scores: entryScores,
+        category: category // Store category for filtering
       };
     });
 
-    const scoredEntries = entriesWithAverages.filter(e => e.hasScores);
-    scoredEntries.sort((a, b) => b.averageScore - a.averageScore);
+    // Filter out special categories before ranking
+    const eligibleEntries = entriesWithAverages.filter(e => {
+      if (!e.hasScores) return false;
+      const category = categories.find(c => c.id === e.category_id);
+      return !isSpecialCategory(category);
+    });
 
+    // Separate special categories (for display only, no rankings)
+    const specialCategoryEntries = entriesWithAverages.filter(e => {
+      if (!e.hasScores) return false;
+      const category = categories.find(c => c.id === e.category_id);
+      return isSpecialCategory(category);
+    });
+
+    // Sort eligible entries by score (highest first)
+    eligibleEntries.sort((a, b) => b.averageScore - a.averageScore);
+
+    // Assign ranks only to eligible entries
     let currentRank = 1;
-    scoredEntries.forEach((entry, index) => {
-      if (index > 0 && entry.averageScore === scoredEntries[index - 1].averageScore) {
-        entry.rank = scoredEntries[index - 1].rank;
+    eligibleEntries.forEach((entry, index) => {
+      if (index > 0 && entry.averageScore === eligibleEntries[index - 1].averageScore) {
+        entry.rank = eligibleEntries[index - 1].rank;
       } else {
         entry.rank = currentRank;
       }
       currentRank++;
     });
 
-    return scoredEntries;
-  }, [entries, scores]);
+    // Special categories get no rank
+    specialCategoryEntries.forEach(entry => {
+      entry.rank = null;
+      entry.isSpecialCategory = true;
+    });
 
-  // Filter results
+    // Return both eligible (ranked) and special (unranked) entries
+    return [...eligibleEntries, ...specialCategoryEntries];
+  }, [entries, scores, categories]);
+
+  // Separate special categories from regular results
+  const specialCategoryResults = useMemo(() => {
+    return rankedResults.filter(entry => {
+      const category = categories.find(c => c.id === entry.category_id);
+      return isSpecialCategory(category);
+    });
+  }, [rankedResults, categories]);
+
+  // Filter results (exclude special categories from regular filtering)
   const filteredResults = useMemo(() => {
-    let filtered = [...rankedResults];
+    let filtered = [...rankedResults].filter(entry => {
+      const category = categories.find(c => c.id === entry.category_id);
+      return !isSpecialCategory(category); // Exclude special categories from regular results
+    });
 
     if (selectedCategory) {
       filtered = filtered.filter(e => e.category_id === selectedCategory);
@@ -193,14 +240,22 @@ function ResultsPage() {
     }
 
     return filtered;
-  }, [rankedResults, selectedCategory, selectedAgeDivision, selectedAbilityLevel, searchQuery]);
+  }, [rankedResults, selectedCategory, selectedAgeDivision, selectedAbilityLevel, searchQuery, categories]);
 
-  // Calculate grouped rankings by exact combination (Category + Variety + Age + Ability + Division Type)
+  // Calculate grouped rankings by exact combination (EXCLUDE SPECIAL CATEGORIES)
   const groupedRankings = useMemo(() => {
     if (rankedResults.length === 0) return {};
 
+    // Filter out special categories before grouping
+    const eligibleResults = rankedResults.filter(entry => {
+      const category = categories.find(c => c.id === entry.category_id);
+      return !isSpecialCategory(category);
+    });
+
+    if (eligibleResults.length === 0) return {};
+
     // Group entries by exact combination (NOW INCLUDING DIVISION TYPE)
-    const groups = groupByExactCombination(rankedResults, categories, ageDivisions);
+    const groups = groupByExactCombination(eligibleResults, categories, ageDivisions);
     
     // Calculate rankings per group
     const rankedGroups = calculateRankingsPerGroup(groups);
@@ -208,12 +263,18 @@ function ResultsPage() {
     return rankedGroups;
   }, [rankedResults, categories, ageDivisions]);
 
-  // Calculate Top 4 Overall Highest Scores
+  // Calculate Top 4 Overall Highest Scores (EXCLUDE SPECIAL CATEGORIES)
   const top4Overall = useMemo(() => {
     if (rankedResults.length === 0) return [];
     
-    return calculateTop4Overall(rankedResults);
-  }, [rankedResults]);
+    // Filter out special categories
+    const eligibleResults = rankedResults.filter(entry => {
+      const category = categories.find(c => c.id === entry.category_id);
+      return !isSpecialCategory(category);
+    });
+    
+    return calculateTop4Overall(eligibleResults);
+  }, [rankedResults, categories]);
 
   // Medal Program Results - Top 4 per category combination
   const medalProgramResults = useMemo(() => {
@@ -1611,6 +1672,102 @@ function ResultsPage() {
             </div>
           )}
 
+          {/* SPECIAL CATEGORIES SECTION (Participation Recognition Only) */}
+          {specialCategoryResults.length > 0 && (
+            <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl shadow-2xl p-8 mb-12 border-4 border-gray-300">
+              <div className="text-center mb-8">
+                <h2 className="text-4xl font-black text-gray-700 mb-3">
+                  🎭 Special Categories
+                </h2>
+                <p className="text-lg text-gray-600 font-semibold bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 inline-block">
+                  Participation Recognition Only - Not Eligible for Placement Awards or Medals
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {specialCategoryResults.map((entry) => {
+                  const category = categories.find(c => c.id === entry.category_id);
+                  const categoryName = category?.name || 'Unknown';
+                  const ageDivisionName = getAgeDivisionName(entry.age_division_id);
+
+                  return (
+                    <div
+                      key={entry.id}
+                      className="bg-white rounded-2xl shadow-lg border-2 border-gray-300 p-6"
+                    >
+                      <div className="flex items-center gap-4 flex-wrap">
+                        {/* Entry Photo */}
+                        <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-gray-300">
+                          {entry.photo_url ? (
+                            <LazyLoadImage
+                              src={entry.photo_url}
+                              alt={entry.competitor_name}
+                              className="w-full h-full object-cover"
+                              effect="blur"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl">
+                              {entry.dance_type && entry.dance_type.includes('Solo') ? '👤' : '👥'}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Entry Info */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                            #{entry.entry_number} {entry.competitor_name}
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700">
+                              {categoryName}
+                            </span>
+                            {ageDivisionName && (
+                              <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700">
+                                🎂 {ageDivisionName}
+                              </span>
+                            )}
+                            <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700">
+                              ⭐ {entry.ability_level}
+                            </span>
+                            <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700">
+                              {getDivisionTypeDisplayName(entry.dance_type)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Average Score */}
+                        <div className="text-center">
+                          <div className="text-3xl font-black text-gray-700">
+                            {entry.averageScore.toFixed(2)}
+                          </div>
+                          <div className="text-sm text-gray-500 font-semibold">Average Score</div>
+                        </div>
+                      </div>
+
+                      {/* Judge Scores */}
+                      {entry.scores && entry.scores.length > 0 && (
+                        <div className="mt-4 pt-4 border-t-2 border-gray-200">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {entry.scores.map((score) => (
+                              <div key={score.id} className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                                <div className="text-xs font-semibold text-gray-600 mb-1">
+                                  Judge {score.judge_number}
+                                </div>
+                                <div className="text-2xl font-bold text-gray-700">
+                                  {score.total_score.toFixed(1)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* FOOTER */}
           <div className="mt-16 pt-8 border-t-2 border-gray-200 text-center">
             <p className="text-sm font-semibold text-gray-600 mb-2">TOPAZ 2.0 © 2025</p>
@@ -1618,6 +1775,16 @@ function ResultsPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Competition Modal */}
+      <EditCompetitionModal
+        competition={competition}
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSave={handleCompetitionUpdated}
+        entries={entries}
+        scores={scores}
+      />
     </Layout>
   );
 }

@@ -102,7 +102,7 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.text('Entry Information', 18, yPos);
     yPos += 8;
     
-    doc.setFontSize(10);
+      doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     
     doc.text(`Entry Number: ${entry.entry_number}`, 18, yPos);
@@ -127,14 +127,14 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       yPos += 6;
     }
     
-    // Medal program info
+    // Basic medal program indicator (kept for entry info section)
     if (entry.is_medal_program) {
       doc.setFillColor(...tealColor);
       doc.roundedRect(18, yPos - 4, 60, 5, 2, 2, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text(`🏆 Medal Program: ${entry.medal_points || 0} Points • ${entry.current_medal_level || 'None'}`, 20, yPos);
+      doc.text(`🏆 Medal Program`, 20, yPos);
       doc.setTextColor(...darkGray);
       yPos += 6;
     }
@@ -227,8 +227,8 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.roundedRect(14, yPos - 3, pageWidth - 28, 8, 2, 2, 'F');
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
     doc.text('AVERAGE', colPositions[0], yPos + 4);
     doc.text(avgTechnique.toFixed(2), colPositions[1], yPos + 4, { align: 'right' });
     doc.text(avgCreativity.toFixed(2), colPositions[2], yPos + 4, { align: 'right' });
@@ -237,26 +237,114 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.text(avgTotal.toFixed(2), colPositions[5], yPos + 4, { align: 'right' });
     
     yPos += 15;
-    
-    // =============================================================================
+      
+      // =============================================================================
     // TOTAL SCORE SUMMARY
-    // =============================================================================
+      // =============================================================================
     console.log('🏆 Adding total score summary...');
     
     doc.setFillColor(...lightGray);
     doc.roundedRect(14, yPos, pageWidth - 28, 15, 3, 3, 'F');
-    yPos += 8;
-    
+        yPos += 8;
+        
     doc.setTextColor(...darkGray);
     doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
+        doc.setFont('helvetica', 'bold');
     doc.text('TOTAL SCORE', pageWidth / 2, yPos, { align: 'center' });
-    yPos += 8;
-    
+        yPos += 8;
+        
     doc.setFontSize(24);
     doc.setTextColor(...tealColor);
     doc.text(`${avgTotal.toFixed(2)} / 100`, pageWidth / 2, yPos, { align: 'center' });
-    yPos += 10;
+    yPos += 15;
+    
+    // =============================================================================
+    // MEDAL PROGRAM STATUS (if enrolled)
+    // =============================================================================
+    if (entry.is_medal_program) {
+      console.log('🏅 Adding medal program status...');
+      
+      // Helper function to get next medal info
+      const getNextMedalInfo = (currentPoints) => {
+        const points = currentPoints || 0;
+        if (points < 25) {
+          return { level: 'Bronze', threshold: 25, pointsNeeded: 25 - points };
+        } else if (points < 35) {
+          return { level: 'Silver', threshold: 35, pointsNeeded: 35 - points };
+        } else if (points < 50) {
+          return { level: 'Gold', threshold: 50, pointsNeeded: 50 - points };
+        }
+        return null; // Already Gold
+      };
+      
+      // Medal emoji mapping
+      const medalEmoji = {
+        'Bronze': '🥉',
+        'Silver': '🥈',
+        'Gold': '🥇',
+        'None': '⭐'
+      };
+      
+      const currentMedalLevel = entry.current_medal_level || 'None';
+      const medalPoints = entry.medal_points || 0;
+      const medalIcon = medalEmoji[currentMedalLevel] || '⭐';
+      const nextMedal = getNextMedalInfo(medalPoints);
+      
+      // Medal status box
+      doc.setFillColor(...lightGray);
+      doc.roundedRect(14, yPos, pageWidth - 28, nextMedal ? 40 : 30, 3, 3, 'F');
+      
+      yPos += 8;
+      
+      // Title
+      doc.setTextColor(...darkGray);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MEDAL PROGRAM STATUS', pageWidth / 2, yPos, { align: 'center' });
+      
+      yPos += 8;
+      
+      // Divider line
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, yPos, pageWidth - 20, yPos);
+      
+      yPos += 8;
+      
+      // Medal level
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Medal Level: ${currentMedalLevel} ${medalIcon}`, 20, yPos);
+      yPos += 7;
+      
+      // Total points
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Points: ${medalPoints} points`, 20, yPos);
+      yPos += 7;
+      
+      // Progress to next medal
+      if (nextMedal) {
+        doc.text(`Progress: ${nextMedal.pointsNeeded} points to ${nextMedal.level} medal (${nextMedal.threshold} points)`, 20, yPos);
+        yPos += 7;
+        
+        // Next medal threshold
+        doc.setFontSize(9);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`Next Medal: ${nextMedal.level} at ${nextMedal.threshold} points`, 20, yPos);
+        
+        // Gold medal threshold (always show)
+        if (nextMedal.level !== 'Gold') {
+          yPos += 6;
+          doc.text(`Gold Medal: 50 points`, 20, yPos);
+        }
+      } else {
+        // Already Gold
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...tealColor);
+        doc.text('✨ Gold Medal Achieved! ✨', 20, yPos);
+      }
+      
+      yPos += 10;
+    }
     
     // =============================================================================
     // FOOTER

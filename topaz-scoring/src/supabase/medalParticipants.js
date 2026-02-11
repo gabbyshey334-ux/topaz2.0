@@ -559,11 +559,57 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
       };
     }
 
+    // Get categories to check for special categories
+    console.log('\n🔍 Step 3.5: Fetching categories to filter special categories...');
+    const { data: allCategories, error: categoriesError } = await supabase
+      .from('categories')
+      .select('id, name, is_special_category, type')
+      .eq('competition_id', competitionId);
+
+    if (categoriesError) {
+      console.error('⚠️ Warning: Could not fetch categories:', categoriesError);
+    }
+
+    // Helper function to check if category is special
+    const isSpecialCategory = (categoryId) => {
+      if (!allCategories) return false;
+      const category = allCategories.find(c => c.id === categoryId);
+      if (!category) return false;
+      const categoryName = category.name || '';
+      return categoryName === 'Production' || 
+             categoryName === 'Student Choreography' || 
+             categoryName === 'Teacher/Student' ||
+             category.is_special_category === true ||
+             category.type === 'special';
+    };
+
+    // Filter out special categories BEFORE grouping
+    console.log('\n🚫 Filtering out special categories from medal points...');
+    const eligibleEntries = scoredEntries.filter(entry => {
+      const isSpecial = isSpecialCategory(entry.category_id);
+      if (isSpecial) {
+        console.log(`   ⚠️ Excluding special category entry: "${entry.competitor_name}" (${entry.category_id})`);
+      }
+      return !isSpecial;
+    });
+
+    console.log(`   ✅ Eligible entries for medal points: ${eligibleEntries.length} (excluded ${scoredEntries.length - eligibleEntries.length} special category entries)`);
+
+    if (eligibleEntries.length === 0) {
+      console.log('⚠️ WARNING: No eligible entries after filtering special categories');
+      return {
+        success: true,
+        message: 'No eligible entries for medal points (all entries are in special categories)',
+        totalAwarded: 0,
+        firstPlaceCount: 0
+      };
+    }
+
     // Group by category/age/ability/divisionType to determine 1st place
     console.log('\n🎯 Step 4: Grouping entries by category combination...');
     const groupedEntries = {};
     
-    for (const entry of scoredEntries) {
+    for (const entry of eligibleEntries) {
       const divisionType = entry.divisionType || entry.division_type || entry.dance_type || 'Solo';
       const key = `${entry.category_id}_${entry.age_division_id}_${entry.ability_level}_${divisionType}`;
       

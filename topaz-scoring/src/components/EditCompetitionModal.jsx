@@ -11,7 +11,9 @@ export default function EditCompetitionModal({
   competition, 
   isOpen, 
   onClose, 
-  onSave 
+  onSave,
+  entries = [],
+  scores = []
 }) {
   // Form state
   const [competitionName, setCompetitionName] = useState('');
@@ -29,26 +31,34 @@ export default function EditCompetitionModal({
   const [errors, setErrors] = useState({});
   const [warnings, setWarnings] = useState([]);
   
-  // Available categories (same as CompetitionSetup)
-  const FIXED_CATEGORIES = [
-    { name: 'Tap', color: 'blue' },
-    { name: 'Jazz', color: 'purple' },
-    { name: 'Ballet', color: 'pink' },
-    { name: 'Lyrical/Contemporary', color: 'teal' },
-    { name: 'Vocal', color: 'yellow' },
-    { name: 'Acting', color: 'orange' },
-    { name: 'Hip Hop', color: 'red' }
+  // Available categories (same as CompetitionSetup - NEW STRUCTURE)
+  const DANCE_CATEGORIES = [
+    { name: 'Tap', color: 'blue', type: 'dance' },
+    { name: 'Jazz', color: 'purple', type: 'dance' },
+    { name: 'Ballet', color: 'pink', type: 'dance' },
+    { name: 'Lyrical/Contemporary', color: 'teal', type: 'dance' },
+    { name: 'Vocal', color: 'yellow', type: 'dance' },
+    { name: 'Acting', color: 'orange', type: 'dance' },
+    { name: 'Hip Hop', color: 'red', type: 'dance' },
+    { name: 'Ballroom', color: 'indigo', type: 'dance' },
+    { name: 'Line Dancing', color: 'cyan', type: 'dance' }
+  ];
+
+  const VARIETY_CATEGORIES = [
+    { name: 'Variety A - Song & Dance, Character, or Combination', color: 'purple', type: 'variety' },
+    { name: 'Variety B - Dance with Prop', color: 'blue', type: 'variety' },
+    { name: 'Variety C - Dance with Acrobatics', color: 'pink', type: 'variety' },
+    { name: 'Variety D - Dance with Acrobatics & Prop', color: 'teal', type: 'variety' },
+    { name: 'Variety E - Hip Hop with Floor Work & Acrobatics', color: 'red', type: 'variety' }
   ];
 
   const SPECIAL_CATEGORIES = [
-    { name: 'Production', color: 'gray', special: true },
-    { name: 'Student Choreography', color: 'green', special: true },
-    { name: 'Teacher/Student', color: 'indigo', special: true }
+    { name: 'Production', color: 'gray', type: 'special', special: true },
+    { name: 'Student Choreography', color: 'green', type: 'special', special: true },
+    { name: 'Teacher/Student', color: 'indigo', type: 'special', special: true }
   ];
 
-  const ALL_AVAILABLE_CATEGORIES = [...FIXED_CATEGORIES, ...SPECIAL_CATEGORIES];
-  
-  const varietyOptions = ['None', 'Variety A', 'Variety B', 'Variety C', 'Variety D', 'Variety E'];
+  const ALL_AVAILABLE_CATEGORIES = [...DANCE_CATEGORIES, ...VARIETY_CATEGORIES, ...SPECIAL_CATEGORIES];
 
   // Load competition data when modal opens
   useEffect(() => {
@@ -73,20 +83,16 @@ export default function EditCompetitionModal({
       if (result.success) {
         setExistingCategories(result.data || []);
         
-        // Build selectedCategories object from existing categories
+        // Build selectedCategories object from existing categories (NEW STRUCTURE - no variety levels)
         const selected = {};
         result.data.forEach(cat => {
-          // Extract category name and variety level from name
-          // Format: "Category Name" or "Category Name - Variety Level"
-          const parts = cat.name.split(' - ');
-          const categoryName = parts[0];
-          const varietyLevel = parts[1] || 'None';
+          // Category name is the full name (no variety levels to extract)
+          const categoryName = cat.name;
           
-          if (!selected[categoryName]) {
-            selected[categoryName] = { selected: true, varietyLevels: [] };
-          }
-          if (!selected[categoryName].varietyLevels.includes(varietyLevel)) {
-            selected[categoryName].varietyLevels.push(varietyLevel);
+          // Check if this category exists in our available categories
+          const availableCat = ALL_AVAILABLE_CATEGORIES.find(ac => ac.name === categoryName);
+          if (availableCat) {
+            selected[categoryName] = { selected: true };
           }
         });
         setSelectedCategories(selected);
@@ -111,7 +117,7 @@ export default function EditCompetitionModal({
     setJudgeNames(newNames);
   };
 
-  // Toggle category selection
+  // Toggle category selection (NEW STRUCTURE - simple checkbox, no variety levels)
   const toggleCategory = (categoryName) => {
     setSelectedCategories(prev => {
       const newState = { ...prev };
@@ -119,37 +125,9 @@ export default function EditCompetitionModal({
         // Toggle off
         delete newState[categoryName];
       } else {
-        // Toggle on with default "None" variety
-        newState[categoryName] = { selected: true, varietyLevels: ['None'] };
+        // Toggle on (no variety levels needed)
+        newState[categoryName] = { selected: true };
       }
-      return newState;
-    });
-  };
-
-  // Toggle variety level for a category
-  const toggleVarietyLevel = (categoryName, varietyLevel) => {
-    setSelectedCategories(prev => {
-      const newState = { ...prev };
-      if (!newState[categoryName]) return newState;
-      
-      const varietyLevels = [...newState[categoryName].varietyLevels];
-      const index = varietyLevels.indexOf(varietyLevel);
-      
-      if (index > -1) {
-        // Remove variety level
-        varietyLevels.splice(index, 1);
-        // If no variety levels left, remove category
-        if (varietyLevels.length === 0) {
-          delete newState[categoryName];
-        } else {
-          newState[categoryName] = { ...newState[categoryName], varietyLevels };
-        }
-      } else {
-        // Add variety level
-        varietyLevels.push(varietyLevel);
-        newState[categoryName] = { ...newState[categoryName], varietyLevels };
-      }
-      
       return newState;
     });
   };
@@ -168,18 +146,44 @@ export default function EditCompetitionModal({
     }
 
     // Check if reducing judge count below existing scores
-    // This would require checking scores, which we'll do in the save function
-    // For now, just validate the count is valid
+    if (scores && scores.length > 0) {
+      const maxJudgeUsed = Math.max(...scores.map(s => s.judge_number || 0));
+      if (judgeCount < maxJudgeUsed) {
+        newErrors.judgeCount = `Cannot reduce judges below ${maxJudgeUsed}. Scores already entered for Judge ${maxJudgeUsed}.`;
+      }
+    }
+
     if (judgeCount < 1 || judgeCount > 10) {
       newErrors.judgeCount = 'Judge count must be between 1 and 10';
     }
 
+    // Check for categories with entries (prevent removal)
+    if (entries && entries.length > 0) {
+      const selectedCategoryNames = Object.keys(selectedCategories).filter(
+        name => selectedCategories[name]?.selected
+      );
+      const currentCategoryNames = existingCategories.map(cat => cat.name);
+      const categoriesToRemove = currentCategoryNames.filter(
+        name => !selectedCategoryNames.includes(name)
+      );
+
+      for (const categoryName of categoriesToRemove) {
+        const category = existingCategories.find(c => c.name === categoryName);
+        if (category) {
+          const entriesInCategory = entries.filter(e => e.category_id === category.id);
+          if (entriesInCategory.length > 0) {
+            newErrors.categories = `Cannot remove "${categoryName}" category. It has ${entriesInCategory.length} entry/entries.`;
+            break; // Stop at first error
+          }
+        }
+      }
+    }
+
     setErrors(newErrors);
     
-    // Check for categories with entries (warn if removing)
-    if (competition?.id) {
-      // This will be checked during save
-      newWarnings.push('Removing categories that have entries may affect rankings');
+    // Warnings for other potential issues
+    if (competition?.id && Object.keys(selectedCategories).length === 0) {
+      newWarnings.push('No categories selected. Competition will have no categories.');
     }
 
     setWarnings(newWarnings);
@@ -224,43 +228,54 @@ export default function EditCompetitionModal({
     }
   };
 
-  // Update categories (add new, remove deleted)
+  // Update categories (add new, remove deleted) - NEW STRUCTURE
   const updateCategories = async () => {
-    // Build list of desired categories
-    const desiredCategories = [];
-    Object.keys(selectedCategories).forEach(categoryName => {
-      const categoryData = selectedCategories[categoryName];
-      categoryData.varietyLevels.forEach(varietyLevel => {
-        const categoryFullName = varietyLevel === 'None' 
-          ? categoryName 
-          : `${categoryName} - ${varietyLevel}`;
-        desiredCategories.push(categoryFullName);
-      });
-    });
+    // Build list of desired categories (category name is the full name, no variety levels)
+    const desiredCategoryNames = Object.keys(selectedCategories).filter(
+      name => selectedCategories[name]?.selected
+    );
 
     // Get current category names
     const currentCategoryNames = existingCategories.map(cat => cat.name);
 
     // Find categories to add
-    const toAdd = desiredCategories.filter(name => !currentCategoryNames.includes(name));
+    const toAdd = desiredCategoryNames.filter(name => !currentCategoryNames.includes(name));
     
-    // Find categories to remove
-    const toRemove = existingCategories.filter(cat => !desiredCategories.includes(cat.name));
+    // Find categories to remove (only if they have no entries)
+    const toRemove = existingCategories.filter(cat => {
+      if (desiredCategoryNames.includes(cat.name)) return false; // Keep this category
+      
+      // Check if category has entries
+      const entriesInCategory = entries.filter(e => e.category_id === cat.id);
+      if (entriesInCategory.length > 0) {
+        console.warn(`⚠️ Skipping removal of "${cat.name}" - has ${entriesInCategory.length} entries`);
+        return false; // Don't remove categories with entries
+      }
+      
+      return true; // Safe to remove
+    });
 
     // Add new categories
     for (const categoryName of toAdd) {
-      const isSpecial = SPECIAL_CATEGORIES.some(c => c.name === categoryName.split(' - ')[0]);
+      // Find category type
+      const danceCat = DANCE_CATEGORIES.find(c => c.name === categoryName);
+      const varietyCat = VARIETY_CATEGORIES.find(c => c.name === categoryName);
+      const specialCat = SPECIAL_CATEGORIES.find(c => c.name === categoryName);
+      
+      const categoryType = danceCat?.type || varietyCat?.type || specialCat?.type || 'dance';
+      const isSpecial = specialCat?.special || false;
+      
       await createCategory({
         competition_id: competition.id,
         name: categoryName,
-        is_special_category: isSpecial
+        description: categoryName, // Store name in description
+        is_special_category: isSpecial,
+        type: categoryType
       });
     }
 
-    // Remove deleted categories (with warning if they have entries)
+    // Remove deleted categories (only those without entries)
     for (const category of toRemove) {
-      // TODO: Check if category has entries before deleting
-      // For now, we'll delete and let the database handle foreign key constraints
       await deleteCategory(category.id);
     }
   };
@@ -401,55 +416,89 @@ export default function EditCompetitionModal({
           <div className="bg-gray-50 rounded-xl p-6">
             <h3 className="text-xl font-bold text-teal-600 mb-4">Categories</h3>
             <p className="text-sm text-gray-600 mb-4">
-              Select categories for this competition. You can add variety levels for each category.
+              Select categories for this competition. Categories are standalone (no variety levels).
             </p>
 
-            <div className="space-y-4">
-              {ALL_AVAILABLE_CATEGORIES.map(category => {
-                const isSelected = selectedCategories[category.name]?.selected || false;
-                const varietyLevels = selectedCategories[category.name]?.varietyLevels || [];
-
-                return (
-                  <div key={category.name} className="border-2 rounded-lg p-4 bg-white">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleCategory(category.name)}
-                          className="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
-                        />
-                        <span className="font-semibold text-gray-800">{category.name}</span>
-                        {category.special && (
-                          <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
-                            Special
-                          </span>
-                        )}
-                      </label>
-                    </div>
-
-                    {isSelected && (
-                      <div className="mt-3 pl-7">
-                        <p className="text-xs text-gray-600 mb-2">Variety Levels:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {varietyOptions.map(variety => (
-                            <label key={variety} className="flex items-center gap-1 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={varietyLevels.includes(variety)}
-                                onChange={() => toggleVarietyLevel(category.name, variety)}
-                                className="w-4 h-4 text-teal-600 rounded"
-                              />
-                              <span className="text-sm text-gray-700">{variety}</span>
-                            </label>
-                          ))}
-                        </div>
+            <div className="space-y-6">
+              {/* DANCE CATEGORIES */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-5 border-2 border-purple-200">
+                <h4 className="text-lg font-bold text-purple-800 mb-3">PERFORMING ARTS CATEGORIES:</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {DANCE_CATEGORIES.map(category => {
+                    const isSelected = selectedCategories[category.name]?.selected || false;
+                    return (
+                      <div key={category.name} className="bg-white rounded-lg p-3 border-2 border-gray-200 hover:border-teal-300 transition-colors">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleCategory(category.name)}
+                            className="w-5 h-5 text-teal-600 rounded focus:ring-teal-500"
+                          />
+                          <span className="text-sm font-semibold text-gray-800">{category.name}</span>
+                        </label>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* VARIETY CATEGORIES */}
+              <div className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-xl p-5 border-2 border-pink-200">
+                <h4 className="text-lg font-bold text-pink-800 mb-3">VARIETY ARTS CATEGORIES:</h4>
+                <div className="space-y-3">
+                  {VARIETY_CATEGORIES.map(category => {
+                    const isSelected = selectedCategories[category.name]?.selected || false;
+                    return (
+                      <div key={category.name} className="bg-white rounded-lg p-4 border-2 border-gray-200 hover:border-pink-300 transition-colors">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleCategory(category.name)}
+                            className="w-5 h-5 text-pink-600 rounded focus:ring-pink-500"
+                          />
+                          <span className="text-base font-semibold text-gray-800">{category.name}</span>
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* SPECIAL CATEGORIES */}
+              <div className="bg-gradient-to-r from-gray-50 to-amber-50 rounded-xl p-5 border-2 border-amber-200">
+                <h4 className="text-lg font-bold text-amber-800 mb-2">SPECIAL CATEGORIES:</h4>
+                <p className="text-sm text-gray-700 mb-3 font-medium">
+                  (Participation recognition only - not eligible for high scoring awards or medals)
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {SPECIAL_CATEGORIES.map(category => {
+                    const isSelected = selectedCategories[category.name]?.selected || false;
+                    return (
+                      <div key={category.name} className="bg-white rounded-lg p-3 border-2 border-gray-200 hover:border-amber-300 transition-colors">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleCategory(category.name)}
+                            className="w-5 h-5 text-amber-600 rounded focus:ring-amber-500"
+                          />
+                          <span className="text-sm font-semibold text-gray-800">{category.name}</span>
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
+
+            {/* Error message for categories */}
+            {errors.categories && (
+              <div className="mt-4 bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                <p className="text-red-700 font-semibold">{errors.categories}</p>
+              </div>
+            )}
           </div>
         </div>
 

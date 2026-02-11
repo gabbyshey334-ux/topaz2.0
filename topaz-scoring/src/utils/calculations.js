@@ -348,7 +348,7 @@ export const groupByExactCombination = (entries, categories = [], ageDivisions =
     // Get category info
     const category = categories.find(c => c.id === entry.category_id);
     const categoryName = category?.name || 'Unknown';
-    const varietyLevel = extractVarietyLevel(category?.description);
+    const categoryType = category?.type || 'dance'; // NEW: category type (dance, variety, special)
     
     // Get age division info
     const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
@@ -357,37 +357,25 @@ export const groupByExactCombination = (entries, categories = [], ageDivisions =
     // Get ability level
     const abilityLevel = entry.ability_level || 'Unknown';
     
-    // Get division type (Solo, Duo/Trio, Small Group, etc.)
+    // Get division type (Solo, Duo, Trio, Small Group, etc.)
     const divisionType = entry.dance_type || 'Solo';
     
-    // CRITICAL CHANGE: Create grouping key based on variety level
-    let key;
-    let displayName;
-    
-    if (varietyLevel !== 'None') {
-      // Variety levels compete ACROSS categories
-      // Key: Variety{Level}|Age|Ability|DivisionType
-      key = `Variety${varietyLevel}|${ageDivisionName}|${abilityLevel}|${divisionType}`;
-      displayName = `${varietyLevel} - ${ageDivisionName} - ${abilityLevel} - ${divisionType}`;
-    } else {
-      // Straight categories compete WITHIN their category
-      // Key: Category|Age|Ability|DivisionType
-      key = `${categoryName}|${ageDivisionName}|${abilityLevel}|${divisionType}`;
-      displayName = `${categoryName} - ${ageDivisionName} - ${abilityLevel} - ${divisionType}`;
-    }
+    // NEW STRUCTURE: All categories compete within themselves (no cross-category competition)
+    // Key: Category|Age|Ability|DivisionType
+    const key = `${categoryName}|${ageDivisionName}|${abilityLevel}|${divisionType}`;
+    const displayName = `${categoryName} - ${ageDivisionName} - ${abilityLevel} - ${divisionType}`;
     
     if (!groups[key]) {
       groups[key] = {
         key: key,
         displayName: displayName,
-        category: categoryName, // Keep for reference, but not used in grouping for varieties
+        category: categoryName,
         categoryId: entry.category_id,
-        variety: varietyLevel,
+        categoryType: categoryType, // NEW: store category type
         ageDivision: ageDivisionName,
         ageDivisionId: entry.age_division_id,
         abilityLevel: abilityLevel,
         divisionType: divisionType,
-        isVarietyGroup: varietyLevel !== 'None', // Flag to indicate cross-category grouping
         entries: []
       };
     }
@@ -446,6 +434,7 @@ export const calculateRankingsPerGroup = (groups) => {
  * Calculate top 4 highest overall scores across the entire competition
  * @param {Array} entries - Array of all entries with averageScore
  * @returns {Array} - Top 4 entries sorted by score
+ * NOTE: Special categories should be filtered out before calling this function
  */
 export const calculateTop4Overall = (entries) => {
   if (!entries || entries.length === 0) return [];
@@ -469,8 +458,10 @@ export const getDivisionTypeEmoji = (divisionType) => {
   
   if (type.includes('solo')) {
     return '👤';
-  } else if (type.includes('duo') || type.includes('trio')) {
+  } else if (type.includes('duo')) {
     return '👥';
+  } else if (type.includes('trio')) {
+    return '👥👥';
   } else if (type.includes('small group')) {
     return '👥👥';
   } else if (type.includes('large group')) {
@@ -492,7 +483,8 @@ export const getDivisionTypeDisplayName = (divisionType) => {
   
   // Clean up the division type for display
   if (divisionType.includes('Solo')) return 'Solo';
-  if (divisionType.includes('Duo/Trio')) return 'Duo/Trio';
+  if (divisionType.includes('Duo') && !divisionType.includes('Trio')) return 'Duo';
+  if (divisionType.includes('Trio')) return 'Trio';
   if (divisionType.includes('Small Group')) return 'Small Group';
   if (divisionType.includes('Large Group')) return 'Large Group';
   if (divisionType.includes('Production')) return 'Production';
