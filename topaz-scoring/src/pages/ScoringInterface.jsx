@@ -487,13 +487,6 @@ function ScoringInterface() {
     // Return as-is if no match (shouldn't happen, but fallback)
     return divisionType || 'Solo';
   };
-  
-  // Helper function to get category name (for display)
-  const getCategoryName = (categoryId) => {
-    if (!categoryId) return '';
-    const category = categories.find(c => c.id === categoryId);
-    return category?.name || '';
-  };
 
   if (loading) {
     return (
