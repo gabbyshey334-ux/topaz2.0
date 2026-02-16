@@ -8,6 +8,7 @@ import EmptyState from '../components/EmptyState';
 import AbilityBadge from '../components/AbilityBadge';
 import { createScore, getEntryScores, updateScore } from '../supabase/scores';
 import { validateScore, calculateTotal } from '../utils/calculations';
+import { getAdminFilters, subscribeToAdminFilters } from '../supabase/adminFilters';
 
 function ScoringInterface() {
   const navigate = useNavigate();
@@ -42,11 +43,15 @@ function ScoringInterface() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentEntry, setCurrentEntry] = useState(null);
 
-  // State - Filters
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedDivisionType, setSelectedDivisionType] = useState('all');
-  const [selectedAgeDivision, setSelectedAgeDivision] = useState('all');
-  const [selectedAbilityLevel, setSelectedAbilityLevel] = useState('all');
+  // State - Admin Filters (controlled by admin, not judge)
+  const [adminFilters, setAdminFilters] = useState({
+    category_filter: null,
+    division_type_filter: 'all',
+    age_division_filter: null,
+    ability_filter: 'all'
+  });
+  
+  // Search query (only filter judges can control)
   const [searchQuery, setSearchQuery] = useState('');
 
   // State - Scoring Form
@@ -66,6 +71,46 @@ function ScoringInterface() {
   // State - UI
   const [showEntryList, setShowEntryList] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState(false);
+
+  // Load admin filters and subscribe to changes
+  useEffect(() => {
+    if (!competitionId) return;
+
+    // Load initial admin filters
+    const loadFilters = async () => {
+      try {
+        const result = await getAdminFilters(competitionId);
+        if (result.success && result.data) {
+          setAdminFilters({
+            category_filter: result.data.category_filter || null,
+            division_type_filter: result.data.division_type_filter || 'all',
+            age_division_filter: result.data.age_division_filter || null,
+            ability_filter: result.data.ability_filter || 'all'
+          });
+        }
+      } catch (error) {
+        console.error('Error loading admin filters:', error);
+      }
+    };
+
+    loadFilters();
+
+    // Subscribe to real-time filter changes
+    const channel = subscribeToAdminFilters(competitionId, (newFilters) => {
+      console.log('🔔 Admin filters updated:', newFilters);
+      setAdminFilters({
+        category_filter: newFilters.category_filter || null,
+        division_type_filter: newFilters.division_type_filter || 'all',
+        age_division_filter: newFilters.age_division_filter || null,
+        ability_filter: newFilters.ability_filter || 'all'
+      });
+      toast.info('Filters updated by admin', { autoClose: 2000 });
+    });
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [competitionId]);
 
   // Redirect if no data
   useEffect(() => {
@@ -104,55 +149,44 @@ function ScoringInterface() {
     }
   }, [entries]);
 
-  // Filter entries by category, division type, age division, ability level, and search
+  // Filter entries using ADMIN FILTERS (not judge-controlled) + search query
   useEffect(() => {
     let filtered = [...entries];
 
-    // Filter by category
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(e => e.category_id === selectedCategory);
+    // Apply admin category filter
+    if (adminFilters.category_filter) {
+      filtered = filtered.filter(e => e.category_id === adminFilters.category_filter);
     }
 
-    // Filter by division type
-    if (selectedDivisionType !== 'all') {
-      const normalizedFilter = normalizeDivisionType(selectedDivisionType);
-      console.log('🔍 Division Type Filter:', {
-        filterValue: selectedDivisionType,
-        normalizedFilter: normalizedFilter,
-        totalEntries: filtered.length
-      });
-      
+    // Apply admin division type filter
+    if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
+      const filterType = adminFilters.division_type_filter;
       filtered = filtered.filter(e => {
-        const entryDivisionType = getDivisionType(e);
-        const matches = entryDivisionType === normalizedFilter;
+        const entryType = e.dance_type || '';
+        const normalizedEntry = entryType.toLowerCase().replace(/[_\s()]/g, '');
+        const normalizedFilter = filterType.toLowerCase().replace(/[_\s()]/g, '');
         
-        // Log first few entries for debugging
-        if (filtered.indexOf(e) < 3) {
-          console.log(`  Entry #${e.entry_number}:`, {
-            dance_type: e.dance_type,
-            extracted: entryDivisionType,
-            filter: normalizedFilter,
-            matches: matches
-          });
-        }
+        if (normalizedFilter.includes('smallgroup')) return normalizedEntry.includes('smallgroup');
+        if (normalizedFilter.includes('largegroup')) return normalizedEntry.includes('largegroup');
+        if (normalizedFilter.includes('duo')) return normalizedEntry.includes('duo') && !normalizedEntry.includes('trio');
+        if (normalizedFilter.includes('trio')) return normalizedEntry.includes('trio');
+        if (normalizedFilter.includes('solo')) return normalizedEntry.includes('solo') || (!normalizedEntry.includes('group') && !normalizedEntry.includes('duo') && !normalizedEntry.includes('trio'));
         
-        return matches;
+        return normalizedEntry.includes(normalizedFilter);
       });
-      
-      console.log(`✅ After division type filter: ${filtered.length} entries`);
     }
 
-    // Filter by age division
-    if (selectedAgeDivision !== 'all') {
-      filtered = filtered.filter(e => e.age_division_id === selectedAgeDivision);
+    // Apply admin age division filter
+    if (adminFilters.age_division_filter) {
+      filtered = filtered.filter(e => e.age_division_id === adminFilters.age_division_filter);
     }
 
-    // Filter by ability level
-    if (selectedAbilityLevel !== 'all') {
-      filtered = filtered.filter(e => e.ability_level === selectedAbilityLevel);
+    // Apply admin ability level filter
+    if (adminFilters.ability_filter && adminFilters.ability_filter !== 'all') {
+      filtered = filtered.filter(e => e.ability_level === adminFilters.ability_filter);
     }
 
-    // Filter by search query
+    // Apply search query (only filter judges can control)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(e => 
@@ -164,7 +198,7 @@ function ScoringInterface() {
     setFilteredEntries(filtered);
     setCurrentIndex(0);
     setCurrentEntry(filtered[0] || null);
-  }, [selectedCategory, selectedDivisionType, selectedAgeDivision, selectedAbilityLevel, searchQuery, entries]);
+  }, [adminFilters, searchQuery, entries]);
 
   // Auto-calculate total
   useEffect(() => {
@@ -454,10 +488,11 @@ function ScoringInterface() {
     return divisionType || 'Solo';
   };
   
-  // Normalize filter value for comparison
-  const normalizeDivisionType = (value) => {
-    if (!value || value === 'all') return value;
-    return value.trim();
+  // Helper function to get category name (for display)
+  const getCategoryName = (categoryId) => {
+    if (!categoryId) return '';
+    const category = categories.find(c => c.id === categoryId);
+    return category?.name || '';
   };
 
   if (loading) {
@@ -579,91 +614,24 @@ function ScoringInterface() {
 
         {/* FILTER & PROGRESS SECTION */}
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            {/* Category Filter */}
-            {categories.length > 0 && (
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                  Filter by Category
-                </label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-                >
-                  <option value="all">All Categories</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.display_name || cat.name}
-                    </option>
-                  ))}
-                </select>
+          {/* Admin Filter Notice */}
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🎛️</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-blue-800">
+                  Filters are controlled by Admin
+                </p>
+                <p className="text-xs text-blue-700 mt-1">
+                  The entries you see are filtered by the competition administrator. 
+                  Changes will update automatically.
+                </p>
               </div>
-            )}
-
-            {/* Division Type Filter */}
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                Filter by Division Type
-              </label>
-              <select
-                value={selectedDivisionType}
-                onChange={(e) => setSelectedDivisionType(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-              >
-                <option value="all">All Division Types</option>
-                <option value="Solo">Solo</option>
-                <option value="Duo">Duo</option>
-                <option value="Trio">Trio</option>
-                <option value="Small Group">Small Group</option>
-                <option value="Large Group">Large Group</option>
-                <option value="Production">Production</option>
-                <option value="Student Choreography">Student Choreography</option>
-                <option value="Teacher/Student">Teacher/Student</option>
-              </select>
-            </div>
-
-            {/* Age Division Filter */}
-            {ageDivisions.length > 0 && (
-              <div>
-                <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                  Filter by Age
-                </label>
-                <select
-                  value={selectedAgeDivision}
-                  onChange={(e) => setSelectedAgeDivision(e.target.value)}
-                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-                >
-                  <option value="all">All Ages</option>
-                  {ageDivisions.map(div => (
-                    <option key={div.id} value={div.id}>
-                      {div.name} ({div.min_age}-{div.max_age})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Ability Level Filter */}
-            <div>
-              <label className="block text-gray-700 font-semibold mb-2 text-sm">
-                Filter by Ability
-              </label>
-              <select
-                value={selectedAbilityLevel}
-                onChange={(e) => setSelectedAbilityLevel(e.target.value)}
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[44px]"
-              >
-                <option value="all">All Levels</option>
-                <option value="Beginning">Beginning</option>
-                <option value="Intermediate">Intermediate</option>
-                <option value="Advanced">Advanced</option>
-              </select>
             </div>
           </div>
 
-          {/* Search Box */}
-          <div className="mt-4">
+          {/* Search Box (Only filter judges can control) */}
+          <div className="mb-4">
             <label className="block text-gray-700 font-semibold mb-2 text-sm">
               Search Entry
             </label>
@@ -692,7 +660,7 @@ function ScoringInterface() {
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-gray-700">
                 Showing {filteredEntries.length} of {entries.length} entries
-                {selectedCategory !== 'all' && ` in ${getCategoryName(selectedCategory)}`}
+                {adminFilters.category_filter && ` (filtered by admin)`}
               </p>
               <p className="text-sm font-semibold text-teal-600">
                 Scored {progress.scored} of {progress.total}

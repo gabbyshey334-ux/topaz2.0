@@ -595,6 +595,14 @@ function ResultsPage() {
           {/* ACTION BUTTONS */}
           <div className="flex flex-wrap items-center justify-center gap-4 mb-12">
             <button
+              onClick={() => navigate('/admin', { state: { competitionId } })}
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-orange-600 hover:to-orange-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
+            >
+              <span className="text-xl">🎛️</span>
+              <span>Admin Control Panel</span>
+            </button>
+
+            <button
               onClick={() => setShowEditModal(true)}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-purple-600 hover:to-purple-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >

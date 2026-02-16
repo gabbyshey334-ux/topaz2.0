@@ -1,11 +1,74 @@
 import { jsPDF } from 'jspdf';
 
 /**
+ * Check if an entry is a group (duo, trio, or group)
+ */
+const isGroupEntry = (entry) => {
+  if (!entry) return false;
+  
+  // Check if group_members exists and has members
+  if (entry.group_members && Array.isArray(entry.group_members) && entry.group_members.length > 0) {
+    return true;
+  }
+  
+  // Check dance_type for group indicators
+  const danceType = entry.dance_type || '';
+  const groupTypes = ['Duo', 'Trio', 'Small Group', 'Large Group', 'Production'];
+  return groupTypes.some(type => danceType.includes(type));
+};
+
+/**
+ * Load image from URL and convert to base64 data URL
+ * @param {string} url - Image URL
+ * @returns {Promise<string>} - Base64 data URL
+ */
+const loadImageAsBase64 = (url) => {
+  return new Promise((resolve, reject) => {
+    if (!url) {
+      reject(new Error('No URL provided'));
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        
+        // Convert to JPEG with quality 0.8 to reduce file size
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        resolve(dataUrl);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    img.onerror = () => {
+      reject(new Error(`Failed to load image from ${url}`));
+    };
+    
+    img.src = url;
+  });
+};
+
+/**
  * Generate a professional championship-style score sheet PDF
  * MANUAL TABLE IMPLEMENTATION - NO AUTOTABLE DEPENDENCY
  */
 export const generateScoreSheet = async (entry, allScores, category, ageDivision, competition) => {
   console.log('🏁 Initializing PDF generation (manual table)...');
+  console.log('📋 Entry details:', {
+    entry_number: entry.entry_number,
+    name: entry.competitor_name,
+    is_group: isGroupEntry(entry),
+    group_members_count: entry.group_members?.length || 0,
+    has_photo: !!entry.photo_url
+  });
   
   try {
     const doc = new jsPDF({
@@ -92,8 +155,22 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     // =============================================================================
     console.log('📝 Adding entry information...');
     
+    const isGroup = isGroupEntry(entry);
+    const hasPhoto = !!entry.photo_url;
+    const hasGroupMembers = entry.group_members && Array.isArray(entry.group_members) && entry.group_members.length > 0;
+    
+    // Calculate dynamic height for entry info box
+    let entryInfoHeight = 35; // Base height
+    if (hasPhoto) entryInfoHeight += 65; // Photo space
+    if (isGroup && hasGroupMembers) {
+      entryInfoHeight += 8 + (entry.group_members.length * 6); // Group members list
+    }
+    if (entry.studio_name || entry.teacher_name) {
+      entryInfoHeight += 12; // Studio/Teacher space
+    }
+    
     doc.setFillColor(...lightGray);
-    doc.roundedRect(14, yPos, pageWidth - 28, 35, 3, 3, 'F');
+    doc.roundedRect(14, yPos, pageWidth - 28, entryInfoHeight, 3, 3, 'F');
     yPos += 8;
     
     doc.setTextColor(...darkGray);
@@ -102,13 +179,70 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.text('Entry Information', 18, yPos);
     yPos += 8;
     
-      doc.setFontSize(10);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     
+    // Entry number and name
     doc.text(`Entry Number: ${entry.entry_number}`, 18, yPos);
     doc.text(`Name: ${entry.competitor_name || 'N/A'}`, 100, yPos);
     yPos += 6;
     
+    // Add photo if available (centered)
+    if (hasPhoto) {
+      try {
+        console.log('📸 Loading photo from:', entry.photo_url);
+        const imgData = await loadImageAsBase64(entry.photo_url);
+        
+        // Calculate centered position for photo (60mm wide, 60mm tall)
+        const photoWidth = 60;
+        const photoHeight = 60;
+        const photoX = (pageWidth - photoWidth) / 2;
+        
+        doc.addImage(imgData, 'JPEG', photoX, yPos, photoWidth, photoHeight);
+        console.log('✅ Photo added to PDF');
+        yPos += photoHeight + 5; // Space after photo
+      } catch (error) {
+        console.warn('⚠️ Could not load photo:', error.message);
+        // Continue without photo
+      }
+    }
+    
+    // Group members list (if group entry)
+    if (isGroup && hasGroupMembers) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('GROUP MEMBERS:', 18, yPos);
+      yPos += 7;
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      entry.group_members.forEach((member, index) => {
+        const memberName = member.name || 'Unknown';
+        const memberAge = member.age !== null && member.age !== undefined ? member.age : 'N/A';
+        doc.text(`• ${memberName} (Age ${memberAge})`, 25, yPos);
+        yPos += 6;
+      });
+      
+      yPos += 3; // Extra space after members list
+    }
+    
+    // Studio and Teacher information
+    if (entry.studio_name || entry.teacher_name) {
+      if (entry.studio_name) {
+        doc.text(`Studio: ${entry.studio_name}`, 18, yPos);
+        yPos += 6;
+      }
+      
+      if (entry.teacher_name) {
+        doc.text(`Teacher/Choreographer: ${entry.teacher_name}`, 18, yPos);
+        yPos += 6;
+      }
+      
+      yPos += 3; // Extra space
+    }
+    
+    // Category details
     doc.text(`Category: ${category?.name || 'N/A'}`, 18, yPos);
     doc.text(`Age Division: ${ageDivision?.name || 'N/A'}`, 100, yPos);
     yPos += 6;
@@ -116,16 +250,6 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.text(`Ability Level: ${entry.ability_level || 'N/A'}`, 18, yPos);
     doc.text(`Division Type: ${entry.dance_type || 'N/A'}`, 100, yPos);
     yPos += 6;
-    
-    if (entry.studio_name) {
-      doc.text(`Studio: ${entry.studio_name}`, 18, yPos);
-      yPos += 6;
-    }
-    
-    if (entry.teacher_name) {
-      doc.text(`Teacher: ${entry.teacher_name}`, 18, yPos);
-      yPos += 6;
-    }
     
     // Basic medal program indicator (kept for entry info section)
     if (entry.is_medal_program) {
