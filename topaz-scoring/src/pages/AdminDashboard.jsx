@@ -7,6 +7,7 @@ import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
 import { getCompetitionEntries } from '../supabase/entries';
 import { getAdminFilters, updateAdminFilters, clearAdminFilters, subscribeToAdminFilters } from '../supabase/adminFilters';
+import { resetMedalPointsForCompetition } from '../supabase/medalParticipants';
 
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ function AdminDashboard() {
   });
   
   const [saving, setSaving] = useState(false);
+  const [resettingMedalPoints, setResettingMedalPoints] = useState(false);
 
   // Redirect if no competitionId
   useEffect(() => {
@@ -85,14 +87,14 @@ function AdminDashboard() {
     if (!competitionId) return;
 
     const channel = subscribeToAdminFilters(competitionId, (newFilters) => {
-      console.log('🔔 Admin filters updated by another admin:', newFilters);
+      console.log('🔔 Admin panel received filter sync:', newFilters);
       setAdminFilters({
-        category_filter: newFilters.category_filter || null,
-        division_type_filter: newFilters.division_type_filter || 'all',
-        age_division_filter: newFilters.age_division_filter || null,
-        ability_filter: newFilters.ability_filter || 'all'
+        category_filter: newFilters.category_filter ?? null,
+        division_type_filter: newFilters.division_type_filter ?? 'all',
+        age_division_filter: newFilters.age_division_filter ?? null,
+        ability_filter: newFilters.ability_filter ?? 'all'
       });
-      toast.info('Filters updated by another admin', { autoClose: 2000 });
+      // No toast - admin sees their own success message; other tabs get silent sync
     });
 
     return () => {
@@ -144,34 +146,64 @@ function AdminDashboard() {
 
   // Update a single filter
   const handleFilterChange = async (filterType, value) => {
+    console.log('🎛️ Admin filter change:', { filterType, value });
     const newFilters = {
       ...adminFilters,
       [filterType]: value === 'all' ? null : value
     };
-    
     // Special handling for division_type and ability (they use 'all' string)
     if (filterType === 'division_type_filter' || filterType === 'ability_filter') {
       newFilters[filterType] = value;
     }
 
     setAdminFilters(newFilters);
-
-    // Save to database
     setSaving(true);
+
     try {
       const result = await updateAdminFilters(competitionId, newFilters);
       if (result.success) {
-        toast.success('Filters updated! All judges will see the new filter settings.', { autoClose: 2000 });
+        console.log('🎛️ Filters saved successfully, judges will receive via realtime');
+        toast.success('Filters updated! Judge screens will update within 1–2 seconds.', { autoClose: 2500 });
       } else {
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('Error updating filters:', error);
+      console.error('🎛️ Filter update failed:', error);
       toast.error(`Failed to update filters: ${error.message}`);
-      // Revert on error
-      setAdminFilters(adminFilters);
+      setAdminFilters(adminFilters); // Revert on error
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Reset medal points for this competition (test competitions)
+  const handleResetMedalPoints = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to reset ALL medal points for this competition?\n\n' +
+      'This will set all medal program entries to 0 points and "None" medal level. ' +
+      'Medal award records for this competition will be removed so you can re-award points.\n\n' +
+      'This cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    const doubleConfirmed = window.confirm(
+      'FINAL CONFIRMATION: Reset all medal points to 0 for this competition?'
+    );
+    if (!doubleConfirmed) return;
+
+    setResettingMedalPoints(true);
+    try {
+      const result = await resetMedalPointsForCompetition(competitionId);
+      if (result.success) {
+        toast.success(`Successfully reset medal points for ${result.resetCount || 0} entries. You can now re-award points.`, { autoClose: 5000 });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error resetting medal points:', error);
+      toast.error(`Failed to reset medal points: ${error.message}`);
+    } finally {
+      setResettingMedalPoints(false);
     }
   };
 
@@ -238,24 +270,48 @@ function AdminDashboard() {
     <Layout overlayOpacity="bg-white/90">
       <div className="flex-1 flex flex-col p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => navigate('/results', { state: { competitionId } })}
-            className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px]"
-          >
-            ← Back to Results
-          </button>
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => navigate('/judge-selection', { state: { competitionId } })}
+              className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px] px-3 py-2 rounded-lg hover:bg-gray-100"
+            >
+              ← Back to Competition
+            </button>
 
-          <div className="text-center flex-1 px-4">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              🎛️ Admin Control Panel
-            </h1>
-            <p className="text-teal-600 font-semibold text-sm sm:text-base">
-              {competition.name}
-            </p>
+            <div className="text-center flex-1 px-4">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
+                🎛️ Admin Control Panel
+              </h1>
+              <p className="text-teal-600 font-semibold text-sm sm:text-base">
+                {competition.name}
+              </p>
+            </div>
+
+            <div className="w-36"></div> {/* Spacer for centering */}
           </div>
 
-          <div className="w-24"></div> {/* Spacer for centering */}
+          {/* Navigation Buttons */}
+          <div className="flex flex-wrap gap-2 justify-center">
+            {Array.from({ length: competition?.judges_count || 3 }, (_, i) => i + 1).map((judgeNum) => {
+              const judgeName = competition?.judge_names?.[judgeNum - 1] || `Judge ${judgeNum}`;
+              return (
+                <button
+                  key={judgeNum}
+                  onClick={() => navigate('/scoring', { state: { competitionId, judgeNumber: judgeNum } })}
+                  className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white font-semibold rounded-lg text-sm transition-colors"
+                >
+                  View {judgeName}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => navigate('/results', { state: { competitionId } })}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm transition-colors"
+            >
+              View Results
+            </button>
+          </div>
         </div>
 
         {/* Info Banner */}
@@ -372,6 +428,31 @@ function AdminDashboard() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Medal Points Management */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border-2 border-amber-200">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Medal Points Management</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Reset medal points for this competition. Use this to clear test data. Entries will be set to 0 points and &quot;None&quot; medal level. You can then re-award points.
+          </p>
+          <button
+            onClick={handleResetMedalPoints}
+            disabled={resettingMedalPoints}
+            className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {resettingMedalPoints ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                Resetting...
+              </>
+            ) : (
+              <>
+                <span>⚠️</span>
+                Reset Medal Points for This Competition
+              </>
+            )}
+          </button>
         </div>
 
         {/* Preview Section */}

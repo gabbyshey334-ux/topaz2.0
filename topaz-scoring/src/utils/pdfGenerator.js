@@ -156,12 +156,14 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     console.log('📝 Adding entry information...');
     
     const isGroup = isGroupEntry(entry);
-    const hasPhoto = !!entry.photo_url;
     const hasGroupMembers = entry.group_members && Array.isArray(entry.group_members) && entry.group_members.length > 0;
+    // Skip photo for groups with 5+ members to save space
+    const skipPhoto = isGroup && hasGroupMembers && entry.group_members.length > 5;
+    const hasPhoto = !!entry.photo_url && !skipPhoto;
     
     // Calculate dynamic height for entry info box
     let entryInfoHeight = 35; // Base height
-    if (hasPhoto) entryInfoHeight += 65; // Photo space
+    if (hasPhoto) entryInfoHeight += 45; // Photo space (40x40 + 5 margin)
     if (isGroup && hasGroupMembers) {
       entryInfoHeight += 8 + (entry.group_members.length * 6); // Group members list
     }
@@ -187,19 +189,18 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.text(`Name: ${entry.competitor_name || 'N/A'}`, 100, yPos);
     yPos += 6;
     
-    // Add photo if available (centered)
+    // Add photo if available (centered, compact 40x40 to fit content on one page)
     if (hasPhoto) {
       try {
         console.log('📸 Loading photo from:', entry.photo_url);
         const imgData = await loadImageAsBase64(entry.photo_url);
         
-        // Calculate centered position for photo (60mm wide, 60mm tall)
-        const photoWidth = 60;
-        const photoHeight = 60;
+        const photoWidth = 40;
+        const photoHeight = 40;
         const photoX = (pageWidth - photoWidth) / 2;
         
         doc.addImage(imgData, 'JPEG', photoX, yPos, photoWidth, photoHeight);
-        console.log('✅ Photo added to PDF');
+        console.log('✅ Photo added to PDF (40x40)');
         yPos += photoHeight + 5; // Space after photo
       } catch (error) {
         console.warn('⚠️ Could not load photo:', error.message);
@@ -258,7 +259,7 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text(`🏆 Medal Program`, 20, yPos);
+      doc.text('Medal Program', 20, yPos);
       doc.setTextColor(...darkGray);
       yPos += 6;
     }
@@ -401,17 +402,8 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
         return null; // Already Gold
       };
       
-      // Medal emoji mapping
-      const medalEmoji = {
-        'Bronze': '🥉',
-        'Silver': '🥈',
-        'Gold': '🥇',
-        'None': '⭐'
-      };
-      
       const currentMedalLevel = entry.current_medal_level || 'None';
       const medalPoints = entry.medal_points || 0;
-      const medalIcon = medalEmoji[currentMedalLevel] || '⭐';
       const nextMedal = getNextMedalInfo(medalPoints);
       
       // Medal status box
@@ -437,7 +429,7 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       // Medal level
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Medal Level: ${currentMedalLevel} ${medalIcon}`, 20, yPos);
+      doc.text(`Medal Level: ${currentMedalLevel}`, 20, yPos);
       yPos += 7;
       
       // Total points
@@ -464,7 +456,7 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
         // Already Gold
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...tealColor);
-        doc.text('✨ Gold Medal Achieved! ✨', 20, yPos);
+        doc.text('Gold Medal Achieved!', 20, yPos);
       }
       
       yPos += 10;

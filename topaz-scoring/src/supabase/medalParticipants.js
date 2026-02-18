@@ -172,6 +172,7 @@ export const awardPointToParticipant = async (participantName, competitionId, en
  */
 const updateEntryMedalPointsDirectly = async (entryId, totalPoints, medalLevel) => {
   try {
+    console.log(`      🔄 DB UPDATE: entries SET medal_points=${totalPoints}, current_medal_level='${medalLevel}' WHERE id=${entryId}`);
     const { error } = await supabase
       .from('entries')
       .update({
@@ -181,14 +182,14 @@ const updateEntryMedalPointsDirectly = async (entryId, totalPoints, medalLevel) 
       .eq('id', entryId);
 
     if (error) {
-      console.error(`      ⚠️ Error updating entry ${entryId}: ${error.message}`);
+      console.error(`      ❌ DB ERROR updating entry ${entryId}:`, error.message, error.code);
       return { success: false, error: error.message };
     }
 
-    console.log(`      ✅ Updated entry ${entryId}: ${totalPoints} points (${medalLevel})`);
+    console.log(`      ✅ Entry ${entryId} updated: medal_points=${totalPoints}, current_medal_level=${medalLevel}`);
     return { success: true };
   } catch (error) {
-    console.error(`      ⚠️ Error in updateEntryMedalPointsDirectly: ${error.message}`);
+    console.error(`      ❌ Exception in updateEntryMedalPointsDirectly:`, error.message);
     return { success: false, error: error.message };
   }
 };
@@ -323,6 +324,7 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
       
       // Award point to EACH group member
       let memberIdx = 1;
+      let lastParticipant = null; // Track for group entry update
       for (const member of entry.group_members) {
         if (member.name && member.name.trim()) {
           console.log(`\n      👥 Member ${memberIdx}/${entry.group_members.length}: ${member.name}`);
@@ -334,23 +336,31 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
             entry.id
           );
           
-          if (result.success && !result.alreadyAwarded) {
-            awards.push({
-              name: member.name,
-              points: result.data.total_points,
-              level: result.data.current_medal_level,
-              levelUp: result.levelUp || false
-            });
-            
-            // 2. ALSO update solo entries for this member (NEW)
-            await updateSoloEntryMedalPoints(member.name, competitionId);
-          } else if (result.alreadyAwarded) {
-            console.log(`      ⚠️ Already awarded to ${member.name}`);
+          if (result.success) {
+            lastParticipant = result.data;
+            if (!result.alreadyAwarded) {
+              awards.push({
+                name: member.name,
+                points: result.data.total_points,
+                level: result.data.current_medal_level,
+                levelUp: result.levelUp || false
+              });
+              // 2. ALSO update solo entries for this member
+              await updateSoloEntryMedalPoints(member.name, competitionId);
+            } else {
+              console.log(`      ⚠️ Already awarded to ${member.name} (syncing solo entries)`);
+              await updateSoloEntryMedalPoints(member.name, competitionId);
+            }
           }
           memberIdx++;
         } else {
           console.log(`      ⚠️ Skipping group member with empty name`);
         }
+      }
+      // 3. Update the GROUP ENTRY's medal_points so scorecard shows points
+      if (lastParticipant && entry.is_medal_program) {
+        console.log(`      📝 Updating group entry ${entry.id} with ${lastParticipant.total_points} points (${lastParticipant.current_medal_level})`);
+        await updateEntryMedalPointsDirectly(entry.id, lastParticipant.total_points, lastParticipant.current_medal_level);
       }
     } else if (divisionType.toLowerCase().includes('duo') || divisionType.toLowerCase().includes('trio')) {
       // Duo/Trio - treat similar to groups
@@ -359,6 +369,7 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
       if (entry.group_members && entry.group_members.length > 0) {
         console.log(`      📋 Awarding to ${entry.group_members.length} members`);
         let memberIdx = 1;
+        let lastParticipant = null;
         for (const member of entry.group_members) {
           if (member.name && member.name.trim()) {
             console.log(`\n      👥 Member ${memberIdx}/${entry.group_members.length}: ${member.name}`);
@@ -367,19 +378,28 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
               competitionId,
               entry.id
             );
-            if (result.success && !result.alreadyAwarded) {
-              awards.push({
-                name: member.name,
-                points: result.data.total_points,
-                level: result.data.current_medal_level,
-                levelUp: result.levelUp || false
-              });
-              
-              // ALSO update solo entries for this member
-              await updateSoloEntryMedalPoints(member.name, competitionId);
+            if (result.success) {
+              lastParticipant = result.data;
+              if (!result.alreadyAwarded) {
+                awards.push({
+                  name: member.name,
+                  points: result.data.total_points,
+                  level: result.data.current_medal_level,
+                  levelUp: result.levelUp || false
+                });
+                await updateSoloEntryMedalPoints(member.name, competitionId);
+              } else {
+                console.log(`      ⚠️ Already awarded to ${member.name} (syncing solo entries)`);
+                await updateSoloEntryMedalPoints(member.name, competitionId);
+              }
             }
             memberIdx++;
           }
+        }
+        // Update the DUO/TRIO entry's medal_points so scorecard shows points
+        if (lastParticipant && entry.is_medal_program) {
+          console.log(`      📝 Updating duo/trio entry ${entry.id} with ${lastParticipant.total_points} points (${lastParticipant.current_medal_level})`);
+          await updateEntryMedalPointsDirectly(entry.id, lastParticipant.total_points, lastParticipant.current_medal_level);
         }
       } else {
         // Fallback to competitor_name if no group_members
@@ -389,13 +409,19 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
           competitionId,
           entry.id
         );
-        if (result.success && !result.alreadyAwarded) {
-          awards.push({
-            name: entryName,
-            points: result.data.total_points,
-            level: result.data.current_medal_level,
-            levelUp: result.levelUp || false
-          });
+        if (result.success) {
+          if (!result.alreadyAwarded) {
+            awards.push({
+              name: entryName,
+              points: result.data.total_points,
+              level: result.data.current_medal_level,
+              levelUp: result.levelUp || false
+            });
+          }
+          // Update entry for duo/trio without group_members (fallback)
+          if (entry.is_medal_program) {
+            await updateEntryMedalPointsDirectly(entry.id, result.data.total_points, result.data.current_medal_level);
+          }
         }
       }
     } else {
@@ -407,21 +433,23 @@ export const awardMedalPointsForEntry = async (entry, competitionId) => {
         competitionId,
         entry.id
       );
-      if (result.success && !result.alreadyAwarded) {
-        awards.push({
-          name: entryName,
-          points: result.data.total_points,
-          level: result.data.current_medal_level,
-          levelUp: result.levelUp || false
-        });
-        
-        // ALSO update this specific solo entry's medal_points field
-        // Use participant's total_points (season-long) to keep entries in sync
-        if (entry.is_medal_program) {
+      if (result.success) {
+        if (!result.alreadyAwarded) {
+          awards.push({
+            name: entryName,
+            points: result.data.total_points,
+            level: result.data.current_medal_level,
+            levelUp: result.levelUp || false
+          });
+        }
+        // ALWAYS update solo entry's medal_points (handles alreadyAwarded sync if previous update failed)
+        if (entry.is_medal_program && result.data) {
+          console.log(`      📝 Updating solo entry ${entry.id}: ${result.data.total_points} points (${result.data.current_medal_level})${result.alreadyAwarded ? ' [sync from participant]' : ''}`);
           await updateEntryMedalPointsDirectly(entry.id, result.data.total_points, result.data.current_medal_level);
         }
-      } else if (result.alreadyAwarded) {
-        console.log(`      ⚠️ Already awarded to ${entryName}`);
+        if (result.alreadyAwarded) {
+          console.log(`      ⚠️ Points already awarded to ${entryName} - entry synced with participant total`);
+        }
       }
     }
 
@@ -644,7 +672,7 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
     
     for (const key in groupedEntries) {
       const group = groupedEntries[key];
-      console.log(`\n   🏆 Group ${winnerIdx}: ${group.entries.length} competitors`);
+      console.log(`\n   🏆 Group ${winnerIdx}/${groupCount}: ${group.entries.length} competitors (key: ${key})`);
       
       // Sort by score descending
       group.entries.sort((a, b) => b.averageScore - a.averageScore);
@@ -653,7 +681,8 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
       if (group.entries.length > 0) {
         const winner = group.entries[0];
         const winnerName = winner.competitor_name;
-        console.log(`      🥇 1st Place: "${winnerName}" - Score: ${winner.averageScore.toFixed(2)}`);
+        console.log(`      🥇 1st Place: "${winnerName}" (Entry ID: ${winner.id}) - Score: ${winner.averageScore.toFixed(2)}`);
+        console.log(`         • is_medal_program: ${winner.is_medal_program}`);
         console.log(`         • Category: ${winner.category_id}`);
         console.log(`         • Age Division: ${winner.age_division_id}`);
         console.log(`         • Ability: ${winner.ability_level}`);
@@ -732,6 +761,48 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
     console.error('❌ ========================================');
     console.error('❌ CRITICAL ERROR awarding medal points:', error);
     console.error('❌ ========================================');
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Reset medal points for all entries in a competition (for test competitions)
+ * Sets medal_points=0 and current_medal_level='None' for medal program entries.
+ * Also deletes medal_awards for this competition so re-awarding works.
+ * @param {string} competitionId - UUID of competition
+ * @returns {Object} - Success status with resetCount
+ */
+export const resetMedalPointsForCompetition = async (competitionId) => {
+  try {
+    // 1. Delete medal_awards for this competition (allows re-awarding)
+    const { error: deleteError } = await supabase
+      .from('medal_awards')
+      .delete()
+      .eq('competition_id', competitionId);
+
+    if (deleteError) {
+      console.error('Error deleting medal_awards:', deleteError);
+      throw deleteError;
+    }
+
+    // 2. Reset entries: medal_points=0, current_medal_level='None'
+    const { data: updatedEntries, error: updateError } = await supabase
+      .from('entries')
+      .update({ medal_points: 0, current_medal_level: 'None' })
+      .eq('competition_id', competitionId)
+      .eq('is_medal_program', true)
+      .select('id');
+
+    if (updateError) {
+      console.error('Error resetting entries:', updateError);
+      throw updateError;
+    }
+
+    const resetCount = updatedEntries?.length || 0;
+    console.log(`✅ Reset medal points for ${resetCount} entries in competition ${competitionId}`);
+    return { success: true, resetCount };
+  } catch (error) {
+    console.error('Error resetting medal points:', error);
     return { success: false, error: error.message };
   }
 };

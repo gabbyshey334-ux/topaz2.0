@@ -324,6 +324,9 @@ function ResultsPage() {
           { autoClose: 5000 }
         );
         
+        // Reload entries so medal_points and current_medal_level display immediately
+        await loadAllData();
+        
         // Show summary if available
         if (result.summary && result.summary.length > 0) {
           console.log('Medal Points Summary:', result.summary);

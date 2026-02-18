@@ -315,17 +315,29 @@ function JudgeSelection() {
           {/* Admin Section - Responsive sizing and padding */}
           <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-gray-200 px-4">
             <p className="text-sm sm:text-base text-gray-600 mb-4">Competition Administrator</p>
-            <button
-              onClick={handleAdminView}
-              className="w-full max-w-xs sm:max-w-md mx-auto py-4 sm:py-5 bg-gradient-to-r from-blue-600 to-blue-800 
-                         text-white text-lg sm:text-xl font-bold rounded-xl 
-                         hover:from-blue-700 hover:to-blue-900 active:scale-95 
-                         transition-all shadow-lg flex items-center justify-center gap-3 min-h-[56px]"
-            >
-              <span className="text-xl sm:text-2xl">⚙️</span>
-              <span>Admin View</span>
-            </button>
-            <p className="text-xs sm:text-sm text-gray-500 mt-3">View all scores and manage competition</p>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center max-w-2xl mx-auto">
+              <button
+                onClick={handleAdminView}
+                className="w-full sm:flex-1 py-4 sm:py-5 bg-gradient-to-r from-blue-600 to-blue-800 
+                           text-white text-lg sm:text-xl font-bold rounded-xl 
+                           hover:from-blue-700 hover:to-blue-900 active:scale-95 
+                           transition-all shadow-lg flex items-center justify-center gap-3 min-h-[56px]"
+              >
+                <span className="text-xl sm:text-2xl">📊</span>
+                <span>Admin View</span>
+              </button>
+              <button
+                onClick={() => navigate('/admin', { state: { competitionId } })}
+                className="w-full sm:flex-1 py-4 sm:py-5 bg-gradient-to-r from-indigo-600 to-indigo-800 
+                           text-white text-lg sm:text-xl font-bold rounded-xl 
+                           hover:from-indigo-700 hover:to-indigo-900 active:scale-95 
+                           transition-all shadow-lg flex items-center justify-center gap-3 min-h-[56px]"
+              >
+                <span className="text-xl sm:text-2xl">🎛️</span>
+                <span>Admin Control Panel</span>
+              </button>
+            </div>
+            <p className="text-xs sm:text-sm text-gray-500 mt-3">View scores & results, or control judge filters</p>
           </div>
 
           {/* Guidelines Section - Optimized for small screens */}
@@ -334,7 +346,10 @@ function JudgeSelection() {
               <span className="inline-block mr-1">👉</span> <strong>Judges:</strong> Select your judge number to begin scoring.
             </p>
             <p className="text-teal-800 text-sm sm:text-base mt-2 text-left">
-              <span className="inline-block mr-1">👉</span> <strong>Admin:</strong> Use Admin View to see rankings and results.
+              <span className="inline-block mr-1">👉</span> <strong>Admin View:</strong> See rankings and results.
+            </p>
+            <p className="text-teal-800 text-sm sm:text-base mt-2 text-left">
+              <span className="inline-block mr-1">👉</span> <strong>Admin Control Panel:</strong> Control what judges see (filters apply to all judge screens).
             </p>
           </div>
 

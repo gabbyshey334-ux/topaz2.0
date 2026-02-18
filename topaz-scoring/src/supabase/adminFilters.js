@@ -48,16 +48,15 @@ export const getAdminFilters = async (competitionId) => {
  */
 export const updateAdminFilters = async (competitionId, filters) => {
   try {
-    console.log('📝 Updating admin filters:', { competitionId, filters });
-    
     const filterData = {
       competition_id: competitionId,
       category_filter: filters.category_filter || null,
-      division_type_filter: filters.division_type_filter || 'all',
+      division_type_filter: filters.division_type_filter ?? 'all',
       age_division_filter: filters.age_division_filter || null,
-      ability_filter: filters.ability_filter || 'all',
+      ability_filter: filters.ability_filter ?? 'all',
       updated_at: new Date().toISOString()
     };
+    console.log('📝 Updating admin filters:', { competitionId, filterData });
 
     const { data, error } = await supabase
       .from('admin_filters')
@@ -68,9 +67,12 @@ export const updateAdminFilters = async (competitionId, filters) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Admin filter update error:', error.code, error.message);
+      throw error;
+    }
 
-    console.log('✅ Admin filters updated:', data);
+    console.log('✅ Admin filters saved to DB:', data);
     return { success: true, data };
   } catch (error) {
     console.error('❌ Error updating admin filters:', error);
@@ -122,10 +124,11 @@ export const clearAdminFilters = async (competitionId) => {
  * @returns {Object} - Channel subscription
  */
 export const subscribeToAdminFilters = (competitionId, callback) => {
-  console.log('🔔 Subscribing to admin filter changes for competition:', competitionId);
-  
+  const channelName = `admin_filters_${competitionId}`;
+  console.log('🔔 Subscribing to admin filter changes:', { competitionId, channelName });
+
   const channel = supabase
-    .channel(`admin_filters_${competitionId}`)
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
@@ -135,11 +138,26 @@ export const subscribeToAdminFilters = (competitionId, callback) => {
         filter: `competition_id=eq.${competitionId}`
       },
       (payload) => {
-        console.log('🔔 Admin filter change detected:', payload);
-        callback(payload.new || payload.old);
+        console.log('🔔 Realtime: Admin filter change detected', {
+          eventType: payload.eventType,
+          hasNew: !!payload.new,
+          hasOld: !!payload.old,
+          newData: payload.new
+        });
+        const filterData = payload.new || payload.old;
+        if (filterData) {
+          callback(filterData);
+        } else {
+          console.warn('🔔 Realtime: No filter data in payload, ignoring');
+        }
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log('🔔 Realtime subscription status:', status);
+      if (status === 'CHANNEL_ERROR') {
+        console.error('🔔 Realtime: Subscription error - ensure admin_filters table is in supabase_realtime publication');
+      }
+    });
 
   return channel;
 };

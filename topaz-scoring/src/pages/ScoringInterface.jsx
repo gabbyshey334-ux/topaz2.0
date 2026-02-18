@@ -97,13 +97,15 @@ function ScoringInterface() {
 
     // Subscribe to real-time filter changes
     const channel = subscribeToAdminFilters(competitionId, (newFilters) => {
-      console.log('🔔 Admin filters updated:', newFilters);
-      setAdminFilters({
-        category_filter: newFilters.category_filter || null,
-        division_type_filter: newFilters.division_type_filter || 'all',
-        age_division_filter: newFilters.age_division_filter || null,
-        ability_filter: newFilters.ability_filter || 'all'
-      });
+      console.log('🔔 Judge screen received filter update:', newFilters);
+      const updated = {
+        category_filter: newFilters.category_filter ?? null,
+        division_type_filter: newFilters.division_type_filter ?? 'all',
+        age_division_filter: newFilters.age_division_filter ?? null,
+        ability_filter: newFilters.ability_filter ?? 'all'
+      };
+      setAdminFilters(updated);
+      console.log('🔔 Judge filters applied, filtered count will update');
       toast.info('Filters updated by admin', { autoClose: 2000 });
     });
 
