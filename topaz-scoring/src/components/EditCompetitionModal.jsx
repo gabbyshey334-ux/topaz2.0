@@ -39,9 +39,7 @@ export default function EditCompetitionModal({
     { name: 'Lyrical/Contemporary', color: 'teal', type: 'dance' },
     { name: 'Vocal', color: 'yellow', type: 'dance' },
     { name: 'Acting', color: 'orange', type: 'dance' },
-    { name: 'Hip Hop', color: 'red', type: 'dance' },
-    { name: 'Ballroom', color: 'indigo', type: 'dance' },
-    { name: 'Line Dancing', color: 'cyan', type: 'dance' }
+    { name: 'Hip Hop', color: 'red', type: 'dance' }
   ];
 
   const VARIETY_CATEGORIES = [
@@ -49,7 +47,9 @@ export default function EditCompetitionModal({
     { name: 'Variety B - Dance with Prop', color: 'blue', type: 'variety' },
     { name: 'Variety C - Dance with Acrobatics', color: 'pink', type: 'variety' },
     { name: 'Variety D - Dance with Acrobatics & Prop', color: 'teal', type: 'variety' },
-    { name: 'Variety E - Hip Hop with Floor Work & Acrobatics', color: 'red', type: 'variety' }
+    { name: 'Variety E - Hip Hop with Floor Work & Acrobatics', color: 'red', type: 'variety' },
+    { name: 'Variety F - Ballroom', color: 'indigo', type: 'variety' },
+    { name: 'Variety G - Line Dancing', color: 'cyan', type: 'variety' }
   ];
 
   const SPECIAL_CATEGORIES = [

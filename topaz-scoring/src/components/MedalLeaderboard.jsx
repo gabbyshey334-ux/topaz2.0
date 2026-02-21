@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { getSeasonLeaderboard } from '../supabase/medalParticipants';
+import { resetAllMedalPointsGlobally } from '../supabase/dataManagement';
 import LoadingSpinner from './LoadingSpinner';
 
 function MedalLeaderboard() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     loadLeaderboard();
@@ -21,6 +24,36 @@ function MedalLeaderboard() {
       console.error('Error loading leaderboard:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetLeaderboard = async () => {
+    const confirm1 = window.confirm(
+      'This will reset ALL medal points for ALL participants to 0. ' +
+      'The leaderboard will be cleared. ' +
+      'This cannot be undone. Continue?'
+    );
+    if (!confirm1) return;
+
+    const confirm2 = window.confirm(
+      'FINAL CONFIRMATION: Clear the entire medal leaderboard?'
+    );
+    if (!confirm2) return;
+
+    setResetting(true);
+    try {
+      const result = await resetAllMedalPointsGlobally();
+      if (result.success) {
+        toast.success('Medal leaderboard has been cleared. All medal points reset to 0.');
+        await loadLeaderboard();
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error resetting leaderboard:', error);
+      toast.error(`Failed to reset leaderboard: ${error.message}`);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -67,12 +100,34 @@ function MedalLeaderboard() {
 
   if (leaderboard.length === 0) {
     return (
-      <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-        <div className="text-6xl mb-4">🏅</div>
-        <h3 className="text-2xl font-bold text-gray-800 mb-2">No Medal Data Yet</h3>
-        <p className="text-gray-600">
-          Medal points will appear here once competitions are scored and 1st place winners are awarded.
-        </p>
+      <div className="bg-white rounded-2xl shadow-lg p-8">
+        <div className="text-center mb-6">
+          <div className="text-6xl mb-4">🏅</div>
+          <h3 className="text-2xl font-bold text-gray-800 mb-2">No Medal Data Yet</h3>
+          <p className="text-gray-600 mb-6">
+            Medal points will appear here once competitions are scored and 1st place winners are awarded.
+          </p>
+          <div className="admin-actions">
+            <button
+              type="button"
+              onClick={handleResetLeaderboard}
+              disabled={resetting}
+              className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 mx-auto"
+            >
+              {resetting ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                <>
+                  <span>🔄</span>
+                  Reset Medal Leaderboard
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -89,6 +144,28 @@ function MedalLeaderboard() {
         <p className="text-center text-white/90 font-semibold">
           Top {leaderboard.length} Performers
         </p>
+      </div>
+
+      {/* Admin actions */}
+      <div className="admin-actions px-6 py-4 bg-amber-50 border-b border-amber-200 flex justify-center">
+        <button
+          type="button"
+          onClick={handleResetLeaderboard}
+          disabled={resetting}
+          className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-md"
+        >
+          {resetting ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Resetting...
+            </>
+          ) : (
+            <>
+              <span>🔄</span>
+              Reset Medal Leaderboard
+            </>
+          )}
+        </button>
       </div>
 
       {/* Leaderboard List */}

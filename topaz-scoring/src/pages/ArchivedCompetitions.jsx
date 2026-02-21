@@ -130,6 +130,9 @@ function ArchivedCompetitions() {
   };
 
   const handleViewResults = (comp) => {
+    try {
+      sessionStorage.setItem('topaz_active_competition_id', comp.id);
+    } catch (e) { /* ignore */ }
     navigate('/results', {
       state: {
         competitionId: comp.id,
@@ -173,6 +176,7 @@ function ArchivedCompetitions() {
 
         {/* Back Button */}
         <button
+          type="button"
           onClick={() => navigate('/')}
           className="mb-6 px-4 py-2 text-teal-600 hover:text-teal-700 font-semibold text-sm flex items-center gap-2"
         >

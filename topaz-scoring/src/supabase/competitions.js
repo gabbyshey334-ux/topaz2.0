@@ -11,32 +11,33 @@ export const createCompetition = async (competitionData) => {
     
     // TEMPORARY DEFENSIVE WORKAROUND
     // If the database column 'judge_names' doesn't exist yet, we try to save without it
+    const insertData = {
+      name: competitionData.name,
+      date: competitionData.date,
+      venue: competitionData.venue || null,
+      judges_count: competitionData.judges_count || 3,
+      judge_names: competitionData.judge_names || [],
+      status: competitionData.status || 'active'
+    };
+    if (competitionData.is_test !== undefined) {
+      insertData.is_test = competitionData.is_test;
+    }
     const { data, error } = await supabase
       .from('competitions')
-      .insert([{
-        name: competitionData.name,
-        date: competitionData.date,
-        venue: competitionData.venue || null,
-        judges_count: competitionData.judges_count || 3,
-        judge_names: competitionData.judge_names || [], // Try saving with names
-        status: competitionData.status || 'active'
-      }])
+      .insert([insertData])
       .select()
       .single();
 
     if (error) {
-      // If error is about missing column, retry without judge_names
-      if (error.message?.includes('judge_names')) {
-        console.warn('⚠️ judge_names column missing in DB, retrying without it...');
+      // If error about missing column, retry without optional columns
+      if (error.message?.includes('judge_names') || error.message?.includes('is_test')) {
+        console.warn('⚠️ Optional column missing, retrying without it...');
+        const fallback = { ...insertData };
+        delete fallback.judge_names;
+        delete fallback.is_test;
         const { data: retryData, error: retryError } = await supabase
           .from('competitions')
-          .insert([{
-            name: competitionData.name,
-            date: competitionData.date,
-            venue: competitionData.venue || null,
-            judges_count: competitionData.judges_count || 3,
-            status: competitionData.status || 'active'
-          }])
+          .insert([fallback])
           .select()
           .single();
           

@@ -44,7 +44,11 @@ const isSpecialCategory = (category) => {
 function ResultsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { competitionId } = location.state || {};
+  const stateId = location.state?.competitionId;
+  const savedId = (() => {
+    try { return sessionStorage.getItem('topaz_active_competition_id'); } catch (e) { return null; }
+  })();
+  const competitionId = stateId || savedId || null;
 
   // Special Categories
   const specialCategoryNames = ['Production', 'Student Choreography', 'Teacher/Student'];
@@ -71,9 +75,11 @@ function ResultsPage() {
   const [medalLeaderboardData, setMedalLeaderboardData] = useState(null);
   const [exporting, setExporting] = useState(false);
 
-  // Redirect if no competitionId
+  // Redirect if no competitionId; persist for recovery on refresh
   useEffect(() => {
-    if (!competitionId) {
+    if (competitionId) {
+      try { sessionStorage.setItem('topaz_active_competition_id', competitionId); } catch (e) { /* ignore */ }
+    } else {
       toast.error('No competition selected');
       navigate('/');
     }
@@ -541,6 +547,7 @@ function ResultsPage() {
           <div className="text-center">
             <p className="text-xl text-gray-600 mb-4">Competition not found</p>
             <button
+              type="button"
               onClick={() => navigate('/')}
               className="px-6 py-3 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600"
             >
@@ -595,9 +602,24 @@ function ResultsPage() {
             </div>
           </div>
 
-          {/* ACTION BUTTONS */}
+          {/* NAVIGATION & ACTION BUTTONS */}
           <div className="flex flex-wrap items-center justify-center gap-4 mb-12">
             <button
+              type="button"
+              onClick={() => navigate('/judge-selection', { state: { competitionId } })}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white text-base font-semibold rounded-xl shadow transition-all"
+            >
+              ← Back to Judge Selection
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gray-400 hover:bg-gray-500 text-white text-base font-semibold rounded-xl shadow transition-all"
+            >
+              Home
+            </button>
+            <button
+              type="button"
               onClick={() => navigate('/admin', { state: { competitionId } })}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-orange-600 hover:to-orange-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
@@ -606,6 +628,7 @@ function ResultsPage() {
             </button>
 
             <button
+              type="button"
               onClick={() => setShowEditModal(true)}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-purple-600 hover:to-purple-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
@@ -614,6 +637,7 @@ function ResultsPage() {
             </button>
 
             <button
+              type="button"
               onClick={handlePrintAll}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-blue-600 hover:to-blue-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
@@ -622,6 +646,7 @@ function ResultsPage() {
             </button>
             
             <button
+              type="button"
               onClick={handleExport}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-green-600 hover:to-green-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
@@ -677,6 +702,7 @@ function ResultsPage() {
             </button>
             
             <button
+              type="button"
               onClick={() => navigate('/setup')}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-cyan-600 hover:to-teal-600 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
@@ -801,6 +827,7 @@ function ResultsPage() {
             <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
               <span className="text-sm font-semibold text-gray-600">PROGRAMS:</span>
               <button
+                type="button"
                 onClick={() => {
                   setSelectedFilter(selectedFilter === 'medal' ? 'overall' : 'medal');
                   // Clear other filters when entering medal view for clarity
@@ -821,6 +848,7 @@ function ResultsPage() {
               </button>
               
               <button
+                type="button"
                 onClick={() => {
                   setSelectedFilter(selectedFilter === 'leaderboard' ? 'overall' : 'leaderboard');
                   // Clear other filters

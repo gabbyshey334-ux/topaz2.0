@@ -21,20 +21,19 @@ CREATE INDEX IF NOT EXISTS idx_admin_filters_competition_id ON admin_filters(com
 -- Enable Row Level Security
 ALTER TABLE admin_filters ENABLE ROW LEVEL SECURITY;
 
--- Policy: Allow authenticated users to read admin filters
-CREATE POLICY "Allow authenticated users to read admin filters"
-  ON admin_filters
-  FOR SELECT
-  TO authenticated
-  USING (true);
+-- Policies: Allow anon and authenticated (app uses anon key by default)
+-- DROP existing if re-running
+DROP POLICY IF EXISTS "Allow authenticated users to read admin filters" ON admin_filters;
+DROP POLICY IF EXISTS "Allow authenticated users to manage admin filters" ON admin_filters;
+DROP POLICY IF EXISTS "Allow read admin filters" ON admin_filters;
+DROP POLICY IF EXISTS "Allow insert admin filters" ON admin_filters;
+DROP POLICY IF EXISTS "Allow update admin filters" ON admin_filters;
+DROP POLICY IF EXISTS "Allow delete admin filters" ON admin_filters;
 
--- Policy: Allow authenticated users to insert/update admin filters
-CREATE POLICY "Allow authenticated users to manage admin filters"
-  ON admin_filters
-  FOR ALL
-  TO authenticated
-  USING (true)
-  WITH CHECK (true);
+CREATE POLICY "Allow read admin filters" ON admin_filters FOR SELECT USING (true);
+CREATE POLICY "Allow insert admin filters" ON admin_filters FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update admin filters" ON admin_filters FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow delete admin filters" ON admin_filters FOR DELETE USING (true);
 
 -- ============================================================================
 -- VERIFICATION

@@ -6,6 +6,7 @@ import ScoringInterface from './pages/ScoringInterface';
 import ResultsPage from './pages/ResultsPage';
 import ArchivedCompetitions from './pages/ArchivedCompetitions';
 import AdminDashboard from './pages/AdminDashboard';
+import DataManagement from './pages/DataManagement';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/scoring" element={<ScoringInterface />} />
         <Route path="/results" element={<ResultsPage />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/data-management" element={<DataManagement />} />
         <Route path="/archived-competitions" element={<ArchivedCompetitions />} />
       </Routes>
     </BrowserRouter>

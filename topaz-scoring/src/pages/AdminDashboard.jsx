@@ -12,7 +12,18 @@ import { resetMedalPointsForCompetition } from '../supabase/medalParticipants';
 function AdminDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { competitionId } = location.state || {};
+  const stateId = location.state?.competitionId;
+  const savedId = (() => {
+    try { return sessionStorage.getItem('topaz_active_competition_id'); } catch (e) { return null; }
+  })();
+  const competitionId = stateId || savedId || null;
+
+  // Persist for recovery on refresh
+  useEffect(() => {
+    if (competitionId) {
+      try { sessionStorage.setItem('topaz_active_competition_id', competitionId); } catch (e) { /* ignore */ }
+    }
+  }, [competitionId]);
 
   // State
   const [competition, setCompetition] = useState(null);
@@ -254,8 +265,9 @@ function AdminDashboard() {
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-gray-600 text-lg mb-4">Competition not found</p>
-            <button
-              onClick={() => navigate('/')}
+          <button
+            type="button"
+            onClick={() => navigate('/')}
               className="px-6 py-3 bg-teal-500 text-white rounded-lg hover:bg-teal-600"
             >
               Back to Home
@@ -272,8 +284,9 @@ function AdminDashboard() {
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => navigate('/judge-selection', { state: { competitionId } })}
+          <button
+            type="button"
+            onClick={() => navigate('/judge-selection', { state: { competitionId } })}
               className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px] px-3 py-2 rounded-lg hover:bg-gray-100"
             >
               ← Back to Competition
@@ -298,6 +311,7 @@ function AdminDashboard() {
               return (
                 <button
                   key={judgeNum}
+                  type="button"
                   onClick={() => navigate('/scoring', { state: { competitionId, judgeNumber: judgeNum } })}
                   className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white font-semibold rounded-lg text-sm transition-colors"
                 >
@@ -306,6 +320,7 @@ function AdminDashboard() {
               );
             })}
             <button
+              type="button"
               onClick={() => navigate('/results', { state: { competitionId } })}
               className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm transition-colors"
             >
@@ -437,6 +452,7 @@ function AdminDashboard() {
             Reset medal points for this competition. Use this to clear test data. Entries will be set to 0 points and &quot;None&quot; medal level. You can then re-award points.
           </p>
           <button
+            type="button"
             onClick={handleResetMedalPoints}
             disabled={resettingMedalPoints}
             className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"

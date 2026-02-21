@@ -9,19 +9,38 @@ import AbilityBadge from '../components/AbilityBadge';
 import { createScore, getEntryScores, updateScore } from '../supabase/scores';
 import { validateScore, calculateTotal } from '../utils/calculations';
 import { getAdminFilters, subscribeToAdminFilters } from '../supabase/adminFilters';
+import { getCompetition } from '../supabase/competitions';
+import { getCompetitionCategories } from '../supabase/categories';
+import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
+import { getCompetitionEntries } from '../supabase/entries';
 
 function ScoringInterface() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const {
-    competitionId,
-    judgeNumber,
-    competition,
-    categories = [],
-    ageDivisions = [],
-    entries: allEntries = []
-  } = location.state || {};
+  const stateData = location.state || {};
+  const stateId = stateData.competitionId;
+  const stateJudge = stateData.judgeNumber;
+  const savedId = (() => {
+    try { return sessionStorage.getItem('topaz_active_competition_id'); } catch (e) { return null; }
+  })();
+  const savedJudge = (() => {
+    try { const n = sessionStorage.getItem('topaz_active_judge_number'); return n ? parseInt(n, 10) : null; } catch (e) { return null; }
+  })();
+
+  const competitionId = stateId || savedId || null;
+  const judgeNumber = stateJudge ?? savedJudge ?? null;
+
+  // Data from state (when navigating from Judge Selection) or loaded from API (after refresh)
+  const [loadedCompetition, setLoadedCompetition] = useState(null);
+  const [loadedCategories, setLoadedCategories] = useState([]);
+  const [loadedAgeDivisions, setLoadedAgeDivisions] = useState([]);
+  const [loadedEntries, setLoadedEntries] = useState([]);
+
+  const competition = stateData.competition || loadedCompetition;
+  const categories = stateData.categories?.length ? stateData.categories : loadedCategories;
+  const ageDivisions = stateData.ageDivisions?.length ? stateData.ageDivisions : loadedAgeDivisions;
+  const allEntries = stateData.entries?.length ? stateData.entries : loadedEntries;
 
   console.log('🎯 ScoringInterface render - State:', { 
     competitionId, 
@@ -72,6 +91,31 @@ function ScoringInterface() {
   const [showEntryList, setShowEntryList] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState(false);
 
+  // Load competition data from API when state is empty (e.g. after refresh)
+  useEffect(() => {
+    if (!competitionId || stateData.competition || loadedCompetition) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [compRes, catsRes, divsRes, entriesRes] = await Promise.all([
+          getCompetition(competitionId),
+          getCompetitionCategories(competitionId),
+          getCompetitionAgeDivisions(competitionId),
+          getCompetitionEntries(competitionId)
+        ]);
+        if (cancelled) return;
+        if (compRes.success && compRes.data) setLoadedCompetition(compRes.data);
+        if (catsRes.success && catsRes.data) setLoadedCategories(catsRes.data);
+        if (divsRes.success && divsRes.data) setLoadedAgeDivisions(divsRes.data);
+        if (entriesRes.success && entriesRes.data) setLoadedEntries(entriesRes.data);
+      } catch (e) {
+        if (!cancelled) console.error('Failed to load competition data:', e);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [competitionId, stateData.competition, loadedCompetition]);
+
   // Load admin filters and subscribe to changes
   useEffect(() => {
     if (!competitionId) return;
@@ -114,30 +158,20 @@ function ScoringInterface() {
     };
   }, [competitionId]);
 
-  // Redirect if no data
+  // Redirect if no competitionId/judgeNumber; otherwise set entries when data is ready
   useEffect(() => {
-    console.log('🔍 ScoringInterface mounted - Checking required data...');
-    console.log('📍 Full location state:', location.state);
-    console.log('📍 competitionId:', competitionId);
-    console.log('📍 judgeNumber:', judgeNumber);
-    console.log('📍 competition:', competition);
-    console.log('📍 allEntries length:', allEntries?.length);
-    
     if (!competitionId || !judgeNumber) {
-      console.error('❌ Missing required data:', { competitionId, judgeNumber });
-      toast.error('Missing competition data. Please start from Competition Setup.');
+      toast.error('Missing competition data. Please start from the home page.');
       setTimeout(() => {
-        console.log('🔄 Redirecting to judge-selection...');
-        navigate('/judge-selection', { state: { competitionId } });
+        navigate('/judge-selection', { state: { competitionId: competitionId || undefined } });
       }, 1500);
-      return; // Don't set entries if redirecting
-    } else {
-      console.log('✅ Required data present, setting entries...');
-      console.log('📊 Setting', allEntries.length, 'entries');
+      return;
+    }
+    if (allEntries && allEntries.length >= 0) {
       setEntries(allEntries);
       setLoading(false);
     }
-  }, [competitionId, judgeNumber, allEntries, navigate, location.state]);
+  }, [competitionId, judgeNumber, allEntries, navigate]);
 
   // Debug: Log all unique division types in entries
   useEffect(() => {
@@ -503,14 +537,22 @@ function ScoringInterface() {
     );
   }
 
-  // Missing required data - show error and redirect
+  // Loading competition data (e.g. after refresh)
+  if (competitionId && judgeNumber && !competition && !stateData.competition) {
+    return (
+      <Layout overlayOpacity="bg-white/80">
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-teal-500 border-t-transparent mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">Loading competition data...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Missing required data - show error
   if (!competitionId || !judgeNumber || !competition) {
-    console.error('🚨 Rendering error screen - Missing data:', {
-      hasCompetitionId: !!competitionId,
-      hasJudgeNumber: !!judgeNumber,
-      hasCompetition: !!competition
-    });
-    
     return (
       <Layout overlayOpacity="bg-white/80">
         <div className="flex-1 flex items-center justify-center p-4">
@@ -518,39 +560,31 @@ function ScoringInterface() {
             <div className="text-6xl mb-4">⚠️</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Missing Competition Data</h2>
             <p className="text-gray-600 mb-4">
-              {!competitionId && "• No competition ID provided. "}
-              {!judgeNumber && "• No judge number selected. "}
-              {!competition && "• Competition information not loaded. "}
+              Competition information could not be loaded. This can happen if you opened this page directly or refreshed.
             </p>
             <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 mb-6">
-              <p className="text-sm text-yellow-800 font-semibold mb-2">
-                💡 How to fix this:
-              </p>
+              <p className="text-sm text-yellow-800 font-semibold mb-2">How to fix:</p>
               <p className="text-sm text-yellow-700">
-                1. Start from the Welcome page<br/>
-                2. Create a new competition<br/>
-                3. Select a judge to begin scoring
+                1. Go to the home page<br/>
+                2. Select a competition to continue<br/>
+                3. Choose a judge to begin scoring
               </p>
             </div>
             <div className="flex flex-col gap-3">
               <button
-                onClick={() => {
-                  console.log('🏠 Navigating to home...');
-                  navigate('/');
-                }}
+                type="button"
+                onClick={() => navigate('/')}
                 className="px-6 py-3 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600 transition-colors"
               >
-                🏠 Back to Home
+                Back to Home
               </button>
               {competitionId && (
                 <button
-                  onClick={() => {
-                    console.log('🔙 Navigating back to judge selection with ID:', competitionId);
-                    navigate('/judge-selection', { state: { competitionId } });
-                  }}
+                  type="button"
+                  onClick={() => navigate('/judge-selection', { state: { competitionId } })}
                   className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
                 >
-                  ← Back to Judge Selection
+                  Select Judge
                 </button>
               )}
             </div>
@@ -587,6 +621,7 @@ function ScoringInterface() {
         {/* HEADER SECTION */}
         <div className="flex items-center justify-between mb-6">
           <button
+            type="button"
             onClick={() => navigate('/judge-selection', { state: { competitionId } })}
             className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px]"
           >

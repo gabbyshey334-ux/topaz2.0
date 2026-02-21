@@ -79,6 +79,9 @@ function WelcomePage() {
   };
 
   const handleContinueCompetition = (comp) => {
+    try {
+      sessionStorage.setItem('topaz_active_competition_id', comp.id);
+    } catch (e) { /* ignore */ }
     navigate('/judge-selection', {
       state: {
         competitionId: comp.id,
@@ -225,14 +228,22 @@ function WelcomePage() {
                 )}
               </div>
 
-              {/* View Archived Link */}
-              <div className="mb-4 pb-4 border-b border-gray-200">
+              {/* View Archived & Data Management Links */}
+              <div className="mb-4 pb-4 border-b border-gray-200 flex flex-wrap gap-2">
                 <button
+                  type="button"
                   onClick={() => navigate('/archived-competitions')}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-semibold transition-all flex items-center gap-2"
                 >
                   <Archive size={16} />
-                  View Archived Competitions
+                  View Archived
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/data-management')}
+                  className="px-4 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 text-sm font-semibold transition-all flex items-center gap-2"
+                >
+                  ⚠️ Data Management
                 </button>
               </div>
 
@@ -280,6 +291,7 @@ function WelcomePage() {
                         
                         <div className="flex items-center gap-2">
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleArchiveCompetition(comp);
@@ -296,6 +308,7 @@ function WelcomePage() {
                           </button>
                           
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleContinueCompetition(comp);
@@ -330,6 +343,7 @@ function WelcomePage() {
         {/* Action Buttons - Touch friendly and responsive width */}
         <div className="flex flex-col gap-4 w-full max-w-[280px] sm:max-w-md px-4">
           <button
+            type="button"
             onClick={() => navigate('/setup')}
             className="w-full py-4 sm:py-5 px-6 sm:px-8 bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-lg sm:text-xl font-bold rounded-xl 
                        hover:from-cyan-600 hover:to-teal-600 active:scale-95 transition-all shadow-lg 
@@ -339,6 +353,7 @@ function WelcomePage() {
           </button>
           
           <button
+            type="button"
             onClick={() => setShowInstructions(true)}
             className="w-full py-4 sm:py-5 px-6 sm:px-8 bg-white/80 backdrop-blur-sm text-teal-600 text-lg sm:text-xl font-semibold rounded-xl 
                        border-2 border-teal-500 hover:bg-teal-50 active:scale-95 transition-all shadow-md min-h-[56px]"

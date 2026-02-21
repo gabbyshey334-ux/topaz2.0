@@ -33,6 +33,7 @@ function CompetitionSetup() {
   const [venue, setVenue] = useState('');
   const [judgeCount, setJudgeCount] = useState(3);
   const [judgeNames, setJudgeNames] = useState(['', '', '']);
+  const [isTestCompetition, setIsTestCompetition] = useState(false);
 
   const handleJudgeCountChange = (count) => {
     setJudgeCount(count);
@@ -97,9 +98,7 @@ function CompetitionSetup() {
     { name: 'Lyrical/Contemporary', color: 'teal', type: 'dance' },
     { name: 'Vocal', color: 'yellow', type: 'dance' },
     { name: 'Acting', color: 'orange', type: 'dance' },
-    { name: 'Hip Hop', color: 'red', type: 'dance' },
-    { name: 'Ballroom', color: 'indigo', type: 'dance' },
-    { name: 'Line Dancing', color: 'cyan', type: 'dance' }
+    { name: 'Hip Hop', color: 'red', type: 'dance' }
   ];
 
   // VARIETY CATEGORIES - Standalone, not tied to dance categories
@@ -108,7 +107,9 @@ function CompetitionSetup() {
     { name: 'Variety B - Dance with Prop', color: 'blue', type: 'variety' },
     { name: 'Variety C - Dance with Acrobatics', color: 'pink', type: 'variety' },
     { name: 'Variety D - Dance with Acrobatics & Prop', color: 'teal', type: 'variety' },
-    { name: 'Variety E - Hip Hop with Floor Work & Acrobatics', color: 'red', type: 'variety' }
+    { name: 'Variety E - Hip Hop with Floor Work & Acrobatics', color: 'red', type: 'variety' },
+    { name: 'Variety F - Ballroom', color: 'indigo', type: 'variety', description: 'For couples or groups of couples only. Lifts, gymnastics, props, and all forms of Ballroom allowed.' },
+    { name: 'Variety G - Line Dancing', color: 'cyan', type: 'variety', description: 'Must include at least 3 contestants in routine. Props and gymnastics allowed.' }
   ];
 
   // SPECIAL CATEGORIES
@@ -164,14 +165,14 @@ function CompetitionSetup() {
     'Vocal': 'bg-yellow-100 text-yellow-800 border-yellow-300',
     'Acting': 'bg-orange-100 text-orange-800 border-orange-300',
     'Hip Hop': 'bg-red-100 text-red-800 border-red-300',
-    'Ballroom': 'bg-indigo-100 text-indigo-800 border-indigo-300',
-    'Line Dancing': 'bg-cyan-100 text-cyan-800 border-cyan-300',
     // Variety categories
     'Variety A - Song & Dance, Character, or Combination': 'bg-purple-100 text-purple-800 border-purple-300',
     'Variety B - Dance with Prop': 'bg-blue-100 text-blue-800 border-blue-300',
     'Variety C - Dance with Acrobatics': 'bg-pink-100 text-pink-800 border-pink-300',
     'Variety D - Dance with Acrobatics & Prop': 'bg-teal-100 text-teal-800 border-teal-300',
     'Variety E - Hip Hop with Floor Work & Acrobatics': 'bg-red-100 text-red-800 border-red-300',
+    'Variety F - Ballroom': 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    'Variety G - Line Dancing': 'bg-cyan-100 text-cyan-800 border-cyan-300',
     // Special categories - gray to indicate different status
     'Production': 'bg-gray-100 text-gray-800 border-gray-400',
     'Student Choreography': 'bg-gray-100 text-gray-800 border-gray-400',
@@ -578,6 +579,29 @@ function CompetitionSetup() {
       return;
     }
 
+    // Variety category-specific validation
+    const categoryNameForValidation = currentEntry.categoryId;
+    if (categoryNameForValidation && categoryNameForValidation.includes('Variety F - Ballroom')) {
+      if (currentEntry.type === 'solo') {
+        toast.error('Variety F - Ballroom requires couples or groups of couples (2+ members). Solo entries are not allowed.');
+        return;
+      }
+      if (currentEntry.type === 'group' && currentEntry.groupMembers.length < 2) {
+        toast.error('Variety F - Ballroom requires at least 2 members (couples or groups of couples).');
+        return;
+      }
+    }
+    if (categoryNameForValidation && categoryNameForValidation.includes('Variety G - Line Dancing')) {
+      if (currentEntry.type === 'solo') {
+        toast.error('Variety G - Line Dancing requires at least 3 contestants. Solo entries are not allowed.');
+        return;
+      }
+      if (currentEntry.type === 'group' && currentEntry.groupMembers.length < 3) {
+        toast.error('Variety G - Line Dancing requires at least 3 contestants in the routine.');
+        return;
+      }
+    }
+
     // Warn if age doesn't match any division
     const age = parseInt(currentEntry.age);
     const hasMatchingDivision = FIXED_AGE_DIVISIONS.some(div => 
@@ -829,7 +853,8 @@ function CompetitionSetup() {
         venue: venue.trim() || null,
         judges_count: judgeCount,
         judge_names: judgeNames.map((name, i) => name.trim() || `Judge ${i + 1}`),
-        status: 'active'
+        status: 'active',
+        is_test: isTestCompetition
       };
 
       const compResult = await createCompetition(compData);
@@ -982,7 +1007,7 @@ function CompetitionSetup() {
       
       // Navigate to judge selection
       setTimeout(() => {
-        console.log('🚀 Navigating to judge-selection with competitionId:', competitionId);
+        try { sessionStorage.setItem('topaz_active_competition_id', competitionId); } catch (e) { /* ignore */ }
         navigate('/judge-selection', {
           state: {
             competitionId: competitionId,
@@ -1008,6 +1033,7 @@ function CompetitionSetup() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6 sm:mb-8 max-w-6xl mx-auto w-full">
           <button
+            type="button"
             onClick={() => navigate('/')}
             className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px]"
           >
@@ -1114,6 +1140,23 @@ function CompetitionSetup() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isTestCompetition}
+                    onChange={(e) => setIsTestCompetition(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                  <span className="text-gray-700 font-semibold text-sm sm:text-base">
+                    This is a test/practice competition
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-6">
+                  Mark test competitions for easy cleanup in Data Management
+                </p>
               </div>
 
               <div>
@@ -1285,19 +1328,24 @@ function CompetitionSetup() {
                                     
                                     return (
                       <div key={category.name} className="bg-white rounded-lg p-4 border-2 border-gray-200 hover:border-pink-300 transition-colors">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start gap-3">
                                         <input
                                           type="checkbox"
                             id={`cat-${category.name}`}
                             checked={isSelected || false}
                             onChange={() => handleToggleCategory(category.name)}
-                            className="w-5 h-5 text-pink-600 rounded focus:ring-2 focus:ring-pink-500 cursor-pointer"
+                            className="w-5 h-5 mt-0.5 text-pink-600 rounded focus:ring-2 focus:ring-pink-500 cursor-pointer shrink-0"
                                         />
                                         <label
                             htmlFor={`cat-${category.name}`}
                             className="flex-1 text-base font-semibold text-gray-800 cursor-pointer hover:text-pink-600 transition-colors"
                           >
                             {category.name}
+                            {category.description && (
+                              <span className="block text-sm font-normal text-gray-600 mt-1">
+                                {category.description}
+                              </span>
+                            )}
                                         </label>
                         </div>
                       </div>

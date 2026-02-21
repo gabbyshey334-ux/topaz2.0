@@ -11,9 +11,11 @@ function JudgeSelection() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const { competitionId } = location.state || {};
-
-  console.log('🎯 JudgeSelection render - State:', { competitionId, locationState: location.state });
+  const stateId = location.state?.competitionId;
+  const savedId = (() => {
+    try { return sessionStorage.getItem('topaz_active_competition_id'); } catch (e) { return null; }
+  })();
+  const competitionId = stateId || savedId || null;
 
   // Ready-made image paths
   const logoPath = '/logo.png';
@@ -28,11 +30,16 @@ function JudgeSelection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Persist competitionId for recovery on refresh
+  useEffect(() => {
+    if (competitionId) {
+      try { sessionStorage.setItem('topaz_active_competition_id', competitionId); } catch (e) { /* ignore */ }
+    }
+  }, [competitionId]);
+
   // Redirect if no competitionId
   useEffect(() => {
-    console.log('🔍 JudgeSelection mounted - competitionId:', competitionId);
     if (!competitionId) {
-      console.error('❌ No competitionId provided');
       toast.error('No competition selected');
       navigate('/setup');
     }
@@ -131,6 +138,7 @@ function JudgeSelection() {
               </p>
             )}
             <button
+              type="button"
               onClick={() => navigate('/setup')}
               className="px-6 py-3 bg-teal-500 text-white font-semibold rounded-lg hover:bg-teal-600 transition-colors"
             >
@@ -143,11 +151,15 @@ function JudgeSelection() {
   }
 
   // Handle judge selection
-  const handleJudgeSelect = (judgeNumber) => {
+  const handleJudgeSelect = (judgeNum) => {
+    try {
+      sessionStorage.setItem('topaz_active_competition_id', competitionId);
+      sessionStorage.setItem('topaz_active_judge_number', String(judgeNum));
+    } catch (e) { /* ignore */ }
     navigate('/scoring', {
       state: {
         competitionId,
-        judgeNumber,
+        judgeNumber: judgeNum,
         competition,
         categories,
         ageDivisions,
@@ -185,7 +197,8 @@ function JudgeSelection() {
       <div className="flex-1 flex flex-col p-4 sm:p-6 md:p-8">
         {/* Header - Integrated with full branding logos */}
         <div className="flex items-center justify-between mb-10 max-w-5xl mx-auto w-full">
-          <button 
+          <button
+            type="button"
             onClick={() => navigate('/setup')}
             className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px] z-20"
           >
@@ -317,6 +330,7 @@ function JudgeSelection() {
             <p className="text-sm sm:text-base text-gray-600 mb-4">Competition Administrator</p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center max-w-2xl mx-auto">
               <button
+                type="button"
                 onClick={handleAdminView}
                 className="w-full sm:flex-1 py-4 sm:py-5 bg-gradient-to-r from-blue-600 to-blue-800 
                            text-white text-lg sm:text-xl font-bold rounded-xl 
@@ -327,6 +341,7 @@ function JudgeSelection() {
                 <span>Admin View</span>
               </button>
               <button
+                type="button"
                 onClick={() => navigate('/admin', { state: { competitionId } })}
                 className="w-full sm:flex-1 py-4 sm:py-5 bg-gradient-to-r from-indigo-600 to-indigo-800 
                            text-white text-lg sm:text-xl font-bold rounded-xl 
