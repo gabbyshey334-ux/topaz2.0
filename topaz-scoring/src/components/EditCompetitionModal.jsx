@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { updateCompetition } from '../supabase/competitions';
 import { getCompetitionCategories, createCategory, deleteCategory } from '../supabase/categories';
+import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
+import AddEntryModal from './AddEntryModal';
 
 /**
  * Edit Competition Modal Component
@@ -12,6 +14,7 @@ export default function EditCompetitionModal({
   isOpen, 
   onClose, 
   onSave,
+  onEntryAdded,
   entries = [],
   scores = []
 }) {
@@ -24,7 +27,11 @@ export default function EditCompetitionModal({
   
   // Categories state
   const [existingCategories, setExistingCategories] = useState([]);
+  const [existingAgeDivisions, setExistingAgeDivisions] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState({});
+  
+  // Add Entry modal
+  const [showAddEntryModal, setShowAddEntryModal] = useState(false);
   
   // UI state
   const [loading, setLoading] = useState(false);
@@ -79,23 +86,28 @@ export default function EditCompetitionModal({
     if (!competition?.id) return;
     
     try {
-      const result = await getCompetitionCategories(competition.id);
-      if (result.success) {
-        setExistingCategories(result.data || []);
+      const [catsResult, divsResult] = await Promise.all([
+        getCompetitionCategories(competition.id),
+        getCompetitionAgeDivisions(competition.id)
+      ]);
+      
+      if (catsResult.success) {
+        setExistingCategories(catsResult.data || []);
         
         // Build selectedCategories object from existing categories (NEW STRUCTURE - no variety levels)
         const selected = {};
-        result.data.forEach(cat => {
-          // Category name is the full name (no variety levels to extract)
+        (catsResult.data || []).forEach(cat => {
           const categoryName = cat.name;
-          
-          // Check if this category exists in our available categories
           const availableCat = ALL_AVAILABLE_CATEGORIES.find(ac => ac.name === categoryName);
           if (availableCat) {
             selected[categoryName] = { selected: true };
           }
         });
         setSelectedCategories(selected);
+      }
+      
+      if (divsResult.success) {
+        setExistingAgeDivisions(divsResult.data || []);
       }
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -502,6 +514,25 @@ export default function EditCompetitionModal({
           </div>
         </div>
 
+          {/* Manage Entries */}
+          <div className="bg-teal-50 rounded-xl p-6 border-2 border-teal-200">
+            <h3 className="text-xl font-bold text-teal-800 mb-2">Manage Entries</h3>
+            <p className="text-gray-600 text-sm mb-4">Add or view entries for this competition.</p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAddEntryModal(true)}
+                className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all shadow-md flex items-center gap-2"
+              >
+                <span>➕</span>
+                Add New Entry
+              </button>
+              <p className="text-sm text-teal-700 self-center">
+                {entries.length} {entries.length === 1 ? 'entry' : 'entries'} in this competition
+              </p>
+            </div>
+          </div>
+
         {/* Footer */}
         <div className="sticky bottom-0 bg-gray-100 p-6 rounded-b-2xl flex justify-end gap-4">
           <button
@@ -530,6 +561,20 @@ export default function EditCompetitionModal({
           </button>
         </div>
       </div>
+
+      {/* Add Entry Modal */}
+      <AddEntryModal
+        isOpen={showAddEntryModal}
+        onClose={() => setShowAddEntryModal(false)}
+        competitionId={competition?.id}
+        competition={competition}
+        categories={existingCategories}
+        ageDivisions={existingAgeDivisions}
+        onSuccess={() => {
+          onEntryAdded?.();
+          setShowAddEntryModal(false);
+        }}
+      />
     </div>
   );
 }

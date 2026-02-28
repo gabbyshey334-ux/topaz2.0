@@ -1821,6 +1821,7 @@ function ResultsPage() {
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
         onSave={handleCompetitionUpdated}
+        onEntryAdded={loadAllData}
         entries={entries}
         scores={scores}
       />
