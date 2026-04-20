@@ -830,10 +830,6 @@ function CompetitionSetup() {
       newErrors.categories = 'Please select at least one category';
     }
 
-    if (entries.length === 0) {
-      newErrors.entries = 'Please add at least one dancer or group';
-    }
-
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       toast.error('Please fix validation errors');
