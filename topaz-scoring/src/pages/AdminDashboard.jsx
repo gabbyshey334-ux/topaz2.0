@@ -8,6 +8,12 @@ import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
 import { getCompetitionEntries } from '../supabase/entries';
 import { getAdminFilters, updateAdminFilters, clearAdminFilters, subscribeToAdminFilters } from '../supabase/adminFilters';
 import { resetMedalPointsForCompetition } from '../supabase/medalParticipants';
+import {
+  abilitiesMatch,
+  entryMatchesCategoryId,
+  getDisplayCategoryName,
+  normalizeDivisionCompare
+} from '../utils/entryFilters';
 
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -117,9 +123,11 @@ function AdminDashboard() {
   const filteredEntries = (() => {
     let filtered = [...allEntries];
 
-    // Filter by category
+    // Filter by category (UUID + normalized style for website-synced rows)
     if (adminFilters.category_filter) {
-      filtered = filtered.filter(e => e.category_id === adminFilters.category_filter);
+      filtered = filtered.filter((e) =>
+        entryMatchesCategoryId(e, adminFilters.category_filter, categories)
+      );
     }
 
     // Filter by division type
@@ -127,10 +135,9 @@ function AdminDashboard() {
       filtered = filtered.filter(e => {
         const entryType = e.dance_type || '';
         const filterType = adminFilters.division_type_filter;
-        
-        // Normalize comparison
-        const normalizedEntry = entryType.toLowerCase().replace(/[_\s()]/g, '');
-        const normalizedFilter = filterType.toLowerCase().replace(/[_\s()]/g, '');
+
+        const normalizedEntry = normalizeDivisionCompare(entryType);
+        const normalizedFilter = normalizeDivisionCompare(filterType);
         
         if (normalizedFilter.includes('smallgroup')) return normalizedEntry.includes('smallgroup');
         if (normalizedFilter.includes('largegroup')) return normalizedEntry.includes('largegroup');
@@ -149,7 +156,7 @@ function AdminDashboard() {
 
     // Filter by ability level
     if (adminFilters.ability_filter && adminFilters.ability_filter !== 'all') {
-      filtered = filtered.filter(e => e.ability_level === adminFilters.ability_filter);
+      filtered = filtered.filter((e) => abilitiesMatch(e.ability_level, adminFilters.ability_filter));
     }
 
     return filtered;
@@ -508,7 +515,7 @@ function AdminDashboard() {
                         Entry #{entry.entry_number}: {entry.competitor_name}
                       </span>
                       <div className="text-sm text-gray-600 mt-1">
-                        {categories.find(c => c.id === entry.category_id)?.name || 'Unknown'} • 
+                        {getDisplayCategoryName(entry, categories)} • 
                         {entry.dance_type || 'Solo'} • 
                         {entry.ability_level || 'N/A'}
                       </div>

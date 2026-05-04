@@ -13,6 +13,12 @@ import { getCompetition } from '../supabase/competitions';
 import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
 import { getCompetitionEntries } from '../supabase/entries';
+import {
+  abilitiesMatch,
+  entryMatchesCategoryId,
+  getDisplayCategoryName,
+  normalizeDivisionCompare
+} from '../utils/entryFilters';
 
 function ScoringInterface() {
   const navigate = useNavigate();
@@ -189,9 +195,11 @@ function ScoringInterface() {
   useEffect(() => {
     let filtered = [...entries];
 
-    // Apply admin category filter
+    // Apply admin category filter (UUID + normalized style match for synced entries)
     if (adminFilters.category_filter) {
-      filtered = filtered.filter(e => e.category_id === adminFilters.category_filter);
+      filtered = filtered.filter((e) =>
+        entryMatchesCategoryId(e, adminFilters.category_filter, categories)
+      );
     }
 
     // Apply admin division type filter
@@ -199,8 +207,8 @@ function ScoringInterface() {
       const filterType = adminFilters.division_type_filter;
       filtered = filtered.filter(e => {
         const entryType = e.dance_type || '';
-        const normalizedEntry = entryType.toLowerCase().replace(/[_\s()]/g, '');
-        const normalizedFilter = filterType.toLowerCase().replace(/[_\s()]/g, '');
+        const normalizedEntry = normalizeDivisionCompare(entryType);
+        const normalizedFilter = normalizeDivisionCompare(filterType);
         
         if (normalizedFilter.includes('smallgroup')) return normalizedEntry.includes('smallgroup');
         if (normalizedFilter.includes('largegroup')) return normalizedEntry.includes('largegroup');
@@ -217,9 +225,9 @@ function ScoringInterface() {
       filtered = filtered.filter(e => e.age_division_id === adminFilters.age_division_filter);
     }
 
-    // Apply admin ability level filter
+    // Apply admin ability level filter (Beginning / Beg / etc.)
     if (adminFilters.ability_filter && adminFilters.ability_filter !== 'all') {
-      filtered = filtered.filter(e => e.ability_level === adminFilters.ability_filter);
+      filtered = filtered.filter((e) => abilitiesMatch(e.ability_level, adminFilters.ability_filter));
     }
 
     // Apply search query (only filter judges can control)
@@ -234,7 +242,7 @@ function ScoringInterface() {
     setFilteredEntries(filtered);
     setCurrentIndex(0);
     setCurrentEntry(filtered[0] || null);
-  }, [adminFilters, searchQuery, entries]);
+  }, [adminFilters, searchQuery, entries, categories]);
 
   // Auto-calculate total
   useEffect(() => {
@@ -433,11 +441,7 @@ function ScoringInterface() {
     }
   };
 
-  // Get category name
-  const getCategoryName = (categoryId) => {
-    const cat = categories.find(c => c.id === categoryId);
-    return cat ? cat.name : 'Unknown';
-  };
+  const getCategoryNameForEntry = (entry) => getDisplayCategoryName(entry, categories);
 
   // Get age division name
   const getAgeDivisionName = (divisionId) => {
@@ -730,7 +734,7 @@ function ScoringInterface() {
                         #{entry.entry_number} {entry.competitor_name}
                       </p>
                       <p className="text-xs truncate opacity-80">
-                        {getCategoryName(entry.category_id)}
+                        {getCategoryNameForEntry(entry)}
                       </p>
                     </div>
                   </div>
@@ -809,7 +813,7 @@ function ScoringInterface() {
                       </h2>
                       <div className="flex flex-wrap gap-2">
                         <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold">
-                          {getCategoryName(currentEntry.category_id)}
+                          {getCategoryNameForEntry(currentEntry)}
                         </span>
                         {currentEntry.age_division_id && (
                           <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">

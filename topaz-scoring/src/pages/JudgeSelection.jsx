@@ -6,6 +6,7 @@ import { getCompetition } from '../supabase/competitions';
 import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
 import { getCompetitionEntries } from '../supabase/entries';
+import { entryMatchesCategory } from '../utils/entryFilters';
 
 function JudgeSelection() {
   const navigate = useNavigate();
@@ -182,9 +183,11 @@ function JudgeSelection() {
     });
   };
 
-  // Get entry count for a category
+  // Get entry count for a category (includes website-synced rows matched by dance_type style)
   const getCategoryEntryCount = (categoryId) => {
-    return entries.filter(e => e.category_id === categoryId).length;
+    const cat = categories.find((c) => c.id === categoryId);
+    if (!cat) return 0;
+    return entries.filter((e) => entryMatchesCategory(e, cat)).length;
   };
 
   // Get entry count for an age division
