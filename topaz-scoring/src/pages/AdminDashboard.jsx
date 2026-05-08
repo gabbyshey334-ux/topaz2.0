@@ -9,10 +9,14 @@ import { getCompetitionEntries } from '../supabase/entries';
 import { getAdminFilters, updateAdminFilters, clearAdminFilters, subscribeToAdminFilters } from '../supabase/adminFilters';
 import { resetMedalPointsForCompetition } from '../supabase/medalParticipants';
 import {
+  ageFilterMatchesEntry,
   abilitiesMatch,
   entryMatchesCategoryId,
   getDisplayCategoryName,
-  normalizeDivisionCompare
+  getEntryAgeGroupLabel,
+  getEntryDivisionType,
+  normalizeDivisionCompare,
+  normalizeFilterText
 } from '../utils/entryFilters';
 
 function AdminDashboard() {
@@ -133,25 +137,23 @@ function AdminDashboard() {
     // Filter by division type
     if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
       filtered = filtered.filter(e => {
-        const entryType = e.dance_type || '';
         const filterType = adminFilters.division_type_filter;
+        const entryDivision = getEntryDivisionType(e);
+        const normalizedEntry = normalizeFilterText(entryDivision);
+        const normalizedFilter = normalizeFilterText(filterType);
+        const fallbackEntry = normalizeDivisionCompare(e.dance_type || '');
+        const fallbackFilter = normalizeDivisionCompare(filterType);
 
-        const normalizedEntry = normalizeDivisionCompare(entryType);
-        const normalizedFilter = normalizeDivisionCompare(filterType);
-        
-        if (normalizedFilter.includes('smallgroup')) return normalizedEntry.includes('smallgroup');
-        if (normalizedFilter.includes('largegroup')) return normalizedEntry.includes('largegroup');
-        if (normalizedFilter.includes('duo')) return normalizedEntry.includes('duo') && !normalizedEntry.includes('trio');
-        if (normalizedFilter.includes('trio')) return normalizedEntry.includes('trio');
-        if (normalizedFilter.includes('solo')) return normalizedEntry.includes('solo') || (!normalizedEntry.includes('group') && !normalizedEntry.includes('duo') && !normalizedEntry.includes('trio'));
-        
-        return normalizedEntry.includes(normalizedFilter);
+        if (!normalizedFilter) return true;
+        return normalizedEntry === normalizedFilter || fallbackEntry === fallbackFilter;
       });
     }
 
     // Filter by age division
     if (adminFilters.age_division_filter) {
-      filtered = filtered.filter(e => e.age_division_id === adminFilters.age_division_filter);
+      filtered = filtered.filter((e) =>
+        ageFilterMatchesEntry(e, adminFilters.age_division_filter, ageDivisions)
+      );
     }
 
     // Filter by ability level
@@ -516,7 +518,8 @@ function AdminDashboard() {
                       </span>
                       <div className="text-sm text-gray-600 mt-1">
                         {getDisplayCategoryName(entry, categories)} • 
-                        {entry.dance_type || 'Solo'} • 
+                        {getEntryDivisionType(entry)} • 
+                        {getEntryAgeGroupLabel(entry, ageDivisions)} • 
                         {entry.ability_level || 'N/A'}
                       </div>
                     </div>

@@ -14,10 +14,14 @@ import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
 import { getCompetitionEntries } from '../supabase/entries';
 import {
+  ageFilterMatchesEntry,
   abilitiesMatch,
   entryMatchesCategoryId,
   getDisplayCategoryName,
-  normalizeDivisionCompare
+  getEntryDivisionType,
+  getEntryAgeGroupLabel,
+  normalizeDivisionCompare,
+  normalizeFilterText
 } from '../utils/entryFilters';
 
 function ScoringInterface() {
@@ -184,7 +188,7 @@ function ScoringInterface() {
     if (entries.length > 0) {
       const uniqueTypes = [...new Set(entries.map(e => {
         const raw = e.dance_type || 'Solo';
-        const normalized = getDivisionType(e);
+        const normalized = getEntryDivisionType(e);
         return `${raw} -> ${normalized}`;
       }))];
       console.log('📊 All unique division types in entries:', uniqueTypes);
@@ -206,23 +210,22 @@ function ScoringInterface() {
     if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
       const filterType = adminFilters.division_type_filter;
       filtered = filtered.filter(e => {
-        const entryType = e.dance_type || '';
-        const normalizedEntry = normalizeDivisionCompare(entryType);
-        const normalizedFilter = normalizeDivisionCompare(filterType);
+        const entryDivision = getEntryDivisionType(e);
+        const normalizedEntry = normalizeFilterText(entryDivision);
+        const normalizedFilter = normalizeFilterText(filterType);
+        const fallbackEntry = normalizeDivisionCompare(e.dance_type || '');
+        const fallbackFilter = normalizeDivisionCompare(filterType);
         
-        if (normalizedFilter.includes('smallgroup')) return normalizedEntry.includes('smallgroup');
-        if (normalizedFilter.includes('largegroup')) return normalizedEntry.includes('largegroup');
-        if (normalizedFilter.includes('duo')) return normalizedEntry.includes('duo') && !normalizedEntry.includes('trio');
-        if (normalizedFilter.includes('trio')) return normalizedEntry.includes('trio');
-        if (normalizedFilter.includes('solo')) return normalizedEntry.includes('solo') || (!normalizedEntry.includes('group') && !normalizedEntry.includes('duo') && !normalizedEntry.includes('trio'));
-        
-        return normalizedEntry.includes(normalizedFilter);
+        if (!normalizedFilter) return true;
+        return normalizedEntry === normalizedFilter || fallbackEntry === fallbackFilter;
       });
     }
 
     // Apply admin age division filter
     if (adminFilters.age_division_filter) {
-      filtered = filtered.filter(e => e.age_division_id === adminFilters.age_division_filter);
+      filtered = filtered.filter((e) =>
+        ageFilterMatchesEntry(e, adminFilters.age_division_filter, ageDivisions)
+      );
     }
 
     // Apply admin ability level filter (Beginning / Beg / etc.)
@@ -443,11 +446,7 @@ function ScoringInterface() {
 
   const getCategoryNameForEntry = (entry) => getDisplayCategoryName(entry, categories);
 
-  // Get age division name
-  const getAgeDivisionName = (divisionId) => {
-    const div = ageDivisions.find(d => d.id === divisionId);
-    return div ? div.name : null;
-  };
+  const getEntryAgeLabel = (entry) => getEntryAgeGroupLabel(entry, ageDivisions);
 
   // Calculate progress
   const calculateProgress = () => {
@@ -481,51 +480,6 @@ function ScoringInterface() {
   // Check if entry is a group
   const isGroup = (entry) => {
     return entry.dance_type && entry.dance_type.includes('group');
-  };
-
-  /**
-   * Get division type from entry - normalizes to standard format
-   * Handles variations like:
-   * - "Small Group (4-10)" -> "Small Group"
-   * - "Large Group (11+)" -> "Large Group"
-   * - "Duo/Trio" -> "Duo/Trio"
-   * - "Solo" -> "Solo"
-   * Also handles pipe-separated values: "Solo | Variety A" -> "Solo"
-   */
-  const getDivisionType = (entry) => {
-    if (!entry.dance_type) return 'Solo';
-    
-    // Extract division type (before pipe if present)
-    let divisionType = entry.dance_type;
-    const pipeIndex = divisionType.indexOf('|');
-    if (pipeIndex > -1) {
-      divisionType = divisionType.substring(0, pipeIndex);
-    }
-    
-    // Remove counts in parentheses: "Small Group (4-10)" -> "Small Group"
-    divisionType = divisionType.replace(/\s*\([^)]*\)\s*$/, '');
-    
-    // Trim whitespace
-    divisionType = divisionType.trim();
-    
-    // Normalize to standard values (case-insensitive matching)
-    const lower = divisionType.toLowerCase();
-    
-    if (lower.includes('small group')) return 'Small Group';
-    if (lower.includes('large group')) return 'Large Group';
-    if (lower.includes('duo') && !lower.includes('trio')) {
-      return 'Duo';
-    }
-    if (lower.includes('trio')) {
-      return 'Trio';
-    }
-    if (lower.includes('production')) return 'Production';
-    if (lower.includes('student choreography')) return 'Student Choreography';
-    if (lower.includes('teacher') && lower.includes('student')) return 'Teacher/Student';
-    if (lower.includes('solo')) return 'Solo';
-    
-    // Return as-is if no match (shouldn't happen, but fallback)
-    return divisionType || 'Solo';
   };
 
   if (loading) {
@@ -815,14 +769,12 @@ function ScoringInterface() {
                         <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold">
                           {getCategoryNameForEntry(currentEntry)}
                         </span>
-                        {currentEntry.age_division_id && (
-                          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
-                            {getAgeDivisionName(currentEntry.age_division_id)}
-                          </span>
-                        )}
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
+                          {getEntryAgeLabel(currentEntry)}
+                        </span>
                         <AbilityBadge abilityLevel={currentEntry.ability_level} size="md" />
                         <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
-                          {getDivisionType(currentEntry)}
+                          {getEntryDivisionType(currentEntry)}
                         </span>
                       </div>
                     </div>

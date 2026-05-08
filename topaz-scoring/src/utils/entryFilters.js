@@ -7,6 +7,47 @@ export function normalizeMatchKey(str) {
   return String(str).toLowerCase().replace(/[-\s]/g, '');
 }
 
+export function normalizeFilterText(str) {
+  if (str == null || str === '') return '';
+  return String(str).toLowerCase().trim().replace(/[-\s]+/g, ' ');
+}
+
+export function getAgeGroup(age) {
+  const n = parseInt(age, 10);
+  if (Number.isNaN(n)) return 'Unknown';
+  if (n >= 3 && n <= 7) return 'Junior Primary (3-7)';
+  if (n >= 8 && n <= 10) return 'Primary (8-10)';
+  if (n >= 11 && n <= 13) return 'Junior (11-13)';
+  if (n >= 14 && n <= 18) return 'Teen (14-18)';
+  if (n >= 19) return 'Senior (19+)';
+  return 'Unknown';
+}
+
+export function getEntryAgeGroupLabel(entry, ageDivisionsList = []) {
+  if (!entry) return 'Unknown';
+
+  if (entry.age_division?.name) {
+    const withRange =
+      entry.age_division.min_age != null && entry.age_division.max_age != null
+        ? `${entry.age_division.name} (${entry.age_division.min_age}-${entry.age_division.max_age})`
+        : entry.age_division.name;
+    return withRange;
+  }
+
+  if (entry.age_division_id) {
+    const byId = ageDivisionsList.find((d) => d.id === entry.age_division_id);
+    if (byId?.name) {
+      const withRange =
+        byId.min_age != null && byId.max_age != null
+          ? `${byId.name} (${byId.min_age}-${byId.max_age})`
+          : byId.name;
+      return withRange;
+    }
+  }
+
+  return getAgeGroup(entry.age);
+}
+
 /**
  * Normalize division-type strings for admin division filters (extends legacy normalization).
  */
@@ -14,6 +55,30 @@ export function normalizeDivisionCompare(str) {
   return String(str || '')
     .toLowerCase()
     .replace(/[-_\s()/]/g, '');
+}
+
+export function getEntryDivisionType(entry) {
+  if (!entry?.dance_type) return 'Solo';
+
+  let divisionType = entry.dance_type;
+  const pipeIndex = divisionType.indexOf('|');
+  if (pipeIndex > -1) {
+    divisionType = divisionType.substring(0, pipeIndex);
+  }
+
+  divisionType = divisionType.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const lower = divisionType.toLowerCase();
+
+  if (lower.includes('small group')) return 'Small Group';
+  if (lower.includes('large group')) return 'Large Group';
+  if (lower.includes('duo') && !lower.includes('trio')) return 'Duo';
+  if (lower.includes('trio')) return 'Trio';
+  if (lower.includes('production')) return 'Production';
+  if (lower.includes('student choreography')) return 'Student Choreography';
+  if (lower.includes('teacher') && lower.includes('student')) return 'Teacher/Student';
+  if (lower.includes('solo')) return 'Solo';
+
+  return divisionType || 'Solo';
 }
 
 /**
@@ -79,6 +144,33 @@ export function normalizeAbilityKey(s) {
 export function abilitiesMatch(entryAbility, filterAbility) {
   if (!filterAbility || filterAbility === 'all') return true;
   return normalizeAbilityKey(entryAbility) === normalizeAbilityKey(filterAbility);
+}
+
+export function ageFilterMatchesEntry(entry, filterAgeDivisionId, ageDivisionsList = []) {
+  if (!filterAgeDivisionId) return true;
+  if (!entry) return false;
+
+  // Keep fast path for structured entries where age_division_id is linked.
+  if (entry.age_division_id === filterAgeDivisionId) return true;
+
+  // Fallback for website-synced rows that only have numeric age.
+  const selectedDivision = ageDivisionsList.find((d) => d.id === filterAgeDivisionId);
+  if (!selectedDivision) return false;
+
+  const entryLabel = normalizeFilterText(getEntryAgeGroupLabel(entry, ageDivisionsList));
+  const selectedLabel = normalizeFilterText(
+    selectedDivision.min_age != null && selectedDivision.max_age != null
+      ? `${selectedDivision.name} (${selectedDivision.min_age}-${selectedDivision.max_age})`
+      : selectedDivision.name
+  );
+
+  if (entryLabel === selectedLabel) return true;
+
+  const age = parseInt(entry.age, 10);
+  if (Number.isNaN(age)) return false;
+  if (selectedDivision.min_age != null && age < selectedDivision.min_age) return false;
+  if (selectedDivision.max_age != null && age > selectedDivision.max_age) return false;
+  return true;
 }
 
 /** Resolve label for UI when category_id is missing (e.g. website sync). */
