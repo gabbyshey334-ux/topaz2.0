@@ -348,7 +348,7 @@ export const exportToJSON = (
           category_id: entry.category_id,
           age_division_id: entry.age_division_id,
           ability_level: entry.ability_level,
-          division_type: entry.dance_type
+          division_type: entry.division_type || entry.dance_type
         };
       })
     };

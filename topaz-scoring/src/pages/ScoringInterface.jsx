@@ -20,8 +20,7 @@ import {
   getDisplayCategoryName,
   getEntryDivisionType,
   getEntryAgeGroupLabel,
-  normalizeDivisionCompare,
-  normalizeFilterText
+  matchesDivisionTypeFilter
 } from '../utils/entryFilters';
 
 function ScoringInterface() {
@@ -206,19 +205,11 @@ function ScoringInterface() {
       );
     }
 
-    // Apply admin division type filter
+    // Apply admin division type filter (entries.division_type)
     if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
-      const filterType = adminFilters.division_type_filter;
-      filtered = filtered.filter(e => {
-        const entryDivision = getEntryDivisionType(e);
-        const normalizedEntry = normalizeFilterText(entryDivision);
-        const normalizedFilter = normalizeFilterText(filterType);
-        const fallbackEntry = normalizeDivisionCompare(e.dance_type || '');
-        const fallbackFilter = normalizeDivisionCompare(filterType);
-        
-        if (!normalizedFilter) return true;
-        return normalizedEntry === normalizedFilter || fallbackEntry === fallbackFilter;
-      });
+      filtered = filtered.filter((e) =>
+        matchesDivisionTypeFilter(e, adminFilters.division_type_filter)
+      );
     }
 
     // Apply admin age division filter
@@ -245,7 +236,7 @@ function ScoringInterface() {
     setFilteredEntries(filtered);
     setCurrentIndex(0);
     setCurrentEntry(filtered[0] || null);
-  }, [adminFilters, searchQuery, entries, categories]);
+  }, [adminFilters, searchQuery, entries, categories, ageDivisions]);
 
   // Auto-calculate total
   useEffect(() => {
@@ -463,8 +454,8 @@ function ScoringInterface() {
     return 'text-orange-600';
   };
 
-  // Parse group members from dance_type field
-  const parseGroupMembers = (danceType) => {
+  // Parse group members from legacy dance_type field
+  const parseGroupMembersFromDanceType = (danceType) => {
     if (!danceType) return [];
     try {
       const match = danceType.match(/Members: (\[.*?\])/);
@@ -477,9 +468,24 @@ function ScoringInterface() {
     return [];
   };
 
-  // Check if entry is a group
+  const parseGroupMembersFromEntry = (entry) => {
+    const gm = entry?.group_members;
+    if (Array.isArray(gm) && gm.length > 0) {
+      return gm.map((m) =>
+        typeof m === 'string'
+          ? { name: m }
+          : { name: m?.name || '', age: m?.age }
+      );
+    }
+    return parseGroupMembersFromDanceType(entry?.dance_type);
+  };
+
+  // Duo/Trio/Production (and legacy dance_type "group") show expandable members
   const isGroup = (entry) => {
-    return entry.dance_type && entry.dance_type.includes('group');
+    const d = entry?.division_type;
+    if (d === 'Duo' || d === 'Trio' || d === 'Production') return true;
+    if (d === 'Small Group' || d === 'Large Group') return true;
+    return !!(entry?.dance_type && String(entry.dance_type).toLowerCase().includes('group'));
   };
 
   if (loading) {
@@ -571,7 +577,7 @@ function ScoringInterface() {
   }
 
   const progress = calculateProgress();
-  const groupMembers = isGroup(currentEntry) ? parseGroupMembers(currentEntry.dance_type) : [];
+  const groupMembers = isGroup(currentEntry) ? parseGroupMembersFromEntry(currentEntry) : [];
 
   return (
     <Layout overlayOpacity="bg-white/90">

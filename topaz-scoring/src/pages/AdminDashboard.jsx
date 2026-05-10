@@ -15,8 +15,7 @@ import {
   getDisplayCategoryName,
   getEntryAgeGroupLabel,
   getEntryDivisionType,
-  normalizeDivisionCompare,
-  normalizeFilterText
+  matchesDivisionTypeFilter
 } from '../utils/entryFilters';
 
 function AdminDashboard() {
@@ -134,19 +133,11 @@ function AdminDashboard() {
       );
     }
 
-    // Filter by division type
+    // Filter by division type (entries.division_type — Solo / Duo / Trio / Production)
     if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
-      filtered = filtered.filter(e => {
-        const filterType = adminFilters.division_type_filter;
-        const entryDivision = getEntryDivisionType(e);
-        const normalizedEntry = normalizeFilterText(entryDivision);
-        const normalizedFilter = normalizeFilterText(filterType);
-        const fallbackEntry = normalizeDivisionCompare(e.dance_type || '');
-        const fallbackFilter = normalizeDivisionCompare(filterType);
-
-        if (!normalizedFilter) return true;
-        return normalizedEntry === normalizedFilter || fallbackEntry === fallbackFilter;
-      });
+      filtered = filtered.filter((e) =>
+        matchesDivisionTypeFilter(e, adminFilters.division_type_filter)
+      );
     }
 
     // Filter by age division
@@ -397,11 +388,7 @@ function AdminDashboard() {
                 <option value="Solo">Solo</option>
                 <option value="Duo">Duo</option>
                 <option value="Trio">Trio</option>
-                <option value="Small Group">Small Group</option>
-                <option value="Large Group">Large Group</option>
                 <option value="Production">Production</option>
-                <option value="Student Choreography">Student Choreography</option>
-                <option value="Teacher/Student">Teacher/Student</option>
               </select>
             </div>
 

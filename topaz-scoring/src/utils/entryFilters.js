@@ -58,6 +58,10 @@ export function normalizeDivisionCompare(str) {
 }
 
 export function getEntryDivisionType(entry) {
+  if (entry?.division_type != null && String(entry.division_type).trim() !== '') {
+    return String(entry.division_type).trim();
+  }
+
   if (!entry?.dance_type) return 'Solo';
 
   let divisionType = entry.dance_type;
@@ -78,7 +82,16 @@ export function getEntryDivisionType(entry) {
   if (lower.includes('teacher') && lower.includes('student')) return 'Teacher/Student';
   if (lower.includes('solo')) return 'Solo';
 
-  return divisionType || 'Solo';
+  // dance_type holds only performance category (e.g. "Vocal") — division lives in entries.division_type
+  return 'Solo';
+}
+
+/** Division type filter: matches admin `division_type_filter` to `entries.division_type` (with legacy inference when column is empty). */
+export function matchesDivisionTypeFilter(entry, selectedDivision) {
+  if (!selectedDivision || selectedDivision === 'all') return true;
+  return (
+    normalizeFilterText(getEntryDivisionType(entry)) === normalizeFilterText(selectedDivision)
+  );
 }
 
 /**

@@ -17,6 +17,7 @@ export const createEntry = async (entryData) => {
       category_id: entryData.category_id || null,
       age_division_id: entryData.age_division_id || null,
       age: entryData.age || null,
+      division_type: entryData.division_type || null,
       dance_type: entryData.dance_type || null,
       ability_level: entryData.ability_level || null,
       medal_points: entryData.medal_points || 0,
