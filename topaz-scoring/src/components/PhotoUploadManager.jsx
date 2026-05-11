@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { getCompetitionEntries, updateEntry } from '../supabase/entries';
+import { formatEntryNameWithNumber } from '../utils/entryFilters';
 import { uploadEntryPhoto, compressImage } from '../supabase/photos';
 import LoadingSpinner from './LoadingSpinner';
 
@@ -170,7 +171,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
         });
 
         if (updateResult.success) {
-          toast.success(`Photo uploaded for ${entry.competitor_name}`);
+          toast.success(`Photo uploaded for ${formatEntryNameWithNumber(entry)}`);
           await loadEntries();
         } else {
           toast.error('Failed to update entry');
@@ -301,7 +302,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
                             <p className="font-semibold text-gray-800">{match.file.name}</p>
                             <p className="text-sm text-gray-600">
                               {match.matched ? (
-                                <>Entry #{match.entry.entry_number}: {match.entry.competitor_name}</>
+                                <>{formatEntryNameWithNumber(match.entry)}</>
                               ) : (
                                 <>No match found - Entry #{match.entryNumber || '?'} doesn't exist</>
                               )}
@@ -377,7 +378,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
                         </div>
                         <div>
                           <p className="font-bold text-gray-800">
-                            #{entry.entry_number} {entry.competitor_name}
+                            {formatEntryNameWithNumber(entry)}
                           </p>
                           <p className="text-sm text-gray-600">
                             {entry.dance_type || 'Solo'} • Age {entry.age}

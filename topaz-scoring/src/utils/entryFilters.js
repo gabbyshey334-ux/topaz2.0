@@ -86,11 +86,62 @@ export function getEntryDivisionType(entry) {
   return 'Solo';
 }
 
-/** Division type filter: matches admin `division_type_filter` to `entries.division_type` (with legacy inference when column is empty). */
+/**
+ * One display line: "#{entry_number} {competitor_name}" (no leading space if name missing).
+ */
+export function formatEntryNameWithNumber(entry) {
+  if (!entry) return '';
+  const num = entry.entry_number != null ? entry.entry_number : '';
+  const name = entry.competitor_name ?? '';
+  return `#${num} ${name}`.trim();
+}
+
+/**
+ * Group DB rows into one scoring routine: Solos stay separate; non-Solos keyed by
+ * routine name (competitor_name) + division_type. First row by entry_number is primary; rest are siblings.
+ */
+export function groupEntries(entries) {
+  const seen = new Map();
+  const primary = [];
+  const siblingMap = new Map();
+
+  const sorted = [...(entries || [])].sort(
+    (a, b) => (a.entry_number || 0) - (b.entry_number || 0)
+  );
+
+  for (const entry of sorted) {
+    if (!entry.division_type || entry.division_type === 'Solo') {
+      primary.push(entry);
+      siblingMap.set(entry.id, []);
+      continue;
+    }
+    const key =
+      String(entry.competitor_name || '').trim().toLowerCase() +
+      '||' +
+      String(entry.division_type || '');
+    if (!seen.has(key)) {
+      seen.set(key, entry.id);
+      primary.push(entry);
+      siblingMap.set(entry.id, []);
+    } else {
+      const primaryId = seen.get(key);
+      const list = siblingMap.get(primaryId);
+      if (list) list.push(entry);
+    }
+  }
+  return { primary, siblingMap };
+}
+
+/** Division type filter: exact match on entries.division_type when set; else legacy inference. */
 export function matchesDivisionTypeFilter(entry, selectedDivision) {
   if (!selectedDivision || selectedDivision === 'all') return true;
+  const raw = entry?.division_type;
+  const dt =
+    raw != null && String(raw).trim() !== '' ? String(raw).trim() : null;
+  if (dt != null) return dt === selectedDivision;
   return (
-    normalizeFilterText(getEntryDivisionType(entry)) === normalizeFilterText(selectedDivision)
+    normalizeFilterText(getEntryDivisionType(entry)) ===
+    normalizeFilterText(selectedDivision)
   );
 }
 

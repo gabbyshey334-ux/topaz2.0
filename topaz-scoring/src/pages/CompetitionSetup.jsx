@@ -1462,7 +1462,7 @@ function CompetitionSetup() {
                         {entry.photoPreview ? (
                           <img
                             src={entry.photoPreview}
-                            alt={entry.name}
+                            alt={`#${entry.number} ${entry.name}`}
                             className="w-16 h-16 object-cover rounded-lg"
                           />
                         ) : (
@@ -1476,19 +1476,17 @@ function CompetitionSetup() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-gray-800 text-lg">
-                              #{entry.number}
-                            </span>
-                            <span className="font-semibold text-gray-700">
-                              {entry.name} {entry.age && entry.type === 'group' && entry.groupMembers.length > 0 
+                            <span className="font-semibold text-gray-800 text-lg">
+                              #{entry.number} {entry.name}
+                              {entry.age && entry.type === 'group' && entry.groupMembers.length > 0 
                                 ? (() => {
                                     const ages = entry.groupMembers.map(m => m.age).filter(a => a);
-                                    if (ages.length === 0) return `(Age ${entry.age})`;
+                                    if (ages.length === 0) return ` (Age ${entry.age})`;
                                     const minAge = Math.min(...ages);
                                     const maxAge = Math.max(...ages);
-                                    return `(Ages ${minAge === maxAge ? minAge : `${minAge}-${maxAge}`} • Oldest: ${entry.age})`;
+                                    return ` (Ages ${minAge === maxAge ? minAge : `${minAge}-${maxAge}`} • Oldest: ${entry.age})`;
                                   })()
-                                : entry.age ? `(Age ${entry.age})` : ''
+                                : entry.age ? ` (Age ${entry.age})` : ''
                               }
                             </span>
                             {entry.isMedalProgram && (

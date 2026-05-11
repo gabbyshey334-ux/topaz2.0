@@ -15,7 +15,8 @@ import {
   getDisplayCategoryName,
   getEntryAgeGroupLabel,
   getEntryDivisionType,
-  matchesDivisionTypeFilter
+  matchesDivisionTypeFilter,
+  formatEntryNameWithNumber
 } from '../utils/entryFilters';
 
 function AdminDashboard() {
@@ -83,9 +84,14 @@ function AdminDashboard() {
         setAllEntries(entriesResult.success ? entriesResult.data : []);
         
         if (filtersResult.success && filtersResult.data) {
+          const rawDiv = filtersResult.data.division_type_filter;
+          const divFilter =
+            rawDiv == null || rawDiv === '' || String(rawDiv).toLowerCase() === 'all'
+              ? 'all'
+              : rawDiv;
           setAdminFilters({
             category_filter: filtersResult.data.category_filter || null,
-            division_type_filter: filtersResult.data.division_type_filter || 'all',
+            division_type_filter: divFilter,
             age_division_filter: filtersResult.data.age_division_filter || null,
             ability_filter: filtersResult.data.ability_filter || 'all'
           });
@@ -108,9 +114,14 @@ function AdminDashboard() {
 
     const channel = subscribeToAdminFilters(competitionId, (newFilters) => {
       console.log('🔔 Admin panel received filter sync:', newFilters);
+      const rawDiv = newFilters.division_type_filter;
+      const divFilter =
+        rawDiv == null || rawDiv === '' || String(rawDiv).toLowerCase() === 'all'
+          ? 'all'
+          : rawDiv;
       setAdminFilters({
         category_filter: newFilters.category_filter ?? null,
-        division_type_filter: newFilters.division_type_filter ?? 'all',
+        division_type_filter: divFilter,
         age_division_filter: newFilters.age_division_filter ?? null,
         ability_filter: newFilters.ability_filter ?? 'all'
       });
@@ -133,7 +144,7 @@ function AdminDashboard() {
       );
     }
 
-    // Filter by division type (entries.division_type — Solo / Duo / Trio / Production)
+    // Filter by division type (entries.division_type — exact when column set)
     if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
       filtered = filtered.filter((e) =>
         matchesDivisionTypeFilter(e, adminFilters.division_type_filter)
@@ -218,12 +229,8 @@ function AdminDashboard() {
     }
   };
 
-  // Clear all filters
+  // Clear all filters (no confirmation — quick reset for stuck admin/judge views)
   const handleClearFilters = async () => {
-    if (!window.confirm('Clear all filters? This will show all entries to all judges.')) {
-      return;
-    }
-
     setSaving(true);
     try {
       const result = await clearAdminFilters(competitionId);
@@ -388,6 +395,8 @@ function AdminDashboard() {
                 <option value="Solo">Solo</option>
                 <option value="Duo">Duo</option>
                 <option value="Trio">Trio</option>
+                <option value="Small Group">Small Group</option>
+                <option value="Large Group">Large Group</option>
                 <option value="Production">Production</option>
               </select>
             </div>
@@ -501,7 +510,7 @@ function AdminDashboard() {
                   >
                     <div>
                       <span className="font-semibold text-gray-800">
-                        Entry #{entry.entry_number}: {entry.competitor_name}
+                        {formatEntryNameWithNumber(entry)}
                       </span>
                       <div className="text-sm text-gray-600 mt-1">
                         {getDisplayCategoryName(entry, categories)} • 

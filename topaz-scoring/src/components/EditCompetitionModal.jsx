@@ -24,6 +24,7 @@ export default function EditCompetitionModal({
   const [venue, setVenue] = useState('');
   const [judgeCount, setJudgeCount] = useState(3);
   const [judgeNames, setJudgeNames] = useState([]);
+  const [judgePins, setJudgePins] = useState([]);
   
   // Categories state
   const [existingCategories, setExistingCategories] = useState([]);
@@ -75,7 +76,17 @@ export default function EditCompetitionModal({
       setVenue(competition.venue || '');
       setJudgeCount(competition.judges_count || 3);
       setJudgeNames(competition.judge_names || Array(competition.judges_count || 3).fill(''));
-      
+      const jp =
+        competition.judge_pins &&
+        typeof competition.judge_pins === 'object' &&
+        !Array.isArray(competition.judge_pins)
+          ? competition.judge_pins
+          : {};
+      const n = competition.judges_count || 3;
+      setJudgePins(
+        Array.from({ length: n }, (_, i) => String(jp[String(i + 1)] ?? '').replace(/\D/g, '').slice(0, 4))
+      );
+
       // Load existing categories
       loadCategories();
     }
@@ -120,6 +131,9 @@ export default function EditCompetitionModal({
     // Resize judgeNames array while preserving existing names
     const newNames = Array.from({ length: count }, (_, i) => judgeNames[i] || '');
     setJudgeNames(newNames);
+    setJudgePins((prev) =>
+      Array.from({ length: count }, (_, i) => (prev[i] != null ? prev[i] : '').replace(/\D/g, '').slice(0, 4))
+    );
   };
 
   // Handle judge name change
@@ -212,12 +226,19 @@ export default function EditCompetitionModal({
     setLoading(true);
     try {
       // Update competition
+      const pinsObj = {};
+      for (let i = 0; i < judgeCount; i++) {
+        const p = (judgePins[i] || '').trim().replace(/\D/g, '').slice(0, 4);
+        if (p) pinsObj[String(i + 1)] = p;
+      }
+
       const updateData = {
         name: competitionName.trim(),
         date: competitionDate,
         venue: venue.trim() || null,
         judges_count: judgeCount,
-        judge_names: judgeNames.filter(name => name.trim())
+        judge_names: judgeNames.filter(name => name.trim()),
+        judge_pins: pinsObj
       };
 
       const updateResult = await updateCompetition(competition.id, updateData);
@@ -402,6 +423,34 @@ export default function EditCompetitionModal({
                         onChange={(e) => handleJudgeNameChange(i, e.target.value)}
                         placeholder={`e.g., Sarah Johnson`}
                         className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-teal-500 focus:outline-none text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-gray-600 mt-4 mb-2">
+                  Optional 4-digit PINs for judge devices. Leave blank to allow access without a PIN.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: judgeCount }, (_, i) => (
+                    <div key={`pin-${i}`}>
+                      <label className="block text-gray-600 text-xs font-semibold mb-1 uppercase">
+                        Judge {i + 1} PIN (4 digits)
+                      </label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={4}
+                        value={judgePins[i] || ''}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+                          setJudgePins((prev) => {
+                            const next = [...prev];
+                            next[i] = v;
+                            return next;
+                          });
+                        }}
+                        placeholder="Optional"
+                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[#2E75B6] focus:outline-none text-sm font-mono tracking-widest"
                       />
                     </div>
                   ))}

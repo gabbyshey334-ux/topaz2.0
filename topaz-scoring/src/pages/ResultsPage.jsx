@@ -29,6 +29,7 @@ import {
   getDivisionTypeEmoji,
   getDivisionTypeDisplayName
 } from '../utils/calculations';
+import { formatEntryNameWithNumber } from '../utils/entryFilters';
 
 // Helper function to check if a category is special (should not get awards/medals)
 const isSpecialCategory = (category) => {
@@ -240,6 +241,7 @@ function ResultsPage() {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(e => 
+        formatEntryNameWithNumber(e).toLowerCase().includes(query) ||
         e.competitor_name.toLowerCase().includes(query) ||
         e.entry_number.toString().includes(query)
       );
@@ -431,7 +433,7 @@ function ResultsPage() {
   const handlePrintScoreSheet = async (entry) => {
     try {
       setGeneratingPdf(true);
-      console.log('📄 Starting PDF generation for:', entry.competitor_name);
+      console.log('📄 Starting PDF generation for:', formatEntryNameWithNumber(entry));
       
       const category = categories.find(c => c.id === entry.category_id);
       const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
@@ -916,7 +918,7 @@ function ResultsPage() {
                           {/* Photo */}
                           <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-md">
                             {entry.photo_url ? (
-                              <img src={entry.photo_url} alt={entry.competitor_name} className="w-full h-full object-cover" />
+                              <img src={entry.photo_url} alt={formatEntryNameWithNumber(entry)} className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full bg-purple-100 flex items-center justify-center text-2xl">
                                 👤
@@ -926,7 +928,7 @@ function ResultsPage() {
                           
                           {/* Info */}
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-xl font-bold text-gray-800 truncate">{entry.competitor_name}</h3>
+                            <h3 className="text-xl font-bold text-gray-800 truncate">{formatEntryNameWithNumber(entry)}</h3>
                             <p className="text-sm text-gray-600">
                               {getCategoryName(entry.category_id)} • {entry.ability_level}
                             </p>
@@ -1035,14 +1037,14 @@ function ResultsPage() {
                               <div className="flex flex-col items-center text-center">
                                 <div className="w-20 h-20 rounded-full overflow-hidden mb-3 border-2 border-amber-100">
                                   {entry.photo_url ? (
-                                    <img src={entry.photo_url} alt={entry.competitor_name} className="w-full h-full object-cover" />
+                                    <img src={entry.photo_url} alt={formatEntryNameWithNumber(entry)} className="w-full h-full object-cover" />
                                   ) : (
                                     <div className="w-full h-full bg-amber-50 flex items-center justify-center text-2xl text-amber-200">
                                       👤
                                     </div>
                                   )}
                                 </div>
-                                <h4 className="font-bold text-gray-800 line-clamp-1">{entry.competitor_name}</h4>
+                                <h4 className="font-bold text-gray-800 line-clamp-1">{formatEntryNameWithNumber(entry)}</h4>
                                 <div className="text-amber-600 font-black text-lg mb-2">
                                   {entry.averageScore.toFixed(2)}
                                 </div>
@@ -1153,7 +1155,7 @@ function ResultsPage() {
                         <div className="flex flex-col items-center text-center mb-3">
                           <div className="w-20 h-20 rounded-full overflow-hidden mb-3 border-4 border-gray-200">
                             {entry.photo_url ? (
-                              <img src={entry.photo_url} alt={entry.competitor_name} className="w-full h-full object-cover" />
+                              <img src={entry.photo_url} alt={formatEntryNameWithNumber(entry)} className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl">
                                 {entry.dance_type && entry.dance_type.includes('Solo') ? '👤' : '👥'}
@@ -1162,7 +1164,7 @@ function ResultsPage() {
                           </div>
                           
                           <h3 className="text-xl font-bold text-gray-800 mb-1 line-clamp-2">
-                            {entry.competitor_name}
+                            {formatEntryNameWithNumber(entry)}
                           </h3>
                           
                           <p className="text-sm text-gray-600 mb-2">
@@ -1263,7 +1265,7 @@ function ResultsPage() {
                                   {entry.photo_url ? (
                                     <LazyLoadImage
                                       src={entry.photo_url}
-                                      alt={entry.competitor_name}
+                                      alt={formatEntryNameWithNumber(entry)}
                                       effect="blur"
                                       className="w-full h-full object-cover"
                                     />
@@ -1277,7 +1279,7 @@ function ResultsPage() {
                                 {/* Entry Info */}
                                 <div className="flex-1 min-w-0">
                                   <h3 className="text-xl sm:text-2xl font-extrabold text-white drop-shadow-lg mb-2">
-                                    #{entry.entry_number} {entry.competitor_name}
+                                    {formatEntryNameWithNumber(entry)}
                                   </h3>
                                   <div className="flex items-center gap-3">
                                     <span className="px-3 py-1 bg-white/30 backdrop-blur rounded-full text-xs font-bold text-white">
@@ -1427,7 +1429,7 @@ function ResultsPage() {
                         {entry.photo_url ? (
                           <LazyLoadImage
                             src={entry.photo_url}
-                            alt={entry.competitor_name}
+                            alt={formatEntryNameWithNumber(entry)}
                             effect="blur"
                             className="w-full h-full object-cover"
                           />
@@ -1442,7 +1444,7 @@ function ResultsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2 flex-wrap">
                           <h3 className="text-2xl sm:text-3xl font-extrabold text-white drop-shadow-lg">
-                              #{entry.entry_number} {entry.competitor_name}
+                              {formatEntryNameWithNumber(entry)}
                           </h3>
                           {entry.is_medal_program && (
                             <div className="flex items-center gap-2">
@@ -1740,7 +1742,7 @@ function ResultsPage() {
                           {entry.photo_url ? (
                             <LazyLoadImage
                               src={entry.photo_url}
-                              alt={entry.competitor_name}
+                              alt={formatEntryNameWithNumber(entry)}
                               className="w-full h-full object-cover"
                               effect="blur"
                             />
@@ -1754,7 +1756,7 @@ function ResultsPage() {
                         {/* Entry Info */}
                         <div className="flex-1 min-w-0">
                           <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                            #{entry.entry_number} {entry.competitor_name}
+                            {formatEntryNameWithNumber(entry)}
                           </h3>
                           <div className="flex flex-wrap gap-2">
                             <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700">

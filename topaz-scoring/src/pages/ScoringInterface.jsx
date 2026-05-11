@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
@@ -21,11 +21,9 @@ import {
   getEntryDivisionType,
   getEntryAgeGroupLabel,
   matchesDivisionTypeFilter,
-  dedupeEntriesForGroupScoring,
-  getSiblingRoutineEntries,
-  getRoutineDisplayTitle,
-  entryMatchesSearchQuery,
-  isGroupDivisionForScoring
+  groupEntries,
+  formatEntryNameWithNumber,
+  entryMatchesSearchQuery
 } from '../utils/entryFilters';
 
 function ScoringInterface() {
@@ -105,6 +103,8 @@ function ScoringInterface() {
   const [showEntryList, setShowEntryList] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState(false);
 
+  const siblingMapRef = useRef(new Map());
+
   // Load competition data from API when state is empty (e.g. after refresh)
   useEffect(() => {
     if (!competitionId || stateData.competition || loadedCompetition) return;
@@ -139,9 +139,14 @@ function ScoringInterface() {
       try {
         const result = await getAdminFilters(competitionId);
         if (result.success && result.data) {
+          const rawDiv = result.data.division_type_filter;
+          const divFilter =
+            rawDiv == null || rawDiv === '' || String(rawDiv).toLowerCase() === 'all'
+              ? 'all'
+              : rawDiv;
           setAdminFilters({
             category_filter: result.data.category_filter || null,
-            division_type_filter: result.data.division_type_filter || 'all',
+            division_type_filter: divFilter,
             age_division_filter: result.data.age_division_filter || null,
             ability_filter: result.data.ability_filter || 'all'
           });
@@ -156,9 +161,14 @@ function ScoringInterface() {
     // Subscribe to real-time filter changes
     const channel = subscribeToAdminFilters(competitionId, (newFilters) => {
       console.log('🔔 Judge screen received filter update:', newFilters);
+      const rawDiv = newFilters.division_type_filter;
+      const divFilter =
+        rawDiv == null || rawDiv === '' || String(rawDiv).toLowerCase() === 'all'
+          ? 'all'
+          : rawDiv;
       const updated = {
         category_filter: newFilters.category_filter ?? null,
-        division_type_filter: newFilters.division_type_filter ?? 'all',
+        division_type_filter: divFilter,
         age_division_filter: newFilters.age_division_filter ?? null,
         ability_filter: newFilters.ability_filter ?? 'all'
       };
@@ -199,8 +209,13 @@ function ScoringInterface() {
     }
   }, [entries]);
 
-  // Filter entries using ADMIN FILTERS (not judge-controlled) + search query
+  // Filter entries using ADMIN FILTERS (not judge-controlled) + search query;
+  // then one card per group routine via groupEntries (primary rows only).
   useEffect(() => {
+    const { primary, siblingMap } = groupEntries(entries);
+    siblingMapRef.current = siblingMap;
+    const primaryIdSet = new Set(primary.map((e) => e.id));
+
     let filtered = [...entries];
 
     // Apply admin category filter (UUID + normalized style match for synced entries)
@@ -210,7 +225,7 @@ function ScoringInterface() {
       );
     }
 
-    // Apply admin division type filter (entries.division_type)
+    // Apply admin division type filter (entries.division_type — exact when column set)
     if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
       filtered = filtered.filter((e) =>
         matchesDivisionTypeFilter(e, adminFilters.division_type_filter)
@@ -235,8 +250,8 @@ function ScoringInterface() {
       filtered = filtered.filter((e) => entryMatchesSearchQuery(e, query));
     }
 
-    // One scoring row per group routine (Duo/Trio/Small/Large Group/Production)
-    filtered = dedupeEntriesForGroupScoring(filtered);
+    filtered = filtered.filter((e) => primaryIdSet.has(e.id));
+    filtered.sort((a, b) => (a.entry_number || 0) - (b.entry_number || 0));
 
     setFilteredEntries(filtered);
     setCurrentIndex(0);
@@ -259,7 +274,7 @@ function ScoringInterface() {
 
       const routineGroup = [
         currentEntry,
-        ...getSiblingRoutineEntries(currentEntry, entries)
+        ...(siblingMapRef.current.get(currentEntry.id) || [])
       ];
 
       try {
@@ -368,7 +383,7 @@ function ScoringInterface() {
 
       const targets = [
         currentEntry,
-        ...getSiblingRoutineEntries(currentEntry, entries)
+        ...(siblingMapRef.current.get(currentEntry.id) || [])
       ];
 
       let primaryScoreId = null;
@@ -463,10 +478,25 @@ function ScoringInterface() {
 
   const getEntryAgeLabel = (entry) => getEntryAgeGroupLabel(entry, ageDivisions);
 
-  const getEntryListPrimaryLabel = (entry) =>
-    isGroupDivisionForScoring(entry)
-      ? getRoutineDisplayTitle(entry)
-      : entry.competitor_name;
+  const getScoringSidebarLine = (entry) => {
+    const base = formatEntryNameWithNumber(entry);
+    const div = entry.division_type;
+    if (!div || div === 'Solo') return base;
+    let memberCount =
+      Array.isArray(entry.group_members) && entry.group_members.length > 0
+        ? entry.group_members.length
+        : null;
+    if (memberCount == null) {
+      if (div === 'Duo') memberCount = 2;
+      else if (div === 'Trio') memberCount = 3;
+      else memberCount = 0;
+    }
+    const memberPart = memberCount > 0 ? ` • ${memberCount} members` : '';
+    return `${base} (${div}${memberPart})`;
+  };
+
+  const isNonSoloDivision = (entry) =>
+    !!(entry?.division_type && entry.division_type !== 'Solo');
 
   // Calculate progress
   const calculateProgress = () => {
@@ -507,14 +537,6 @@ function ScoringInterface() {
       );
     }
     return parseGroupMembersFromDanceType(entry?.dance_type);
-  };
-
-  // Duo/Trio/Production (and legacy dance_type "group") show expandable members
-  const isGroup = (entry) => {
-    const d = entry?.division_type;
-    if (d === 'Duo' || d === 'Trio' || d === 'Production') return true;
-    if (d === 'Small Group' || d === 'Large Group') return true;
-    return !!(entry?.dance_type && String(entry.dance_type).toLowerCase().includes('group'));
   };
 
   if (loading) {
@@ -606,7 +628,12 @@ function ScoringInterface() {
   }
 
   const progress = calculateProgress();
-  const groupMembers = isGroup(currentEntry) ? parseGroupMembersFromEntry(currentEntry) : [];
+  const showGroupMemberList =
+    currentEntry.division_type &&
+    currentEntry.division_type !== 'Solo' &&
+    Array.isArray(currentEntry.group_members) &&
+    currentEntry.group_members.length > 0;
+  const groupMembers = showGroupMemberList ? parseGroupMembersFromEntry(currentEntry) : [];
 
   return (
     <Layout overlayOpacity="bg-white/90">
@@ -720,7 +747,7 @@ function ScoringInterface() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold truncate">
-                        #{entry.entry_number} {getEntryListPrimaryLabel(entry)}
+                        {getScoringSidebarLine(entry)}
                       </p>
                       <p className="text-xs truncate opacity-80">
                         {getCategoryNameForEntry(entry)}
@@ -757,7 +784,7 @@ function ScoringInterface() {
                     }`}
                   >
                     <span className="mr-2">{scoredEntries.has(entry.id) ? '✓' : '○'}</span>
-                    #{entry.entry_number} {getEntryListPrimaryLabel(entry)}
+                    {getScoringSidebarLine(entry)}
                   </button>
                 ))}
               </div>
@@ -774,12 +801,12 @@ function ScoringInterface() {
                   {currentEntry.photo_url ? (
                     <LazyLoadImage
                       src={currentEntry.photo_url}
-                      alt={getEntryListPrimaryLabel(currentEntry)}
+                      alt={formatEntryNameWithNumber(currentEntry)}
                       effect="blur"
                       className="w-32 h-32 sm:w-40 sm:h-40 object-cover rounded-lg border-2 border-gray-300"
                       placeholder={
                         <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gray-200 rounded-lg flex items-center justify-center text-5xl animate-pulse">
-                          {isGroup(currentEntry) ? '👥' : '💃'}
+                          {isNonSoloDivision(currentEntry) ? '👥' : '💃'}
                         </div>
                       }
                     />
@@ -793,14 +820,10 @@ function ScoringInterface() {
                 {/* Entry Info */}
                 <div className="flex-1">
                   <div className="flex items-start gap-3 mb-2">
-                    <span className="text-4xl font-bold text-gray-800">
-                      #{currentEntry.entry_number}
-                    </span>
                     <div className="flex-1">
                       <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-                        {isGroupDivisionForScoring(currentEntry)
-                          ? `${getRoutineDisplayTitle(currentEntry)}${currentEntry.age ? ` (${currentEntry.age})` : ''}`
-                          : `${currentEntry.competitor_name}${currentEntry.age ? ` (${currentEntry.age})` : ''}`}
+                        {formatEntryNameWithNumber(currentEntry)}
+                        {currentEntry.age ? ` (${currentEntry.age})` : ''}
                       </h2>
                       <div className="flex flex-wrap gap-2">
                         <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold">
@@ -817,10 +840,11 @@ function ScoringInterface() {
                     </div>
                   </div>
 
-                  {/* Group Members */}
-                  {isGroup(currentEntry) && groupMembers.length > 0 && (
+                  {/* Group members (non-Solo with group_members from sync) */}
+                  {showGroupMemberList && groupMembers.length > 0 && (
                     <div className="mt-4">
                       <button
+                        type="button"
                         onClick={() => setExpandedGroup(!expandedGroup)}
                         className="text-teal-600 hover:text-teal-800 font-semibold text-sm flex items-center gap-1"
                       >

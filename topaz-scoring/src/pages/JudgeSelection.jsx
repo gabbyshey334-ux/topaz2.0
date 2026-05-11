@@ -31,6 +31,11 @@ function JudgeSelection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [selectedJudgeNumber, setSelectedJudgeNumber] = useState(null);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+
   // Persist competitionId for recovery on refresh
   useEffect(() => {
     if (competitionId) {
@@ -151,8 +156,7 @@ function JudgeSelection() {
     );
   }
 
-  // Handle judge selection
-  const handleJudgeSelect = (judgeNum) => {
+  const navigateToScoring = (judgeNum) => {
     try {
       sessionStorage.setItem('topaz_active_competition_id', competitionId);
       sessionStorage.setItem('topaz_active_judge_number', String(judgeNum));
@@ -167,6 +171,35 @@ function JudgeSelection() {
         entries
       }
     });
+  };
+
+  // Handle judge selection (PIN gate when judge_pins[judge] is set)
+  const handleJudgeSelect = (judgeNum) => {
+    const pins = competition.judge_pins && typeof competition.judge_pins === 'object' && !Array.isArray(competition.judge_pins)
+      ? competition.judge_pins
+      : {};
+    const correct = pins[String(judgeNum)];
+    if (correct == null || String(correct).trim() === '') {
+      navigateToScoring(judgeNum);
+      return;
+    }
+    setSelectedJudgeNumber(judgeNum);
+    setPinInput('');
+    setPinError(false);
+    setShowPinModal(true);
+  };
+
+  const handlePinSubmit = (e) => {
+    e.preventDefault();
+    if (selectedJudgeNumber == null) return;
+    const pins = competition.judge_pins || {};
+    const correct = pins[String(selectedJudgeNumber)];
+    if (!correct || pinInput === String(correct)) {
+      setShowPinModal(false);
+      navigateToScoring(selectedJudgeNumber);
+      return;
+    }
+    setPinError(true);
   };
 
   // Handle admin view
@@ -314,6 +347,7 @@ function JudgeSelection() {
               const judgeName = competition?.judge_names?.[judgeNum - 1] || `Judge ${judgeNum}`;
               return (
                 <button
+                  type="button"
                   key={judgeNum}
                   onClick={() => handleJudgeSelect(judgeNum)}
                   className="aspect-[4/3] sm:aspect-square bg-gradient-to-br from-cyan-400 to-teal-500 rounded-2xl 
@@ -378,6 +412,65 @@ function JudgeSelection() {
           </div>
         </div>
       </div>
+
+      {showPinModal && selectedJudgeNumber != null && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pin-modal-title"
+        >
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border-2 border-gray-200">
+            <h2 id="pin-modal-title" className="text-xl font-bold text-gray-800 mb-1">
+              Judge {selectedJudgeNumber} — Enter PIN
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              {competition?.judge_names?.[selectedJudgeNumber - 1] || `Judge ${selectedJudgeNumber}`}
+            </p>
+            <form onSubmit={handlePinSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="judge-pin-input" className="sr-only">
+                  PIN
+                </label>
+                <input
+                  id="judge-pin-input"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  autoComplete="one-time-code"
+                  value={pinInput}
+                  onChange={(ev) => {
+                    setPinInput(ev.target.value.replace(/\D/g, '').slice(0, 4));
+                    setPinError(false);
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl text-center text-2xl tracking-widest font-mono focus:border-[#2E75B6] focus:outline-none min-h-[52px]"
+                  placeholder="••••"
+                />
+                {pinError && (
+                  <p className="text-red-600 text-sm font-semibold mt-2">Incorrect PIN. Try again.</p>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl font-bold text-white bg-[#2E75B6] hover:bg-[#256499] min-h-[48px] transition-colors"
+              >
+                Enter
+              </button>
+              <button
+                type="button"
+                className="w-full py-2 text-gray-600 font-semibold text-sm hover:text-gray-800"
+                onClick={() => {
+                  setShowPinModal(false);
+                  setPinInput('');
+                  setPinError(false);
+                }}
+              >
+                Cancel
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
