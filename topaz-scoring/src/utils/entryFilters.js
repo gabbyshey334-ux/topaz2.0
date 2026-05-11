@@ -201,3 +201,113 @@ export function getDisplayCategoryName(entry, categoriesList) {
   }
   return 'Unknown';
 }
+
+/** Division types that score as one routine (multiple DB rows may exist per routine). */
+export const GROUP_DIVISION_TYPES_FOR_SCORING = [
+  'Duo',
+  'Trio',
+  'Small Group',
+  'Large Group',
+  'Production'
+];
+
+function parseGroupMembersSortedKey(entry) {
+  const gm = entry?.group_members;
+  if (Array.isArray(gm) && gm.length > 0) {
+    return gm
+      .map((m) =>
+        typeof m === 'string'
+          ? String(m).trim().toLowerCase()
+          : String(m?.name || '').trim().toLowerCase()
+      )
+      .filter(Boolean)
+      .sort()
+      .join('|');
+  }
+  const dt = entry?.dance_type;
+  if (typeof dt === 'string') {
+    try {
+      const match = dt.match(/Members: (\[.*?\])/);
+      if (match) {
+        const arr = JSON.parse(match[1]);
+        return arr
+          .map((x) => String(typeof x === 'string' ? x : x?.name || '').trim().toLowerCase())
+          .filter(Boolean)
+          .sort()
+          .join('|');
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return '';
+}
+
+export function isGroupDivisionForScoring(entry) {
+  const d = getEntryDivisionType(entry);
+  return GROUP_DIVISION_TYPES_FOR_SCORING.includes(d);
+}
+
+/**
+ * Stable key: same routine + same category/age/division → one scoring card.
+ * Uses routine_name when present; otherwise competitor_name (website sync stores routine there).
+ * Appends sorted member names when present so duplicate rows share one key even if labels differ slightly.
+ */
+export function getRoutineGroupKey(entry) {
+  if (!entry) return '';
+  if (!isGroupDivisionForScoring(entry)) {
+    return `solo::${entry.id}`;
+  }
+  const routineLabel = String(entry.routine_name ?? entry.competitor_name ?? '').trim();
+  const membersKey = parseGroupMembersSortedKey(entry);
+  const routineNorm = normalizeMatchKey(routineLabel);
+  const identity = membersKey ? `${routineNorm}::${membersKey}` : routineNorm;
+  return [
+    entry.category_id || '',
+    entry.age_division_id || '',
+    normalizeMatchKey(getEntryDivisionType(entry)),
+    identity
+  ].join('::');
+}
+
+export function dedupeEntriesForGroupScoring(entryList) {
+  if (!entryList?.length) return [];
+  return entryList.filter((entry, index, arr) => {
+    if (!isGroupDivisionForScoring(entry)) return true;
+    const key = getRoutineGroupKey(entry);
+    return arr.findIndex((e) => isGroupDivisionForScoring(e) && getRoutineGroupKey(e) === key) === index;
+  });
+}
+
+export function getSiblingRoutineEntries(entry, allEntries) {
+  if (!entry || !allEntries?.length || !isGroupDivisionForScoring(entry)) return [];
+  const key = getRoutineGroupKey(entry);
+  return allEntries.filter(
+    (e) => e.id !== entry.id && isGroupDivisionForScoring(e) && getRoutineGroupKey(e) === key
+  );
+}
+
+/** Primary headline for group cards: explicit routine title when synced/admin adds it. */
+export function getRoutineDisplayTitle(entry) {
+  if (!entry) return '';
+  const t = entry.routine_name?.trim();
+  if (t) return t;
+  return String(entry.competitor_name ?? '').trim();
+}
+
+/** Match search query against routine title and group member names. */
+export function entryMatchesSearchQuery(entry, queryLower) {
+  if (!queryLower) return true;
+  if ((entry.competitor_name || '').toLowerCase().includes(queryLower)) return true;
+  if (String(entry.entry_number).includes(queryLower)) return true;
+  const routine = (entry.routine_name || '').toLowerCase();
+  if (routine.includes(queryLower)) return true;
+  const gm = entry.group_members;
+  if (Array.isArray(gm)) {
+    for (const m of gm) {
+      const n = typeof m === 'string' ? m : m?.name;
+      if (n && String(n).toLowerCase().includes(queryLower)) return true;
+    }
+  }
+  return false;
+}

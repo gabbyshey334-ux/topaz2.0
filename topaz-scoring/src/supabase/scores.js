@@ -243,6 +243,54 @@ export const checkExistingScore = async (entryId, judgeNumber) => {
 };
 
 /**
+ * Insert or update this judge's score for an entry (unique on entry_id + judge_number).
+ */
+export const upsertJudgeScore = async (scoreData) => {
+  try {
+    const {
+      competition_id,
+      entry_id,
+      judge_number,
+      technique,
+      creativity,
+      presentation,
+      appearance,
+      notes
+    } = scoreData;
+
+    const existing = await checkExistingScore(entry_id, judge_number);
+    if (!existing.success) throw new Error(existing.error);
+
+    const techniqueN = parseFloat(technique);
+    const creativityN = parseFloat(creativity);
+    const presentationN = parseFloat(presentation);
+    const appearanceN = parseFloat(appearance);
+
+    const payload = {
+      technique: techniqueN,
+      creativity: creativityN,
+      presentation: presentationN,
+      appearance: appearanceN,
+      notes: notes || null
+    };
+
+    if (existing.data?.id) {
+      return updateScore(existing.data.id, payload);
+    }
+
+    return createScore({
+      competition_id,
+      entry_id,
+      judge_number,
+      ...payload
+    });
+  } catch (error) {
+    console.error('❌ Error upserting judge score:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
  * Bulk create scores
  * @param {Array} scoresData - Array of score objects (including notes)
  * @returns {Array} - Created scores

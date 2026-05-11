@@ -6,7 +6,7 @@ import 'react-lazy-load-image-component/src/effects/blur.css';
 import Layout from '../components/Layout';
 import EmptyState from '../components/EmptyState';
 import AbilityBadge from '../components/AbilityBadge';
-import { createScore, getEntryScores, updateScore } from '../supabase/scores';
+import { getEntryScores, upsertJudgeScore } from '../supabase/scores';
 import { validateScore, calculateTotal } from '../utils/calculations';
 import { getAdminFilters, subscribeToAdminFilters } from '../supabase/adminFilters';
 import { getCompetition } from '../supabase/competitions';
@@ -20,7 +20,12 @@ import {
   getDisplayCategoryName,
   getEntryDivisionType,
   getEntryAgeGroupLabel,
-  matchesDivisionTypeFilter
+  matchesDivisionTypeFilter,
+  dedupeEntriesForGroupScoring,
+  getSiblingRoutineEntries,
+  getRoutineDisplayTitle,
+  entryMatchesSearchQuery,
+  isGroupDivisionForScoring
 } from '../utils/entryFilters';
 
 function ScoringInterface() {
@@ -224,14 +229,14 @@ function ScoringInterface() {
       filtered = filtered.filter((e) => abilitiesMatch(e.ability_level, adminFilters.ability_filter));
     }
 
-    // Apply search query (only filter judges can control)
+    // Apply search query (only filter judges can control); includes routine + member names for groups
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(e => 
-        e.competitor_name.toLowerCase().includes(query) ||
-        e.entry_number.toString().includes(query)
-      );
+      filtered = filtered.filter((e) => entryMatchesSearchQuery(e, query));
     }
+
+    // One scoring row per group routine (Duo/Trio/Small/Large Group/Production)
+    filtered = dedupeEntriesForGroupScoring(filtered);
 
     setFilteredEntries(filtered);
     setCurrentIndex(0);
@@ -247,36 +252,43 @@ function ScoringInterface() {
     setTotal(t + c + p + a);
   }, [technique, creativity, presentation, appearance]);
 
-  // Load existing score for current entry
+  // Load existing score for current entry (including sibling rows for the same group routine)
   useEffect(() => {
     const loadExistingScore = async () => {
       if (!currentEntry) return;
 
+      const routineGroup = [
+        currentEntry,
+        ...getSiblingRoutineEntries(currentEntry, entries)
+      ];
+
       try {
-        const result = await getEntryScores(currentEntry.id);
-        
-        if (result.success && result.data) {
-          const scores = result.data;
-          const judgeScore = scores.find(s => s.judge_number === judgeNumber);
+        for (const ent of routineGroup) {
+          const result = await getEntryScores(ent.id);
 
-          if (judgeScore) {
-            // Load existing scores
-            setTechnique(judgeScore.technique.toString());
-            setCreativity(judgeScore.creativity.toString());
-            setPresentation(judgeScore.presentation.toString());
-            setAppearance(judgeScore.appearance.toString());
-            setNotes(judgeScore.notes || '');
-            setExistingScoreId(judgeScore.id);
+          if (result.success && result.data) {
+            const scores = result.data;
+            const judgeScore = scores.find((s) => s.judge_number === judgeNumber);
 
-            // Mark as scored
-            setScoredEntries(prev => new Set([...prev, currentEntry.id]));
-          } else {
-            // Clear form
-            clearForm();
+            if (judgeScore) {
+              setTechnique(judgeScore.technique.toString());
+              setCreativity(judgeScore.creativity.toString());
+              setPresentation(judgeScore.presentation.toString());
+              setAppearance(judgeScore.appearance.toString());
+              setNotes(judgeScore.notes || '');
+              setExistingScoreId(judgeScore.id);
+
+              setScoredEntries((prev) => {
+                const next = new Set(prev);
+                routineGroup.forEach((e) => next.add(e.id));
+                return next;
+              });
+              return;
+            }
           }
-        } else {
-          clearForm();
         }
+
+        clearForm();
       } catch (error) {
         console.error('Error loading existing score:', error);
         clearForm();
@@ -284,7 +296,7 @@ function ScoringInterface() {
     };
 
     loadExistingScore();
-  }, [currentEntry, judgeNumber]);
+  }, [currentEntry, judgeNumber, entries]);
 
   // Clear form
   const clearForm = () => {
@@ -344,35 +356,47 @@ function ScoringInterface() {
     try {
       setSaving(true);
 
-      const scoreData = {
+      const scorePayload = {
         competition_id: competitionId,
-        entry_id: currentEntry.id,
         judge_number: judgeNumber,
         technique: parseFloat(technique),
         creativity: parseFloat(creativity),
         presentation: parseFloat(presentation),
         appearance: parseFloat(appearance),
-        total_score: parseFloat(total.toFixed(2)),
         notes: notes.trim() || null
       };
 
-      let result;
-      if (existingScoreId) {
-        // Update existing score
-        result = await updateScore(existingScoreId, scoreData);
-      } else {
-        // Create new score
-        result = await createScore(scoreData);
+      const targets = [
+        currentEntry,
+        ...getSiblingRoutineEntries(currentEntry, entries)
+      ];
+
+      let primaryScoreId = null;
+
+      for (const ent of targets) {
+        const result = await upsertJudgeScore({
+          ...scorePayload,
+          entry_id: ent.id
+        });
+
+        if (!result.success) {
+          throw new Error(result.error);
+        }
+
+        if (ent.id === currentEntry.id) {
+          primaryScoreId = result.data?.id ?? null;
+        }
       }
 
-      if (!result.success) {
-        throw new Error(result.error);
-      }
+      setExistingScoreId(primaryScoreId);
 
       toast.success('Score saved!');
       
-      // Mark as scored
-      setScoredEntries(prev => new Set([...prev, currentEntry.id]));
+      setScoredEntries((prev) => {
+        const next = new Set(prev);
+        targets.forEach((t) => next.add(t.id));
+        return next;
+      });
 
       // Move to next entry if requested
       if (moveNext) {
@@ -438,6 +462,11 @@ function ScoringInterface() {
   const getCategoryNameForEntry = (entry) => getDisplayCategoryName(entry, categories);
 
   const getEntryAgeLabel = (entry) => getEntryAgeGroupLabel(entry, ageDivisions);
+
+  const getEntryListPrimaryLabel = (entry) =>
+    isGroupDivisionForScoring(entry)
+      ? getRoutineDisplayTitle(entry)
+      : entry.competitor_name;
 
   // Calculate progress
   const calculateProgress = () => {
@@ -691,7 +720,7 @@ function ScoringInterface() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold truncate">
-                        #{entry.entry_number} {entry.competitor_name}
+                        #{entry.entry_number} {getEntryListPrimaryLabel(entry)}
                       </p>
                       <p className="text-xs truncate opacity-80">
                         {getCategoryNameForEntry(entry)}
@@ -728,7 +757,7 @@ function ScoringInterface() {
                     }`}
                   >
                     <span className="mr-2">{scoredEntries.has(entry.id) ? '✓' : '○'}</span>
-                    #{entry.entry_number} {entry.competitor_name}
+                    #{entry.entry_number} {getEntryListPrimaryLabel(entry)}
                   </button>
                 ))}
               </div>
@@ -745,7 +774,7 @@ function ScoringInterface() {
                   {currentEntry.photo_url ? (
                     <LazyLoadImage
                       src={currentEntry.photo_url}
-                      alt={currentEntry.competitor_name}
+                      alt={getEntryListPrimaryLabel(currentEntry)}
                       effect="blur"
                       className="w-32 h-32 sm:w-40 sm:h-40 object-cover rounded-lg border-2 border-gray-300"
                       placeholder={
@@ -769,7 +798,9 @@ function ScoringInterface() {
                     </span>
                     <div className="flex-1">
                       <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-                        {currentEntry.competitor_name} {currentEntry.age && `(${currentEntry.age})`}
+                        {isGroupDivisionForScoring(currentEntry)
+                          ? `${getRoutineDisplayTitle(currentEntry)}${currentEntry.age ? ` (${currentEntry.age})` : ''}`
+                          : `${currentEntry.competitor_name}${currentEntry.age ? ` (${currentEntry.age})` : ''}`}
                       </h2>
                       <div className="flex flex-wrap gap-2">
                         <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold">
