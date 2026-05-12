@@ -25,7 +25,8 @@ import {
   formatEntryName,
   getAbilityLevel,
   entryMatchesSearchQuery,
-  getMemberCount
+  getMemberCount,
+  isGroupDivisionForScoring
 } from '../utils/entryFilters';
 import { pickReconciledJudgeScore } from '../utils/scoreReconciliation';
 
@@ -378,14 +379,19 @@ function ScoringInterface() {
         notes: notes.trim() || null
       };
 
-      const targets = [
+      const routineTargets = [
         currentEntry,
         ...(siblingMapRef.current.get(currentEntry.id) || [])
       ];
 
+      // Non-solo grouped routines: one score row (primary entry_id only).
+      const saveTargets = isGroupDivisionForScoring(currentEntry)
+        ? [currentEntry]
+        : routineTargets;
+
       let primaryScoreId = null;
 
-      for (const ent of targets) {
+      for (const ent of saveTargets) {
         const result = await upsertJudgeScore({
           ...scorePayload,
           entry_id: ent.id
@@ -403,10 +409,10 @@ function ScoringInterface() {
       setExistingScoreId(primaryScoreId);
 
       toast.success('Score saved!');
-      
+
       setScoredEntries((prev) => {
         const next = new Set(prev);
-        targets.forEach((t) => next.add(t.id));
+        routineTargets.forEach((t) => next.add(t.id));
         return next;
       });
 
