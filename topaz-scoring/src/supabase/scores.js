@@ -1,13 +1,29 @@
 import { supabase } from './config';
 
+async function getPerformanceIdForEntryId(entryId) {
+  if (!entryId) return null;
+  const { data, error } = await supabase
+    .from('entries')
+    .select('performance_id')
+    .eq('id', entryId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data.performance_id ?? null;
+}
+
 /**
  * Create a new score
- * @param {Object} scoreData - { competition_id, entry_id, judge_number, technique, creativity, presentation, appearance, notes }
+ * @param {Object} scoreData - { competition_id, entry_id, performance_id?, judge_number, technique, creativity, presentation, appearance, notes }
  * @returns {Object} - Created score data
  */
 export const createScore = async (scoreData) => {
   try {
     console.log('Creating score:', scoreData);
+
+    const performanceId =
+      scoreData.performance_id != null
+        ? scoreData.performance_id
+        : await getPerformanceIdForEntryId(scoreData.entry_id);
     
     // Calculate total
     const total = (
@@ -22,6 +38,7 @@ export const createScore = async (scoreData) => {
       .insert([{
         competition_id: scoreData.competition_id,
         entry_id: scoreData.entry_id,
+        performance_id: performanceId,
         judge_number: scoreData.judge_number,
         technique: parseFloat(scoreData.technique),
         creativity: parseFloat(scoreData.creativity),
@@ -224,7 +241,22 @@ export const deleteScore = async (scoreId) => {
 export const checkExistingScore = async (entryId, judgeNumber) => {
   try {
     console.log('Checking existing score:', entryId, judgeNumber);
-    
+
+    const performanceId = await getPerformanceIdForEntryId(entryId);
+    if (performanceId) {
+      const { data: byPerf, error: perfErr } = await supabase
+        .from('scores')
+        .select('*')
+        .eq('performance_id', performanceId)
+        .eq('judge_number', judgeNumber)
+        .maybeSingle();
+      if (perfErr) throw perfErr;
+      if (byPerf) {
+        console.log('✅ Existing score check (by performance): Found');
+        return { success: true, data: byPerf };
+      }
+    }
+
     const { data, error } = await supabase
       .from('scores')
       .select('*')

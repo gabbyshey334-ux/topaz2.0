@@ -1,4 +1,5 @@
 import { supabase } from './config';
+import { createPerformanceForEntry, ensurePerformancesLinked } from './performances';
 
 /**
  * Create a new entry
@@ -47,6 +48,18 @@ export const createEntry = async (entryData) => {
       console.log('📦 Group members being saved:', cleanedMembers);
     }
 
+    // One performance row per judge-scored unit (participants normalized)
+    const perfShape = {
+      ...entryToInsert,
+      competitor_name: entryToInsert.competitor_name,
+      routine_name: entryData.routine_name ?? null,
+    };
+    const perfResult = await createPerformanceForEntry(perfShape, entryData.competition_id);
+    if (!perfResult.success) {
+      return { success: false, error: perfResult.error || 'Failed to create performance' };
+    }
+    entryToInsert.performance_id = perfResult.performanceId;
+
     const { data, error } = await supabase
       .from('entries')
       .insert([entryToInsert])
@@ -54,23 +67,26 @@ export const createEntry = async (entryData) => {
       .single();
 
     if (error) {
-      // If error is about is_medal_program column, try without it
       if (error.message && error.message.includes('is_medal_program')) {
         console.warn('⚠️ is_medal_program column not found, saving without it...');
         delete entryToInsert.is_medal_program;
-        
+
         const { data: retryData, error: retryError } = await supabase
           .from('entries')
           .insert([entryToInsert])
           .select()
           .single();
-        
-        if (retryError) throw retryError;
-        
+
+        if (retryError) {
+          await supabase.from('performances').delete().eq('id', entryToInsert.performance_id);
+          throw retryError;
+        }
+
         console.log('✅ Entry created (without is_medal_program):', retryData);
         return { success: true, data: retryData };
       }
-      
+
+      await supabase.from('performances').delete().eq('id', entryToInsert.performance_id);
       throw error;
     }
     
@@ -102,9 +118,16 @@ export const getCompetitionEntries = async (competitionId) => {
       .order('entry_number');
 
     if (error) throw error;
+
+    let rows = data || [];
+    try {
+      rows = await ensurePerformancesLinked(rows, competitionId);
+    } catch (linkErr) {
+      console.warn('ensurePerformancesLinked skipped:', linkErr?.message || linkErr);
+    }
     
-    console.log('✅ Entries fetched:', data?.length);
-    return { success: true, data };
+    console.log('✅ Entries fetched:', rows?.length);
+    return { success: true, data: rows };
   } catch (error) {
     console.error('❌ Error fetching entries:', error);
     return { success: false, error: error.message };

@@ -123,6 +123,14 @@ describe('getCanonicalPerformanceEntries & getPerformanceScoreEntryIds', () => {
     const ids = getPerformanceScoreEntryIds(canon[0], entries);
     expect([...ids].sort()).toEqual(['18', '6']);
   });
+
+  it('getPerformanceScoreEntryIds prefers shared performance_id on entry rows', () => {
+    const all = [
+      { id: 'a', performance_id: 'p1', division_type: 'Duo', dance_type: 'Tap', group_members: ['x'] },
+      { id: 'b', performance_id: 'p1', division_type: 'Duo', dance_type: 'Tap', group_members: ['y'] },
+    ];
+    expect([...getPerformanceScoreEntryIds(all[0], all)].sort()).toEqual(['a', 'b']);
+  });
 });
 
 describe('sharesMemberBetweenEntries', () => {

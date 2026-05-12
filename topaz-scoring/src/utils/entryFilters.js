@@ -208,6 +208,11 @@ export function getCanonicalPerformanceEntries(entries) {
 /** All `entries.id` rows whose judge scores apply to this performance (primary + merged siblings). */
 export function getPerformanceScoreEntryIds(entry, allEntries) {
   if (!entry?.id) return new Set();
+  const pid = entry.performance_id;
+  if (pid && allEntries && Array.isArray(allEntries) && allEntries.length > 0) {
+    const linked = allEntries.filter((e) => e.performance_id === pid).map((e) => e.id).filter(Boolean);
+    if (linked.length > 0) return new Set(linked);
+  }
   if (!allEntries || !Array.isArray(allEntries) || allEntries.length === 0) {
     return new Set([entry.id]);
   }

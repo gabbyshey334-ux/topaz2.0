@@ -44,6 +44,14 @@ export {
   getNextEntryNumber
 } from './entries';
 
+// Performance model (canonical routine + participants)
+export {
+  performancePayloadFromEntry,
+  replaceParticipantsForPerformance,
+  createPerformanceForEntry,
+  ensurePerformancesLinked,
+} from './performances';
+
 // Score functions
 export {
   createScore,
@@ -53,7 +61,8 @@ export {
   updateScore,
   deleteScore,
   checkExistingScore,
-  bulkCreateScores
+  bulkCreateScores,
+  upsertJudgeScore
 } from './scores';
 
 // Photo functions
