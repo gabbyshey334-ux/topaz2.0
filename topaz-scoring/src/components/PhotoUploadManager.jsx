@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { getCompetitionEntries, updateEntry } from '../supabase/entries';
-import { formatEntryNameWithNumber } from '../utils/entryFilters';
+import { formatEntryName } from '../utils/entryFilters';
 import { uploadEntryPhoto, compressImage } from '../supabase/photos';
 import LoadingSpinner from './LoadingSpinner';
 
@@ -171,7 +171,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
         });
 
         if (updateResult.success) {
-          toast.success(`Photo uploaded for ${formatEntryNameWithNumber(entry)}`);
+          toast.success(`Photo uploaded for ${formatEntryName(entry)}`);
           await loadEntries();
         } else {
           toast.error('Failed to update entry');
@@ -302,7 +302,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
                             <p className="font-semibold text-gray-800">{match.file.name}</p>
                             <p className="text-sm text-gray-600">
                               {match.matched ? (
-                                <>{formatEntryNameWithNumber(match.entry)}</>
+                                <>{formatEntryName(match.entry)}</>
                               ) : (
                                 <>No match found - Entry #{match.entryNumber || '?'} doesn't exist</>
                               )}
@@ -378,10 +378,10 @@ function PhotoUploadManager({ competitionId, onClose }) {
                         </div>
                         <div>
                           <p className="font-bold text-gray-800">
-                            {formatEntryNameWithNumber(entry)}
+                            {formatEntryName(entry)}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {entry.dance_type || 'Solo'} • Age {entry.age}
+                            {entry.dance_type || 'Solo'} • Age {entry.age ?? 'N/A'}
                           </p>
                         </div>
                       </div>

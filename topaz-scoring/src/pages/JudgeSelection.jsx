@@ -198,12 +198,13 @@ function JudgeSelection() {
     if (selectedJudgeNumber == null) return;
     const pins = getJudgePinsObject();
     const correct = pins[String(selectedJudgeNumber)] ?? '';
-    if (!correct || pinInput === String(correct)) {
+    if (pinInput === String(correct)) {
       setShowPinModal(false);
       navigateToScoring(selectedJudgeNumber);
       return;
     }
     setPinError(true);
+    setPinInput('');
   };
 
   // Handle admin view

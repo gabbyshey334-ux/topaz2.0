@@ -22,7 +22,8 @@ import {
   getEntryAgeGroupLabel,
   matchesDivisionTypeFilter,
   groupEntries,
-  formatEntryNameWithNumber,
+  formatEntryName,
+  getAbilityLevel,
   entryMatchesSearchQuery,
   getMemberCount
 } from '../utils/entryFilters';
@@ -183,7 +184,7 @@ function ScoringInterface() {
     };
   }, [competitionId]);
 
-  // Redirect if no competitionId/judgeNumber; otherwise set entries when data is ready
+  // Redirect if missing ids; otherwise collapse group routines to primary rows only
   useEffect(() => {
     if (!competitionId || !judgeNumber) {
       toast.error('Missing competition data. Please start from the home page.');
@@ -192,10 +193,11 @@ function ScoringInterface() {
       }, 1500);
       return;
     }
-    if (allEntries && allEntries.length >= 0) {
-      setEntries(allEntries);
-      setLoading(false);
-    }
+    const raw = Array.isArray(allEntries) ? allEntries : [];
+    const { primary, siblingMap } = groupEntries(raw);
+    siblingMapRef.current = siblingMap;
+    setEntries(primary);
+    setLoading(false);
   }, [competitionId, judgeNumber, allEntries, navigate]);
 
   // Debug: Log all unique division types in entries
@@ -210,48 +212,37 @@ function ScoringInterface() {
     }
   }, [entries]);
 
-  // Filter entries using ADMIN FILTERS (not judge-controlled) + search query;
-  // then one card per group routine via groupEntries (primary rows only).
+  // Filter primary entries using admin filters + search (entries are already one row per routine)
   useEffect(() => {
-    const { primary, siblingMap } = groupEntries(entries);
-    siblingMapRef.current = siblingMap;
-    const primaryIdSet = new Set(primary.map((e) => e.id));
-
     let filtered = [...entries];
 
-    // Apply admin category filter (UUID + normalized style match for synced entries)
     if (adminFilters.category_filter) {
       filtered = filtered.filter((e) =>
         entryMatchesCategoryId(e, adminFilters.category_filter, categories)
       );
     }
 
-    // Apply admin division type filter (entries.division_type — exact when column set)
     if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
       filtered = filtered.filter((e) =>
         matchesDivisionTypeFilter(e, adminFilters.division_type_filter)
       );
     }
 
-    // Apply admin age division filter
     if (adminFilters.age_division_filter) {
       filtered = filtered.filter((e) =>
         ageFilterMatchesEntry(e, adminFilters.age_division_filter, ageDivisions)
       );
     }
 
-    // Apply admin ability level filter (Beginning / Beg / etc.)
     if (adminFilters.ability_filter && adminFilters.ability_filter !== 'all') {
       filtered = filtered.filter((e) => abilitiesMatch(e.ability_level, adminFilters.ability_filter));
     }
 
-    // Apply search query (only filter judges can control); includes routine + member names for groups
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter((e) => entryMatchesSearchQuery(e, query));
     }
 
-    filtered = filtered.filter((e) => primaryIdSet.has(e.id));
     filtered.sort((a, b) => (a.entry_number || 0) - (b.entry_number || 0));
 
     setFilteredEntries(filtered);
@@ -469,7 +460,7 @@ function ScoringInterface() {
           competition,
           categories,
           ageDivisions,
-          entries
+          entries: Array.isArray(allEntries) ? allEntries : entries
         }
       });
     }
@@ -480,7 +471,7 @@ function ScoringInterface() {
   const getEntryAgeLabel = (entry) => getEntryAgeGroupLabel(entry, ageDivisions);
 
   const getScoringSidebarLine = (entry) => {
-    const base = formatEntryNameWithNumber(entry);
+    const base = formatEntryName(entry);
     const div = entry?.division_type;
     if (!div || div === 'Solo') return base;
     const memberCount = getMemberCount(entry);
@@ -794,7 +785,7 @@ function ScoringInterface() {
                   {currentEntry.photo_url ? (
                     <LazyLoadImage
                       src={currentEntry.photo_url}
-                      alt={formatEntryNameWithNumber(currentEntry)}
+                      alt={formatEntryName(currentEntry)}
                       effect="blur"
                       className="w-32 h-32 sm:w-40 sm:h-40 object-cover rounded-lg border-2 border-gray-300"
                       placeholder={
@@ -815,8 +806,10 @@ function ScoringInterface() {
                   <div className="flex items-start gap-3 mb-2">
                     <div className="flex-1">
                       <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-                        {formatEntryNameWithNumber(currentEntry)}
-                        {currentEntry.age ? ` (${currentEntry.age})` : ''}
+                        {formatEntryName(currentEntry)}
+                        {currentEntry?.age != null && currentEntry?.age !== ''
+                          ? ` (${currentEntry.age})`
+                          : ' (N/A)'}
                       </h2>
                       <div className="flex flex-wrap gap-2">
                         <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold">
@@ -825,7 +818,7 @@ function ScoringInterface() {
                         <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold">
                           {getEntryAgeLabel(currentEntry)}
                         </span>
-                        <AbilityBadge abilityLevel={currentEntry.ability_level} size="md" />
+                        <AbilityBadge abilityLevel={getAbilityLevel(currentEntry)} size="md" />
                         <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
                           {getEntryDivisionType(currentEntry)}
                         </span>

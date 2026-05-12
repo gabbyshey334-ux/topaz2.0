@@ -87,85 +87,131 @@ export function getEntryDivisionType(entry) {
 }
 
 /**
- * One display line: "#{entry_number} {competitor_name}" for lists and headers.
+ * Display label: "#{entry_number} {competitor_name}"
  */
-export function formatEntryNameWithNumber(entry) {
+export function formatEntryName(entry) {
   if (!entry) return 'Unknown Entry';
   const num = entry.entry_number ?? '?';
   const name = entry.competitor_name ?? 'Unknown';
-  return `#${num} ${name}`;
+  return '#' + num + ' ' + name;
+}
+
+/** @deprecated Use formatEntryName — same implementation */
+export const formatEntryNameWithNumber = formatEntryName;
+
+export function getAbilityLevel(entry) {
+  return entry?.ability_level ?? 'Not specified';
+}
+
+export function getMemberCount(entry) {
+  if (!entry) return 0;
+  if (Array.isArray(entry.group_members) && entry.group_members.length > 0) {
+    return entry.group_members.length;
+  }
+  const d = entry.division_type ?? '';
+  if (d === 'Duo') return 2;
+  if (d === 'Trio') return 3;
+  if (d === 'Small Group') return 6;
+  if (d === 'Large Group') return 10;
+  if (d === 'Production') return 12;
+  return 0;
+}
+
+function normMemberToken(m) {
+  if (m == null) return '';
+  if (typeof m === 'string') return m.toLowerCase().trim();
+  if (typeof m === 'object') return String(m.name ?? '').toLowerCase().trim();
+  return '';
+}
+
+function memberTokens(entry) {
+  const gm = entry?.group_members;
+  if (!Array.isArray(gm) || gm.length === 0) return [];
+  return gm.map(normMemberToken).filter(Boolean);
+}
+
+/** True if two entries share at least one group member name (case-insensitive). */
+export function sharesMemberBetweenEntries(a, b) {
+  const aMembers = memberTokens(a);
+  const bMembers = memberTokens(b);
+  if (!aMembers.length || !bMembers.length) return false;
+  return aMembers.some((m) => m && bMembers.includes(m));
 }
 
 /**
- * Group DB rows into one scoring routine: Solos stay separate; non-Solos keyed by
- * routine name (competitor_name) + division_type. First row by entry_number is primary; rest are siblings.
+ * Group DB rows into one scoring routine.
+ * Non-Solo rows with group_members: same division_type + same dance_type + overlapping member names → one primary + siblings.
+ * Solos, or rows without group member data, stay standalone (incl. Production with null group_members).
  */
 export function groupEntries(entries) {
   if (!entries || !Array.isArray(entries)) {
     return { primary: [], siblingMap: new Map() };
   }
 
-  const seen = new Map();
-  const primary = [];
-  const siblingMap = new Map();
-
   const sorted = [...entries].sort(
     (a, b) => (a.entry_number ?? 0) - (b.entry_number ?? 0)
   );
 
+  const primary = [];
+  const siblingMap = new Map();
+  const assignedIds = new Set();
+
+  const danceKey = (e) => String(e?.dance_type ?? '');
+
   for (const entry of sorted) {
     if (!entry || entry.id == null) continue;
+    if (assignedIds.has(entry.id)) continue;
 
     const divType = entry.division_type ?? 'Solo';
+    const gm = entry.group_members;
+    const hasGroupMembers = Array.isArray(gm) && gm.length > 0;
 
-    if (divType === 'Solo') {
+    if (divType === 'Solo' || !hasGroupMembers) {
       primary.push(entry);
+      siblingMap.set(entry.id, []);
+      assignedIds.add(entry.id);
       continue;
     }
 
-    const name = (entry.competitor_name ?? '').trim().toLowerCase();
-    const key = `${name}||${divType}`;
-
-    if (!seen.has(key)) {
-      seen.set(key, entry.id);
-      primary.push(entry);
-      siblingMap.set(entry.id, []);
-    } else {
-      const primaryId = seen.get(key);
-      const siblings = siblingMap.get(primaryId);
-      if (siblings) siblings.push(entry);
+    const siblings = [];
+    for (const other of sorted) {
+      if (other.id === entry.id) continue;
+      if (assignedIds.has(other.id)) continue;
+      if ((other.division_type ?? 'Solo') !== divType) continue;
+      if (danceKey(other) !== danceKey(entry)) continue;
+      const ogm = other.group_members;
+      if (!Array.isArray(ogm) || ogm.length === 0) continue;
+      if (sharesMemberBetweenEntries(entry, other)) {
+        siblings.push(other);
+        assignedIds.add(other.id);
+      }
     }
+
+    primary.push(entry);
+    siblingMap.set(entry.id, siblings);
+    assignedIds.add(entry.id);
   }
 
   return { primary, siblingMap };
 }
 
-export function getMemberCount(entry) {
-  if (!entry) return 2;
-  if (Array.isArray(entry.group_members) && entry.group_members.length > 0) {
-    return entry.group_members.length;
-  }
-  const divType = entry.division_type ?? '';
-  if (divType === 'Duo') return 2;
-  if (divType === 'Trio') return 3;
-  if (divType === 'Small Group') return 5;
-  if (divType === 'Large Group') return 8;
-  if (divType === 'Production') return 10;
-  return 2;
+/** Division type filter — exact match on entries.division_type (null/undefined treated as Solo). */
+export function matchesDivisionTypeFilter(entry, filter) {
+  if (!filter || filter === 'all') return true;
+  if (!entry) return false;
+  return (entry.division_type ?? 'Solo') === filter;
 }
 
-/** Division type filter: exact match on entries.division_type when set; else legacy inference. */
-export function matchesDivisionTypeFilter(entry, selectedDivision) {
-  if (!selectedDivision || selectedDivision === 'all') return true;
+export function matchesCategoryFilter(entry, filter) {
+  if (!filter || filter === 'all') return true;
   if (!entry) return false;
-  const raw = entry.division_type;
-  const dt =
-    raw != null && String(raw).trim() !== '' ? String(raw).trim() : null;
-  if (dt != null) return dt === selectedDivision;
-  return (
-    normalizeFilterText(getEntryDivisionType(entry)) ===
-    normalizeFilterText(selectedDivision)
-  );
+  return (entry.category_name ?? entry.dance_type ?? '') === filter;
+}
+
+export function matchesAgeDivisionFilter(entry, filter) {
+  if (!filter || filter === 'all') return true;
+  if (!entry) return false;
+  return (entry.age_division_name ?? '') === filter;
 }
 
 /**

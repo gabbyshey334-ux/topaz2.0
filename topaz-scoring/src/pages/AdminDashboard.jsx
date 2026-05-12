@@ -16,7 +16,8 @@ import {
   getEntryAgeGroupLabel,
   getEntryDivisionType,
   matchesDivisionTypeFilter,
-  formatEntryNameWithNumber
+  formatEntryName,
+  getAbilityLevel
 } from '../utils/entryFilters';
 
 function AdminDashboard() {
@@ -510,13 +511,13 @@ function AdminDashboard() {
                   >
                     <div>
                       <span className="font-semibold text-gray-800">
-                        {formatEntryNameWithNumber(entry)}
+                        {formatEntryName(entry)}
                       </span>
                       <div className="text-sm text-gray-600 mt-1">
                         {getDisplayCategoryName(entry, categories)} • 
                         {getEntryDivisionType(entry)} • 
-                        {getEntryAgeGroupLabel(entry, ageDivisions)} • 
-                        {entry.ability_level || 'N/A'}
+                        {getEntryAgeGroupLabel(entry, ageDivisions)} •{' '}
+                        {getAbilityLevel(entry)}
                       </div>
                     </div>
                   </div>
