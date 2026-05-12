@@ -28,6 +28,39 @@ import {
   getMemberCount
 } from '../utils/entryFilters';
 
+/** Total from a scores row (prefer DB total_score). */
+function getScoreRowTotal(s) {
+  if (s == null) return 0;
+  const fromCol = parseFloat(s.total_score);
+  if (!Number.isNaN(fromCol) && s.total_score != null && s.total_score !== '') return fromCol;
+  return (
+    (parseFloat(s.technique) || 0) +
+    (parseFloat(s.creativity) || 0) +
+    (parseFloat(s.presentation) || 0) +
+    (parseFloat(s.appearance) || 0)
+  );
+}
+
+/**
+ * When merged routine rows have different scores for the same judge, pick one deterministically:
+ * 1) Prefer the primary entry's row (canonical card).
+ * 2) Else highest total; tie-break lowest entry_number.
+ */
+function pickReconciledJudgeScore(candidates, primaryEntryId) {
+  if (!candidates?.length) return null;
+  const onPrimary = candidates.find((c) => c.entry?.id === primaryEntryId);
+  if (onPrimary) return onPrimary.score;
+  return candidates.reduce((best, cur) => {
+    const bt = getScoreRowTotal(best.score);
+    const ct = getScoreRowTotal(cur.score);
+    if (ct > bt) return cur;
+    if (ct < bt) return best;
+    const bn = best.entry?.entry_number ?? Infinity;
+    const cn = cur.entry?.entry_number ?? Infinity;
+    return cn < bn ? cur : best;
+  }).score;
+}
+
 function ScoringInterface() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -259,7 +292,7 @@ function ScoringInterface() {
     setTotal(t + c + p + a);
   }, [technique, creativity, presentation, appearance]);
 
-  // Load existing score for current entry (including sibling rows for the same group routine)
+  // Load existing score for current entry (merged routines: reconcile conflicting rows per judge)
   useEffect(() => {
     const loadExistingScore = async () => {
       if (!currentEntry) return;
@@ -270,32 +303,36 @@ function ScoringInterface() {
       ];
 
       try {
+        const candidates = [];
+
         for (const ent of routineGroup) {
           const result = await getEntryScores(ent.id);
-
-          if (result.success && result.data) {
-            const scores = result.data;
-            const judgeScore = scores.find((s) => s.judge_number === judgeNumber);
-
-            if (judgeScore) {
-              setTechnique(judgeScore.technique.toString());
-              setCreativity(judgeScore.creativity.toString());
-              setPresentation(judgeScore.presentation.toString());
-              setAppearance(judgeScore.appearance.toString());
-              setNotes(judgeScore.notes || '');
-              setExistingScoreId(judgeScore.id);
-
-              setScoredEntries((prev) => {
-                const next = new Set(prev);
-                routineGroup.forEach((e) => next.add(e.id));
-                return next;
-              });
-              return;
-            }
+          if (!result.success || !result.data) continue;
+          const judgeScore = result.data.find((s) => s.judge_number === judgeNumber);
+          if (judgeScore) {
+            candidates.push({ entry: ent, score: judgeScore });
           }
         }
 
-        clearForm();
+        if (candidates.length === 0) {
+          clearForm();
+          return;
+        }
+
+        const judgeScore = pickReconciledJudgeScore(candidates, currentEntry.id);
+
+        setTechnique(judgeScore.technique.toString());
+        setCreativity(judgeScore.creativity.toString());
+        setPresentation(judgeScore.presentation.toString());
+        setAppearance(judgeScore.appearance.toString());
+        setNotes(judgeScore.notes || '');
+        setExistingScoreId(judgeScore.id);
+
+        setScoredEntries((prev) => {
+          const next = new Set(prev);
+          routineGroup.forEach((e) => next.add(e.id));
+          return next;
+        });
       } catch (error) {
         console.error('Error loading existing score:', error);
         clearForm();
