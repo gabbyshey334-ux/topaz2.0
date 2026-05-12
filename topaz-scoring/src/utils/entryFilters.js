@@ -108,7 +108,7 @@ export function getMemberCount(entry) {
   if (Array.isArray(entry.group_members) && entry.group_members.length > 0) {
     return entry.group_members.length;
   }
-  const d = entry.division_type ?? '';
+  const d = getEntryDivisionType(entry);
   if (d === 'Duo') return 2;
   if (d === 'Trio') return 3;
   if (d === 'Small Group') return 6;
@@ -140,7 +140,8 @@ export function sharesMemberBetweenEntries(a, b) {
 
 /**
  * Group DB rows into one scoring routine.
- * Non-Solo rows with group_members: same division_type + same dance_type + overlapping member names → one primary + siblings.
+ * Non-Solo rows with group_members: same effective division type + same dance_type + overlapping member names → one primary + siblings.
+ * Effective division uses entries.division_type when set, else inferred from dance_type (see getEntryDivisionType).
  * Solos, or rows without group member data, stay standalone (incl. Production with null group_members).
  */
 export function groupEntries(entries) {
@@ -162,7 +163,7 @@ export function groupEntries(entries) {
     if (!entry || entry.id == null) continue;
     if (assignedIds.has(entry.id)) continue;
 
-    const divType = entry.division_type ?? 'Solo';
+    const divType = getEntryDivisionType(entry);
     const gm = entry.group_members;
     const hasGroupMembers = Array.isArray(gm) && gm.length > 0;
 
@@ -177,7 +178,7 @@ export function groupEntries(entries) {
     for (const other of sorted) {
       if (other.id === entry.id) continue;
       if (assignedIds.has(other.id)) continue;
-      if ((other.division_type ?? 'Solo') !== divType) continue;
+      if (getEntryDivisionType(other) !== divType) continue;
       if (danceKey(other) !== danceKey(entry)) continue;
       const ogm = other.group_members;
       if (!Array.isArray(ogm) || ogm.length === 0) continue;
@@ -215,11 +216,11 @@ export function getPerformanceScoreEntryIds(entry, allEntries) {
   return new Set([entry.id, ...sibs.map((s) => s.id)]);
 }
 
-/** Division type filter — exact match on entries.division_type (null/undefined treated as Solo). */
+/** Division type filter — uses effective division (column or inferred from dance_type). */
 export function matchesDivisionTypeFilter(entry, filter) {
   if (!filter || filter === 'all') return true;
   if (!entry) return false;
-  return (entry.division_type ?? 'Solo') === filter;
+  return getEntryDivisionType(entry) === filter;
 }
 
 export function matchesCategoryFilter(entry, filter) {

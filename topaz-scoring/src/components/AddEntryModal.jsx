@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { createEntry, getNextEntryNumber } from '../supabase/entries';
+import { getEntryDivisionType } from '../utils/entryFilters';
 
 const DANCE_CATEGORIES = [
   { name: 'Tap', type: 'dance' },
@@ -179,6 +180,10 @@ export default function AddEntryModal({
         age_division_id: entry.ageDivisionId || null,
         ability_level: entry.abilityLevel,
         is_medal_program: entry.isMedalProgram,
+        division_type: getEntryDivisionType({
+          dance_type: entry.type === 'group' ? entry.divisionType : 'Solo',
+          division_type: null,
+        }),
         dance_type: entry.divisionType,
         group_members: cleanedGroupMembers,
         photo_url: null,

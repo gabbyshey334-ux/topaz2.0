@@ -483,15 +483,14 @@ function ScoringInterface() {
 
   const getScoringSidebarLine = (entry) => {
     const base = formatEntryName(entry);
-    const div = entry?.division_type;
+    const div = getEntryDivisionType(entry);
     if (!div || div === 'Solo') return base;
     const memberCount = getMemberCount(entry);
     const memberPart = memberCount > 0 ? ` • ${memberCount} members` : '';
     return `${base} (${div}${memberPart})`;
   };
 
-  const isNonSoloDivision = (entry) =>
-    !!(entry?.division_type && entry.division_type !== 'Solo');
+  const isNonSoloDivision = (entry) => getEntryDivisionType(entry) !== 'Solo';
 
   // Calculate progress
   const calculateProgress = () => {
@@ -624,8 +623,7 @@ function ScoringInterface() {
 
   const progress = calculateProgress();
   const showGroupMemberList =
-    currentEntry.division_type &&
-    currentEntry.division_type !== 'Solo' &&
+    getEntryDivisionType(currentEntry) !== 'Solo' &&
     Array.isArray(currentEntry.group_members) &&
     currentEntry.group_members.length > 0;
   const groupMembers = showGroupMemberList ? parseGroupMembersFromEntry(currentEntry) : [];

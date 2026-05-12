@@ -16,6 +16,7 @@ import {
   bulkCreateEntries
 } from '../supabase';
 import { uploadEntryPhoto } from '../supabase/photos';
+import { getEntryDivisionType } from '../utils/entryFilters';
 
 function CompetitionSetup() {
   const navigate = useNavigate();
@@ -961,6 +962,10 @@ function CompetitionSetup() {
           age_division_id: ageDivisionSupabaseId,
           ability_level: entry.abilityLevel,
           is_medal_program: entry.isMedalProgram,
+          division_type: getEntryDivisionType({
+            dance_type: entry.divisionType,
+            division_type: null,
+          }),
           dance_type: entry.divisionType,
           group_members: cleanedGroupMembers, // Send as separate field
           photo_url: photoUrl,

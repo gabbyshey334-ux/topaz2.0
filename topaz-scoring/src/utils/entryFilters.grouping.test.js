@@ -78,6 +78,17 @@ describe('groupEntries (TOPAZ-style data)', () => {
     expect(siblingMap.get('19')).toEqual([]);
   });
 
+  it('merges Duo rows when division_type is null but dance_type encodes Duo (legacy / sync)', () => {
+    const entries = [
+      { id: '6', entry_number: 6, division_type: null, dance_type: 'Duo', group_members: ['Aa', 'Bcd'] },
+      { id: '18', entry_number: 18, division_type: null, dance_type: 'Duo', group_members: ['Bcd', 'Aa'] },
+    ];
+    const { primary, siblingMap } = groupEntries(entries);
+    expect(primary).toHaveLength(1);
+    expect(primary[0].id).toBe('6');
+    expect(siblingMap.get('6').map((e) => e.id)).toEqual(['18']);
+  });
+
   it('does not merge Trios with different dance_type strings', () => {
     const entries = [
       {
