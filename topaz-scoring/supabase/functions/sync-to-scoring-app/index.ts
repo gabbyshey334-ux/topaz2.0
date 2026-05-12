@@ -257,6 +257,64 @@ Deno.serve(async (req: Request) => {
 
   const nextEntryNumber = (maxEntry?.entry_number ?? 0) + 1;
 
+  const perfPayload = {
+    competition_id: competitionId,
+    entry_number: nextEntryNumber,
+    routine_name: null,
+    competitor_name: competitorName,
+    category_id: categoryId,
+    age_division_id: getAgeDivisionId(age),
+    age,
+    dance_type: categoryRaw,
+    ability_level: reg.ability_level || 'Intermediate',
+    studio_name: reg.studio_name || '',
+    teacher_name: reg.teacher_name || '',
+    group_members: groupMembers.length > 0 ? groupMembers : null,
+    division_type: divisionType,
+    is_medal_program: true,
+  };
+
+  const { data: perfRow, error: perfErr } = await scoringClient
+    .from('performances')
+    .insert(perfPayload)
+    .select('id')
+    .single();
+
+  if (perfErr || !perfRow?.id) {
+    const msg = perfErr?.message ?? 'Failed to create performance row';
+    await updateSyncStatus(websiteClient, registrationId, 'failed', null, msg);
+    return new Response(JSON.stringify({ error: msg, perfPayload }), {
+      status: 500,
+      headers: JSON_HEADERS,
+    });
+  }
+
+  const performanceId = perfRow.id as string;
+
+  const participantRows: { performance_id: string; display_name: string; age: number | null; sort_order: number }[] = [];
+  if (groupMembers.length > 0) {
+    groupMembers.forEach((name, idx) => {
+      const n = typeof name === 'string' ? name.trim() : '';
+      if (n) participantRows.push({ performance_id: performanceId, display_name: n, age: null, sort_order: idx });
+    });
+  }
+  if (participantRows.length === 0) {
+    participantRows.push({
+      performance_id: performanceId,
+      display_name: competitorName,
+      age: age || null,
+      sort_order: 0,
+    });
+  }
+
+  const { error: partErr } = await scoringClient.from('performance_participants').insert(participantRows);
+  if (partErr) {
+    await scoringClient.from('performances').delete().eq('id', performanceId);
+    const msg = partErr.message;
+    await updateSyncStatus(websiteClient, registrationId, 'failed', null, msg);
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: JSON_HEADERS });
+  }
+
   const entryPayload = {
     competition_id: competitionId,
     entry_number: nextEntryNumber,
@@ -274,6 +332,7 @@ Deno.serve(async (req: Request) => {
     medal_points: 0,
     current_medal_level: 'None',
     website_registration_id: reg.id,
+    performance_id: performanceId,
   };
 
   console.log('[sync-to-scoring-app] entryPayload:', JSON.stringify(entryPayload));
@@ -296,6 +355,8 @@ Deno.serve(async (req: Request) => {
     const msg = e instanceof Error && e.name === 'AbortError'
       ? 'Scoring app connection timed out after 10 seconds — please retry.'
       : `Unexpected error: ${String(e)}`;
+    await scoringClient.from('performance_participants').delete().eq('performance_id', performanceId);
+    await scoringClient.from('performances').delete().eq('id', performanceId);
     await updateSyncStatus(websiteClient, registrationId, 'failed', null, msg);
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: JSON_HEADERS });
   } finally {
@@ -304,6 +365,8 @@ Deno.serve(async (req: Request) => {
 
   if (insertErr || !insertData) {
     const msg = insertErr?.message ?? 'Insert returned no data';
+    await scoringClient.from('performance_participants').delete().eq('performance_id', performanceId);
+    await scoringClient.from('performances').delete().eq('id', performanceId);
     await updateSyncStatus(websiteClient, registrationId, 'failed', null, msg);
     return new Response(JSON.stringify({ error: msg, entryPayload }), {
       status: 500,
