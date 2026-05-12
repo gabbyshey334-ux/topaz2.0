@@ -1,4 +1,5 @@
 import { supabase } from './config';
+import { groupEntries } from '../utils/entryFilters.js';
 
 /**
  * Get or create a medal participant by name
@@ -485,6 +486,8 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
         id,
         competitor_name,
         dance_type,
+        division_type,
+        routine_name,
         is_medal_program,
         group_members,
         category_id,
@@ -502,13 +505,17 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
       throw entriesError;
     }
 
-    console.log(`📊 Total medal program entries found: ${entries?.length || 0}`);
+    const rawMedalRows = entries || [];
+    const { primary: medalPerformances, siblingMap } = groupEntries(rawMedalRows);
+
+    console.log(`📊 Medal program DB rows: ${rawMedalRows.length}, distinct performances: ${medalPerformances.length}`);
     
     if (entries && entries.length > 0) {
       console.log('📋 Sample entry structure:', {
         id: entries[0].id,
         competitor_name: entries[0].competitor_name,
         dance_type: entries[0].dance_type,
+        division_type: entries[0].division_type,
         has_group_members: !!entries[0].group_members,
         is_medal_program: entries[0].is_medal_program
       });
@@ -555,10 +562,12 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
       };
     }
 
-    // Calculate average score for each entry
+    // Calculate average score for each distinct performance (primary row; scores may be on primary or legacy sibling entry_ids)
     console.log('\n📊 Step 3: Calculating average scores...');
-    const entriesWithScores = entries.map(entry => {
-      const entryScores = allScores.filter(s => s.entry_id === entry.id);
+    const entriesWithScores = medalPerformances.map((entry) => {
+      const siblingIds = (siblingMap.get(entry.id) ?? []).map((s) => s.id);
+      const idSet = new Set([entry.id, ...siblingIds]);
+      const entryScores = allScores.filter((s) => idSet.has(s.entry_id));
       
       if (entryScores.length === 0) {
         console.log(`   ⚠️ No scores for: ${entry.competitor_name}`);

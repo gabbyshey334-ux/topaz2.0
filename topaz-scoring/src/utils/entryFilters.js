@@ -195,6 +195,26 @@ export function groupEntries(entries) {
   return { primary, siblingMap };
 }
 
+/**
+ * One row per judge-scored performance (primary row for each merged group; every solo / non-merged row).
+ * Use for rankings, exports, and counts so sibling DB rows are not double-counted.
+ */
+export function getCanonicalPerformanceEntries(entries) {
+  if (!entries || !Array.isArray(entries)) return [];
+  return groupEntries(entries).primary;
+}
+
+/** All `entries.id` rows whose judge scores apply to this performance (primary + merged siblings). */
+export function getPerformanceScoreEntryIds(entry, allEntries) {
+  if (!entry?.id) return new Set();
+  if (!allEntries || !Array.isArray(allEntries) || allEntries.length === 0) {
+    return new Set([entry.id]);
+  }
+  const { siblingMap } = groupEntries(allEntries);
+  const sibs = siblingMap.get(entry.id) ?? [];
+  return new Set([entry.id, ...sibs.map((s) => s.id)]);
+}
+
 /** Division type filter — exact match on entries.division_type (null/undefined treated as Solo). */
 export function matchesDivisionTypeFilter(entry, filter) {
   if (!filter || filter === 'all') return true;

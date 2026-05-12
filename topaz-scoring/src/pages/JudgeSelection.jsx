@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
@@ -6,7 +6,7 @@ import { getCompetition } from '../supabase/competitions';
 import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
 import { getCompetitionEntries } from '../supabase/entries';
-import { entryMatchesCategory } from '../utils/entryFilters';
+import { entryMatchesCategory, getCanonicalPerformanceEntries } from '../utils/entryFilters';
 
 function JudgeSelection() {
   const navigate = useNavigate();
@@ -30,6 +30,11 @@ function JudgeSelection() {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const performanceRows = useMemo(
+    () => getCanonicalPerformanceEntries(entries),
+    [entries]
+  );
 
   const [showPinModal, setShowPinModal] = useState(false);
   const [selectedJudgeNumber, setSelectedJudgeNumber] = useState(null);
@@ -225,12 +230,12 @@ function JudgeSelection() {
   const getCategoryEntryCount = (categoryId) => {
     const cat = categories.find((c) => c.id === categoryId);
     if (!cat) return 0;
-    return entries.filter((e) => entryMatchesCategory(e, cat)).length;
+    return performanceRows.filter((e) => entryMatchesCategory(e, cat)).length;
   };
 
   // Get entry count for an age division
   const getAgeDivisionEntryCount = (divisionId) => {
-    return entries.filter(e => e.age_division_id === divisionId).length;
+    return performanceRows.filter(e => e.age_division_id === divisionId).length;
   };
 
   return (
@@ -305,7 +310,11 @@ function JudgeSelection() {
               {competition?.name}
             </p>
             <p className="text-sm sm:text-base text-gray-600 mt-2 px-4">
-              {entries.length} total {entries.length === 1 ? 'entry' : 'entries'} • {competition?.judges_count} {competition?.judges_count === 1 ? 'judge' : 'judges'}
+              {performanceRows.length} {performanceRows.length === 1 ? 'performance' : 'performances'}
+              {entries.length !== performanceRows.length
+                ? ` (${entries.length} synced rows)`
+                : ''}{' '}
+              • {competition?.judges_count} {competition?.judges_count === 1 ? 'judge' : 'judges'}
             </p>
           </div>
 

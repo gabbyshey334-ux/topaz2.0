@@ -29,7 +29,7 @@ import {
   getDivisionTypeEmoji,
   getDivisionTypeDisplayName
 } from '../utils/calculations';
-import { formatEntryName } from '../utils/entryFilters';
+import { formatEntryName, groupEntries } from '../utils/entryFilters';
 
 // Helper function to check if a category is special (should not get awards/medals)
 const isSpecialCategory = (category) => {
@@ -157,8 +157,12 @@ function ResultsPage() {
   const rankedResults = useMemo(() => {
     if (entries.length === 0 || scores.length === 0) return [];
 
-    const entriesWithAverages = entries.map(entry => {
-      const entryScores = scores.filter(s => s.entry_id === entry.id);
+    const { primary: canonicalRows, siblingMap } = groupEntries(entries);
+
+    const entriesWithAverages = canonicalRows.map((entry) => {
+      const siblingIds = (siblingMap.get(entry.id) ?? []).map((s) => s.id);
+      const idSet = new Set([entry.id, ...siblingIds]);
+      const entryScores = scores.filter((s) => idSet.has(s.entry_id));
       if (entryScores.length === 0) {
         return { ...entry, averageScore: 0, judgeCount: 0, hasScores: false };
       }
@@ -352,11 +356,12 @@ function ResultsPage() {
 
   // Generate all scorecards in one PDF
   const handleGenerateAllScorecards = async () => {
-    if (!window.confirm(`Generate scorecards for all ${entries.length} entries?\n\nThis may take a few minutes.`)) return;
+    const routineCount = groupEntries(entries).primary.length;
+    if (!window.confirm(`Generate scorecards for all ${routineCount} performances?\n\nThis may take a few minutes.`)) return;
 
     try {
       setGeneratingPdf(true);
-      setPrintProgress({ current: 0, total: entries.length });
+      setPrintProgress({ current: 0, total: routineCount });
       toast.info('Generating all scorecards... Please wait.');
 
       const result = await generateAllScorecards(
@@ -460,9 +465,7 @@ function ResultsPage() {
   };
 
   const handleExport = () => {
-    const category = selectedCategory ? categories.find(c => c.id === selectedCategory) : null;
-    const ageDivision = selectedAgeDivision ? ageDivisions.find(d => d.id === selectedAgeDivision) : null;
-    exportResultsToExcel(filteredResults, categories, ageDivisions, competition, category, ageDivision);
+    exportResultsToExcel(filteredResults, scores, competition, categories, ageDivisions, entries);
     toast.success('Results exported to Excel!');
   };
 
@@ -599,7 +602,7 @@ function ResultsPage() {
               <h3 className="text-3xl font-bold text-teal-600 mb-2">{competition.name}</h3>
               <p className="text-lg text-gray-600 mb-4">{new Date(competition.date).toLocaleDateString()}</p>
               <p className="text-gray-500">
-                {rankedResults.length} total entries • {competition.judges_count} judges • {categories.length} categories
+                {rankedResults.length} performances • {competition.judges_count} judges • {categories.length} categories
               </p>
             </div>
           </div>

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { groupEntries, sharesMemberBetweenEntries } from './entryFilters.js';
+import {
+  groupEntries,
+  sharesMemberBetweenEntries,
+  getCanonicalPerformanceEntries,
+  getPerformanceScoreEntryIds,
+} from './entryFilters.js';
 
 describe('groupEntries (TOPAZ-style data)', () => {
   it('merges Trio rows #9 / #15 / #16 by overlapping members + same dance_type', () => {
@@ -92,6 +97,20 @@ describe('groupEntries (TOPAZ-style data)', () => {
     ];
     const { primary } = groupEntries(entries);
     expect(primary).toHaveLength(2);
+  });
+});
+
+describe('getCanonicalPerformanceEntries & getPerformanceScoreEntryIds', () => {
+  it('returns primary list only', () => {
+    const entries = [
+      { id: '6', entry_number: 6, division_type: 'Duo', dance_type: 'Tap', group_members: ['Aa', 'Bcd'] },
+      { id: '18', entry_number: 18, division_type: 'Duo', dance_type: 'Tap', group_members: ['Bcd', 'Aa'] },
+    ];
+    const canon = getCanonicalPerformanceEntries(entries);
+    expect(canon).toHaveLength(1);
+    expect(canon[0].id).toBe('6');
+    const ids = getPerformanceScoreEntryIds(canon[0], entries);
+    expect([...ids].sort()).toEqual(['18', '6']);
   });
 });
 

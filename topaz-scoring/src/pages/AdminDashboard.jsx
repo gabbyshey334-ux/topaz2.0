@@ -15,6 +15,7 @@ import {
   getDisplayCategoryName,
   getEntryAgeGroupLabel,
   getEntryDivisionType,
+  getCanonicalPerformanceEntries,
   matchesDivisionTypeFilter,
   formatEntryName,
   getAbilityLevel
@@ -134,9 +135,11 @@ function AdminDashboard() {
     };
   }, [competitionId]);
 
+  const canonicalPerformances = getCanonicalPerformanceEntries(allEntries);
+
   // Calculate filtered entries (preview what judges see)
   const filteredEntries = (() => {
-    let filtered = [...allEntries];
+    let filtered = [...canonicalPerformances];
 
     // Filter by category (UUID + normalized style for website-synced rows)
     if (adminFilters.category_filter) {
@@ -485,10 +488,13 @@ function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-lg font-bold text-teal-800">
-                  Showing {filteredEntries.length} of {allEntries.length} entries
+                  Showing {filteredEntries.length} of {canonicalPerformances.length} performances
+                  {canonicalPerformances.length !== allEntries.length
+                    ? ` (${allEntries.length} synced rows)`
+                    : ''}
                 </p>
                 <p className="text-sm text-teal-700 mt-1">
-                  All judges will see these {filteredEntries.length} entries on their scoring screens
+                  All judges will see these {filteredEntries.length} performances on their scoring screens
                 </p>
               </div>
               <div className="text-4xl">👥</div>
@@ -524,7 +530,7 @@ function AdminDashboard() {
                 ))}
                 {filteredEntries.length > 50 && (
                   <div className="text-center text-gray-500 text-sm py-2">
-                    ... and {filteredEntries.length - 50} more entries
+                    ... and {filteredEntries.length - 50} more performances
                   </div>
                 )}
               </div>
