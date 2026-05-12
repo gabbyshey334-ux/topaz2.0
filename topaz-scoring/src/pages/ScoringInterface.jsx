@@ -23,7 +23,8 @@ import {
   matchesDivisionTypeFilter,
   groupEntries,
   formatEntryNameWithNumber,
-  entryMatchesSearchQuery
+  entryMatchesSearchQuery,
+  getMemberCount
 } from '../utils/entryFilters';
 
 function ScoringInterface() {
@@ -480,17 +481,9 @@ function ScoringInterface() {
 
   const getScoringSidebarLine = (entry) => {
     const base = formatEntryNameWithNumber(entry);
-    const div = entry.division_type;
+    const div = entry?.division_type;
     if (!div || div === 'Solo') return base;
-    let memberCount =
-      Array.isArray(entry.group_members) && entry.group_members.length > 0
-        ? entry.group_members.length
-        : null;
-    if (memberCount == null) {
-      if (div === 'Duo') memberCount = 2;
-      else if (div === 'Trio') memberCount = 3;
-      else memberCount = 0;
-    }
+    const memberCount = getMemberCount(entry);
     const memberPart = memberCount > 0 ? ` • ${memberCount} members` : '';
     return `${base} (${div}${memberPart})`;
   };
@@ -515,9 +508,9 @@ function ScoringInterface() {
 
   // Parse group members from legacy dance_type field
   const parseGroupMembersFromDanceType = (danceType) => {
-    if (!danceType) return [];
+    if (danceType == null || danceType === '') return [];
     try {
-      const match = danceType.match(/Members: (\[.*?\])/);
+      const match = String(danceType).match(/Members: (\[.*?\])/);
       if (match) {
         return JSON.parse(match[1]);
       }
@@ -766,7 +759,7 @@ function ScoringInterface() {
               className="w-full bg-white/90 backdrop-blur-sm rounded-lg shadow-md px-4 py-3 text-left flex items-center justify-between"
             >
               <span className="font-semibold text-gray-800">
-                Entry #{currentEntry.entry_number} of {filteredEntries.length}
+                Entry #{currentEntry.entry_number ?? '?'} of {filteredEntries.length}
               </span>
               <span className="text-teal-600">{showEntryList ? '▲' : '▼'}</span>
             </button>
@@ -812,7 +805,7 @@ function ScoringInterface() {
                     />
                   ) : (
                     <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gray-200 rounded-lg flex items-center justify-center text-5xl">
-                      {isGroup(currentEntry) ? '👥' : '💃'}
+                      {isNonSoloDivision(currentEntry) ? '👥' : '💃'}
                     </div>
                   )}
                 </div>

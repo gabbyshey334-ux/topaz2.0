@@ -173,13 +173,17 @@ function JudgeSelection() {
     });
   };
 
+  const getJudgePinsObject = () => {
+    const raw = competition?.judge_pins;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+    return {};
+  };
+
   // Handle judge selection (PIN gate when judge_pins[judge] is set)
   const handleJudgeSelect = (judgeNum) => {
-    const pins = competition.judge_pins && typeof competition.judge_pins === 'object' && !Array.isArray(competition.judge_pins)
-      ? competition.judge_pins
-      : {};
-    const correct = pins[String(judgeNum)];
-    if (correct == null || String(correct).trim() === '') {
+    const pins = getJudgePinsObject();
+    const pinForJudge = pins[String(judgeNum)] ?? '';
+    if (pinForJudge.trim() === '') {
       navigateToScoring(judgeNum);
       return;
     }
@@ -192,8 +196,8 @@ function JudgeSelection() {
   const handlePinSubmit = (e) => {
     e.preventDefault();
     if (selectedJudgeNumber == null) return;
-    const pins = competition.judge_pins || {};
-    const correct = pins[String(selectedJudgeNumber)];
+    const pins = getJudgePinsObject();
+    const correct = pins[String(selectedJudgeNumber)] ?? '';
     if (!correct || pinInput === String(correct)) {
       setShowPinModal(false);
       navigateToScoring(selectedJudgeNumber);

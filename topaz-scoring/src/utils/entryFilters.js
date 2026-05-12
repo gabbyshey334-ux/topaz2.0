@@ -62,9 +62,9 @@ export function getEntryDivisionType(entry) {
     return String(entry.division_type).trim();
   }
 
-  if (!entry?.dance_type) return 'Solo';
+  if (entry?.dance_type == null || entry.dance_type === '') return 'Solo';
 
-  let divisionType = entry.dance_type;
+  let divisionType = String(entry.dance_type);
   const pipeIndex = divisionType.indexOf('|');
   if (pipeIndex > -1) {
     divisionType = divisionType.substring(0, pipeIndex);
@@ -87,13 +87,13 @@ export function getEntryDivisionType(entry) {
 }
 
 /**
- * One display line: "#{entry_number} {competitor_name}" (no leading space if name missing).
+ * One display line: "#{entry_number} {competitor_name}" for lists and headers.
  */
 export function formatEntryNameWithNumber(entry) {
-  if (!entry) return '';
-  const num = entry.entry_number != null ? entry.entry_number : '';
-  const name = entry.competitor_name ?? '';
-  return `#${num} ${name}`.trim();
+  if (!entry) return 'Unknown Entry';
+  const num = entry.entry_number ?? '?';
+  const name = entry.competitor_name ?? 'Unknown';
+  return `#${num} ${name}`;
 }
 
 /**
@@ -101,41 +101,64 @@ export function formatEntryNameWithNumber(entry) {
  * routine name (competitor_name) + division_type. First row by entry_number is primary; rest are siblings.
  */
 export function groupEntries(entries) {
+  if (!entries || !Array.isArray(entries)) {
+    return { primary: [], siblingMap: new Map() };
+  }
+
   const seen = new Map();
   const primary = [];
   const siblingMap = new Map();
 
-  const sorted = [...(entries || [])].sort(
-    (a, b) => (a.entry_number || 0) - (b.entry_number || 0)
+  const sorted = [...entries].sort(
+    (a, b) => (a.entry_number ?? 0) - (b.entry_number ?? 0)
   );
 
   for (const entry of sorted) {
-    if (!entry.division_type || entry.division_type === 'Solo') {
+    if (!entry || entry.id == null) continue;
+
+    const divType = entry.division_type ?? 'Solo';
+
+    if (divType === 'Solo') {
       primary.push(entry);
-      siblingMap.set(entry.id, []);
       continue;
     }
-    const key =
-      String(entry.competitor_name || '').trim().toLowerCase() +
-      '||' +
-      String(entry.division_type || '');
+
+    const name = (entry.competitor_name ?? '').trim().toLowerCase();
+    const key = `${name}||${divType}`;
+
     if (!seen.has(key)) {
       seen.set(key, entry.id);
       primary.push(entry);
       siblingMap.set(entry.id, []);
     } else {
       const primaryId = seen.get(key);
-      const list = siblingMap.get(primaryId);
-      if (list) list.push(entry);
+      const siblings = siblingMap.get(primaryId);
+      if (siblings) siblings.push(entry);
     }
   }
+
   return { primary, siblingMap };
+}
+
+export function getMemberCount(entry) {
+  if (!entry) return 2;
+  if (Array.isArray(entry.group_members) && entry.group_members.length > 0) {
+    return entry.group_members.length;
+  }
+  const divType = entry.division_type ?? '';
+  if (divType === 'Duo') return 2;
+  if (divType === 'Trio') return 3;
+  if (divType === 'Small Group') return 5;
+  if (divType === 'Large Group') return 8;
+  if (divType === 'Production') return 10;
+  return 2;
 }
 
 /** Division type filter: exact match on entries.division_type when set; else legacy inference. */
 export function matchesDivisionTypeFilter(entry, selectedDivision) {
   if (!selectedDivision || selectedDivision === 'all') return true;
-  const raw = entry?.division_type;
+  if (!entry) return false;
+  const raw = entry.division_type;
   const dt =
     raw != null && String(raw).trim() !== '' ? String(raw).trim() : null;
   if (dt != null) return dt === selectedDivision;
@@ -152,9 +175,9 @@ export function matchesDivisionTypeFilter(entry, selectedDivision) {
  */
 export function getEntryStyleLabelForCategoryMatch(entry) {
   const raw = entry?.dance_type;
-  if (!raw || typeof raw !== 'string') return '';
+  if (raw == null || raw === '') return '';
 
-  const trimmed = raw.trim();
+  const trimmed = String(raw).trim();
   const pipeIndex = trimmed.indexOf('|');
   const beforePipe = pipeIndex > -1 ? trimmed.slice(0, pipeIndex).trim() : trimmed;
   const afterPipe = pipeIndex > -1 ? trimmed.slice(pipeIndex + 1).trim() : '';
@@ -341,7 +364,7 @@ export function getSiblingRoutineEntries(entry, allEntries) {
 /** Primary headline for group cards: explicit routine title when synced/admin adds it. */
 export function getRoutineDisplayTitle(entry) {
   if (!entry) return '';
-  const t = entry.routine_name?.trim();
+  const t = entry.routine_name != null ? String(entry.routine_name).trim() : '';
   if (t) return t;
   return String(entry.competitor_name ?? '').trim();
 }
@@ -349,8 +372,9 @@ export function getRoutineDisplayTitle(entry) {
 /** Match search query against routine title and group member names. */
 export function entryMatchesSearchQuery(entry, queryLower) {
   if (!queryLower) return true;
-  if ((entry.competitor_name || '').toLowerCase().includes(queryLower)) return true;
-  if (String(entry.entry_number).includes(queryLower)) return true;
+  if (!entry) return false;
+  if ((entry.competitor_name ?? '').toLowerCase().includes(queryLower)) return true;
+  if (String(entry.entry_number ?? '').includes(queryLower)) return true;
   const routine = (entry.routine_name || '').toLowerCase();
   if (routine.includes(queryLower)) return true;
   const gm = entry.group_members;
