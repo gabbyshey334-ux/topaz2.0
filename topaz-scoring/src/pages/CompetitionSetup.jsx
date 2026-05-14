@@ -74,6 +74,7 @@ function CompetitionSetup() {
     divisionType: 'Solo',
     isMedalProgram: true,
     photoFile: null,
+    photoFile2: null,
     groupMembers: [],
     studioName: '',
     teacherName: ''
@@ -285,6 +286,7 @@ function CompetitionSetup() {
       divisionType: 'Solo',
       isMedalProgram: true,
       photoFile: null,
+      photoFile2: null,
       groupMembers: [],
       studioName: '',
       teacherName: ''
@@ -304,6 +306,7 @@ function CompetitionSetup() {
       divisionType: 'Solo',
       isMedalProgram: true,
       photoFile: null,
+      photoFile2: null,
       groupMembers: [],
       studioName: '',
       teacherName: ''
@@ -318,7 +321,8 @@ function CompetitionSetup() {
       ...currentEntry,
       type: type,
       divisionType: type === 'solo' ? 'Solo' : 'Duo',
-      groupMembers: []
+      groupMembers: [],
+      photoFile2: null,
     });
   };
 
@@ -698,7 +702,9 @@ function CompetitionSetup() {
       divisionType: currentEntry.divisionType,
       isMedalProgram: currentEntry.isMedalProgram,
       photoFile: currentEntry.photoFile,
+      photoFile2: currentEntry.photoFile2,
       photoPreview: currentEntry.photoFile ? URL.createObjectURL(currentEntry.photoFile) : null,
+      photoPreview2: currentEntry.photoFile2 ? URL.createObjectURL(currentEntry.photoFile2) : null,
       groupMembers: cleanedGroupMembers,
       isExpanded: false,
       studioName: currentEntry.studioName?.trim() || '',
@@ -928,6 +934,21 @@ function CompetitionSetup() {
           }
         }
 
+        let photoUrl2 = null;
+        if (entry.photoFile2) {
+          const r2 = await uploadEntryPhoto(
+            entry.photoFile2,
+            entry.id,
+            competitionId
+          );
+          if (r2.success) {
+            photoUrl2 = r2.url;
+            console.log('✅ Second photo uploaded:', photoUrl2);
+          } else {
+            console.error('❌ Second photo upload failed:', r2.error);
+          }
+        }
+
         // Get Supabase category ID from categoryMap
         // entry.categoryId is now just the category name (no variety levels)
         const categorySupabaseId = categoryMap[entry.categoryId] || null;
@@ -969,6 +990,7 @@ function CompetitionSetup() {
           dance_type: entry.divisionType,
           group_members: cleanedGroupMembers, // Send as separate field
           photo_url: photoUrl,
+          photo_url_2: photoUrl2,
           studio_name: entry.studioName || null,
           teacher_name: entry.teacherName || null
         };
@@ -1267,6 +1289,14 @@ function CompetitionSetup() {
                   <li>You can select all photos at once for faster upload</li>
                 </ul>
               </div>
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs sm:text-sm text-blue-900 font-semibold">Photos not uploading after you save?</p>
+                <p className="text-xs sm:text-sm text-blue-800 mt-1">
+                  In the Supabase project for this app, open <strong>Storage</strong>, create a public bucket named{' '}
+                  <code className="bg-white px-1 rounded">entry-photos</code>, then add policies so authenticated users can insert/update/delete and public can read.
+                  Without that bucket, uploads fail silently or with a storage error in the browser console.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1463,7 +1493,7 @@ function CompetitionSetup() {
                   >
                     <div className="flex items-start gap-4">
                       {/* Photo */}
-                      <div className="flex-shrink-0">
+                      <div className="flex-shrink-0 flex gap-1">
                         {entry.photoPreview ? (
                           <img
                             src={entry.photoPreview}
@@ -1475,6 +1505,13 @@ function CompetitionSetup() {
                             {entry.type === 'group' ? '👥' : '💃'}
                           </div>
                         )}
+                        {entry.divisionType === 'Duo' && entry.photoPreview2 ? (
+                          <img
+                            src={entry.photoPreview2}
+                            alt=""
+                            className="w-16 h-16 object-cover rounded-lg border border-teal-200"
+                          />
+                        ) : null}
                       </div>
 
                       {/* Info */}
@@ -1805,7 +1842,14 @@ function CompetitionSetup() {
                 </label>
                 <select
                   value={currentEntry.divisionType}
-                  onChange={(e) => setCurrentEntry({ ...currentEntry, divisionType: e.target.value })}
+                  onChange={(e) => {
+                    const divisionType = e.target.value;
+                    setCurrentEntry({
+                      ...currentEntry,
+                      divisionType,
+                      ...(divisionType !== 'Duo' ? { photoFile2: null } : {}),
+                    });
+                  }}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
                 >
                   {getDivisionTypeOptions(currentEntry.type).map(divType => (
@@ -1862,8 +1906,21 @@ function CompetitionSetup() {
               {/* Photo Upload */}
               <PhotoUpload
                 onPhotoSelect={(file) => setCurrentEntry({ ...currentEntry, photoFile: file })}
-                existingPhotoUrl={currentEntry.photoFile ? URL.createObjectURL(currentEntry.photoFile) : null}
+                label={
+                  currentEntry.type === 'group' && currentEntry.divisionType === 'Duo'
+                    ? 'First dancer photo (optional)'
+                    : currentEntry.type === 'group'
+                      ? 'Group / routine photo (optional)'
+                      : 'Entry photo (optional)'
+                }
               />
+              {currentEntry.type === 'group' && currentEntry.divisionType === 'Duo' && (
+                <PhotoUpload
+                  key="duo-second-photo"
+                  onPhotoSelect={(file) => setCurrentEntry({ ...currentEntry, photoFile2: file })}
+                  label="Second dancer photo (optional)"
+                />
+              )}
 
               {/* Group Members */}
               {currentEntry.type === 'group' && (
@@ -1872,7 +1929,8 @@ function CompetitionSetup() {
                     Group Members *
                   </h4>
                   <p className="text-sm text-gray-600 mb-4">
-                    {currentEntry.divisionType === 'Duo/Trio' && 'Add 2-3 members'}
+                    {currentEntry.divisionType === 'Duo' && 'Add exactly 2 members'}
+                    {currentEntry.divisionType === 'Trio' && 'Add exactly 3 members'}
                     {currentEntry.divisionType === 'Small Group (4-10)' && 'Add 4-10 members'}
                     {currentEntry.divisionType === 'Large Group (11+)' && 'Add 11+ members'}
                     {currentEntry.divisionType === 'Production (10+)' && 'Add 10+ members'}

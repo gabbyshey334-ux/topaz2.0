@@ -106,6 +106,7 @@ function ScoringInterface() {
   // State - UI
   const [showEntryList, setShowEntryList] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState(false);
+  const [hideJudgeNavBack, setHideJudgeNavBack] = useState(false);
 
   const siblingMapRef = useRef(new Map());
 
@@ -185,6 +186,39 @@ function ScoringInterface() {
       channel.unsubscribe();
     };
   }, [competitionId]);
+
+  // After correct judge PIN, hide "Back" on scoring so judges stay in the flow (admins use other nav).
+  useEffect(() => {
+    if (!competitionId || judgeNumber == null) {
+      setHideJudgeNavBack(false);
+      return;
+    }
+    const comp = stateData.competition || loadedCompetition;
+    if (!comp) {
+      setHideJudgeNavBack(false);
+      return;
+    }
+    const pins = comp.judge_pins;
+    const pinForJudge =
+      pins && typeof pins === 'object' && !Array.isArray(pins)
+        ? String(pins[String(judgeNumber)] ?? '').trim()
+        : '';
+    if (!pinForJudge) {
+      setHideJudgeNavBack(false);
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem('topaz_judge_pin_verified');
+      if (!raw) {
+        setHideJudgeNavBack(false);
+        return;
+      }
+      const o = JSON.parse(raw);
+      setHideJudgeNavBack(o.competitionId === competitionId && o.judgeNumber === judgeNumber);
+    } catch {
+      setHideJudgeNavBack(false);
+    }
+  }, [competitionId, judgeNumber, stateData.competition, loadedCompetition]);
 
   // Redirect if missing ids; otherwise collapse group routines to primary rows only
   useEffect(() => {
@@ -610,11 +644,19 @@ function ScoringInterface() {
           <EmptyState
             icon="🎭"
             title="No Entries to Score"
-            description="No entries match the current filters. Try adjusting your category or age division filters."
-            action={{
-              label: "Back to Judge Selection",
-              onClick: () => navigate('/judge-selection', { state: { competitionId } })
-            }}
+            description={
+              hideJudgeNavBack
+                ? 'No entries match the current filters. The competition admin can change filters from the Admin Control Panel.'
+                : 'No entries match the current filters. Try adjusting your category or age division filters.'
+            }
+            action={
+              hideJudgeNavBack
+                ? null
+                : {
+                    label: 'Back to Judge Selection',
+                    onClick: () => navigate('/judge-selection', { state: { competitionId } }),
+                  }
+            }
           />
         </div>
       </Layout>
@@ -633,13 +675,17 @@ function ScoringInterface() {
       <div className="flex-1 flex flex-col p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full">
         {/* HEADER SECTION */}
         <div className="flex items-center justify-between mb-6">
-          <button
-            type="button"
-            onClick={() => navigate('/judge-selection', { state: { competitionId } })}
-            className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px]"
-          >
-            ← Back
-          </button>
+          {!hideJudgeNavBack ? (
+            <button
+              type="button"
+              onClick={() => navigate('/judge-selection', { state: { competitionId } })}
+              className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px]"
+            >
+              ← Back
+            </button>
+          ) : (
+            <span className="min-w-[5rem] min-h-[44px]" aria-hidden="true" />
+          )}
 
           <div className="text-center flex-1 px-4">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -789,8 +835,8 @@ function ScoringInterface() {
             {/* ENTRY DISPLAY */}
             <div className="mb-6 pb-6 border-b-2 border-gray-200">
               <div className="flex flex-col sm:flex-row items-start gap-4">
-                {/* Photo */}
-                <div className="flex-shrink-0">
+                {/* Photo(s) — duo: two headshots when photo_url_2 is set */}
+                <div className="flex-shrink-0 flex flex-row gap-2">
                   {currentEntry.photo_url ? (
                     <LazyLoadImage
                       src={currentEntry.photo_url}
@@ -808,6 +854,19 @@ function ScoringInterface() {
                       {isNonSoloDivision(currentEntry) ? '👥' : '💃'}
                     </div>
                   )}
+                  {getEntryDivisionType(currentEntry) === 'Duo' && currentEntry.photo_url_2 ? (
+                    <LazyLoadImage
+                      src={currentEntry.photo_url_2}
+                      alt=""
+                      effect="blur"
+                      className="w-32 h-32 sm:w-40 sm:h-40 object-cover rounded-lg border-2 border-teal-300"
+                      placeholder={
+                        <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gray-200 rounded-lg flex items-center justify-center text-5xl animate-pulse">
+                          👥
+                        </div>
+                      }
+                    />
+                  ) : null}
                 </div>
 
                 {/* Entry Info */}

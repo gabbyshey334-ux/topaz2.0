@@ -24,6 +24,7 @@ export const createEntry = async (entryData) => {
       medal_points: entryData.medal_points || 0,
       current_medal_level: entryData.current_medal_level || 'None',
       photo_url: entryData.photo_url || null,
+      photo_url_2: entryData.photo_url_2 || null,
       studio_name: entryData.studio_name || null,
       teacher_name: entryData.teacher_name || null
     };

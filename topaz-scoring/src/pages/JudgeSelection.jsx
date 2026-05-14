@@ -162,6 +162,15 @@ function JudgeSelection() {
   }
 
   const navigateToScoring = (judgeNum) => {
+    const pins = getJudgePinsObject();
+    const pinForJudge = pins[String(judgeNum)] ?? '';
+    if (String(pinForJudge).trim() === '') {
+      try {
+        sessionStorage.removeItem('topaz_judge_pin_verified');
+      } catch (e) {
+        /* ignore */
+      }
+    }
     try {
       sessionStorage.setItem('topaz_active_competition_id', competitionId);
       sessionStorage.setItem('topaz_active_judge_number', String(judgeNum));
@@ -205,6 +214,15 @@ function JudgeSelection() {
     const correct = pins[String(selectedJudgeNumber)] ?? '';
     if (pinInput === String(correct)) {
       setShowPinModal(false);
+      // Scoring screen reads this to hide "← Back" / judge-selection escape (so judges stay in scoring after PIN).
+      try {
+        sessionStorage.setItem(
+          'topaz_judge_pin_verified',
+          JSON.stringify({ competitionId, judgeNumber: selectedJudgeNumber }),
+        );
+      } catch (e) {
+        /* ignore */
+      }
       navigateToScoring(selectedJudgeNumber);
       return;
     }

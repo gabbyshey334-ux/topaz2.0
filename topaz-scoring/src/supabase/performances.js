@@ -19,6 +19,7 @@ export function performancePayloadFromEntry(entry, competitionId) {
     dance_type: entry.dance_type ?? null,
     group_members: entry.group_members ?? null,
     photo_url: entry.photo_url ?? null,
+    photo_url_2: entry.photo_url_2 ?? null,
     studio_name: entry.studio_name ?? null,
     teacher_name: entry.teacher_name ?? null,
     is_medal_program: entry.is_medal_program ?? false,
