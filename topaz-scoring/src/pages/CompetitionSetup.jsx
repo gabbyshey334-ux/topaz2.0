@@ -1294,10 +1294,11 @@ function CompetitionSetup() {
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-xs sm:text-sm text-blue-900 font-semibold">Photos not uploading? (Most common fix)</p>
                 <p className="text-xs sm:text-sm text-blue-800 mt-1">
-                  This app uses the Supabase <strong>anon</strong> key, not logged-in users. Create a <strong>public</strong>{' '}
-                  bucket <code className="bg-white px-1 rounded">entry-photos</code> in Dashboard → Storage, then in SQL Editor run{' '}
-                  <code className="bg-white px-1 rounded text-[10px] sm:text-xs break-all">topaz-scoring/migrations/20250513_storage_entry_photos_anon_policies.sql</code>{' '}
-                  so the <strong>anon</strong> role can upload. Policies that only allow <code className="bg-white px-1 rounded">authenticated</code> will block uploads here.
+                  This app uses the Supabase <strong>anon</strong> key, not logged-in users. If the public bucket{' '}
+                  <code className="bg-white px-1 rounded">entry-photos</code> already exists, run only{' '}
+                  <code className="bg-white px-1 rounded text-[10px] sm:text-xs break-all">migrations/20250513_storage_entry_photos_anon_policies.sql</code>{' '}
+                  in the SQL Editor so <strong>anon</strong> can upload/update/delete there. Authenticated-only policies are not enough.
+                  If the bucket is missing, create it first (Storage → New bucket → public).
                 </p>
               </div>
             </div>

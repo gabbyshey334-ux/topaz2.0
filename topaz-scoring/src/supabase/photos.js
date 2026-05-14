@@ -73,8 +73,8 @@ export const uploadEntryPhoto = async (file, entryId, competitionId) => {
     let message = raw;
     if (/row-level security|RLS|violates|permission denied|not authorized/i.test(raw)) {
       message =
-        'Storage blocked the upload (RLS). This app uses the anonymous API key: in Supabase → SQL, run the migration ' +
-        '`migrations/20250513_storage_entry_photos_anon_policies.sql` after creating the public bucket `entry-photos`.';
+        'Storage blocked the upload (RLS). This app uses the anonymous API key: run ' +
+        '`migrations/20250513_storage_entry_photos_anon_policies.sql` on this Supabase project (bucket can already exist).';
     } else if (/Bucket not found|does not exist/i.test(raw)) {
       message =
         'Bucket `entry-photos` is missing. In Supabase → Storage → New bucket: name entry-photos, enable Public.';

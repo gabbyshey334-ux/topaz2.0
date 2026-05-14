@@ -2,8 +2,12 @@
 -- Without these policies, uploads to entry-photos fail with RLS / permission errors
 -- even when the bucket exists and is public.
 --
--- Prerequisite: create bucket `entry-photos` in Dashboard → Storage (public = on).
--- Then run this in the SQL Editor (same project as the app URL in .env).
+-- If the `entry-photos` bucket already exists (public), you only need this file:
+-- applying the anon policies is enough for browser uploads. You do not have to
+-- re-create the bucket or add the older "authenticated-only" policies for this app.
+--
+-- If the bucket does not exist yet: Dashboard → Storage → New bucket → name
+-- `entry-photos`, enable Public — then run this SQL in the same project as .env.
 
 -- Idempotent: drop if re-running
 DROP POLICY IF EXISTS "Anon can upload entry photos" ON storage.objects;
