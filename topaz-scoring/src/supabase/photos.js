@@ -45,7 +45,8 @@ export const uploadEntryPhoto = async (file, entryId, competitionId) => {
     
     // Generate unique filename
     const timestamp = Date.now();
-    const fileExt = compressedFile.name.split('.').pop();
+    let fileExt = compressedFile.name?.split?.('.')?.pop()?.toLowerCase() || 'jpg';
+    if (!['jpg', 'jpeg', 'png', 'webp'].includes(fileExt)) fileExt = 'jpg';
     const fileName = `${competitionId}/${entryId}_${timestamp}.${fileExt}`;
     
     // Upload to Supabase storage
@@ -58,17 +59,27 @@ export const uploadEntryPhoto = async (file, entryId, competitionId) => {
       });
 
     if (error) throw error;
-    
+
     // Get public URL
     const { data: urlData } = supabase.storage
       .from(BUCKET_NAME)
       .getPublicUrl(fileName);
-    
+
     console.log('✅ Photo uploaded:', urlData.publicUrl);
     return { success: true, url: urlData.publicUrl, path: fileName };
   } catch (error) {
     console.error('❌ Error uploading photo:', error);
-    return { success: false, error: error.message };
+    const raw = error?.message || String(error);
+    let message = raw;
+    if (/row-level security|RLS|violates|permission denied|not authorized/i.test(raw)) {
+      message =
+        'Storage blocked the upload (RLS). This app uses the anonymous API key: in Supabase → SQL, run the migration ' +
+        '`migrations/20250513_storage_entry_photos_anon_policies.sql` after creating the public bucket `entry-photos`.';
+    } else if (/Bucket not found|does not exist/i.test(raw)) {
+      message =
+        'Bucket `entry-photos` is missing. In Supabase → Storage → New bucket: name entry-photos, enable Public.';
+    }
+    return { success: false, error: message };
   }
 };
 

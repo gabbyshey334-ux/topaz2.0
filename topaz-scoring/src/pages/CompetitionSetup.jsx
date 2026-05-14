@@ -931,6 +931,7 @@ function CompetitionSetup() {
             console.log('✅ Photo uploaded:', photoUrl);
           } else {
             console.error('❌ Photo upload failed:', photoResult.error);
+            toast.error(photoResult.error || 'Photo upload failed');
           }
         }
 
@@ -946,6 +947,7 @@ function CompetitionSetup() {
             console.log('✅ Second photo uploaded:', photoUrl2);
           } else {
             console.error('❌ Second photo upload failed:', r2.error);
+            toast.error(r2.error || 'Second photo upload failed');
           }
         }
 
@@ -1290,11 +1292,12 @@ function CompetitionSetup() {
                 </ul>
               </div>
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs sm:text-sm text-blue-900 font-semibold">Photos not uploading after you save?</p>
+                <p className="text-xs sm:text-sm text-blue-900 font-semibold">Photos not uploading? (Most common fix)</p>
                 <p className="text-xs sm:text-sm text-blue-800 mt-1">
-                  In the Supabase project for this app, open <strong>Storage</strong>, create a public bucket named{' '}
-                  <code className="bg-white px-1 rounded">entry-photos</code>, then add policies so authenticated users can insert/update/delete and public can read.
-                  Without that bucket, uploads fail silently or with a storage error in the browser console.
+                  This app uses the Supabase <strong>anon</strong> key, not logged-in users. Create a <strong>public</strong>{' '}
+                  bucket <code className="bg-white px-1 rounded">entry-photos</code> in Dashboard → Storage, then in SQL Editor run{' '}
+                  <code className="bg-white px-1 rounded text-[10px] sm:text-xs break-all">topaz-scoring/migrations/20250513_storage_entry_photos_anon_policies.sql</code>{' '}
+                  so the <strong>anon</strong> role can upload. Policies that only allow <code className="bg-white px-1 rounded">authenticated</code> will block uploads here.
                 </p>
               </div>
             </div>
