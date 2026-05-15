@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  groupEntries,
-  sharesMemberBetweenEntries,
-  getCanonicalPerformanceEntries,
-  getPerformanceScoreEntryIds,
-} from './entryFilters.js';
+import { groupEntries, sharesMemberBetweenEntries } from './entryFilters.js';
 
 describe('groupEntries (TOPAZ-style data)', () => {
   it('merges Trio rows #9 / #15 / #16 by overlapping members + same dance_type', () => {
@@ -78,17 +73,6 @@ describe('groupEntries (TOPAZ-style data)', () => {
     expect(siblingMap.get('19')).toEqual([]);
   });
 
-  it('merges Duo rows when division_type is null but dance_type encodes Duo (legacy / sync)', () => {
-    const entries = [
-      { id: '6', entry_number: 6, division_type: null, dance_type: 'Duo', group_members: ['Aa', 'Bcd'] },
-      { id: '18', entry_number: 18, division_type: null, dance_type: 'Duo', group_members: ['Bcd', 'Aa'] },
-    ];
-    const { primary, siblingMap } = groupEntries(entries);
-    expect(primary).toHaveLength(1);
-    expect(primary[0].id).toBe('6');
-    expect(siblingMap.get('6').map((e) => e.id)).toEqual(['18']);
-  });
-
   it('does not merge Trios with different dance_type strings', () => {
     const entries = [
       {
@@ -108,28 +92,6 @@ describe('groupEntries (TOPAZ-style data)', () => {
     ];
     const { primary } = groupEntries(entries);
     expect(primary).toHaveLength(2);
-  });
-});
-
-describe('getCanonicalPerformanceEntries & getPerformanceScoreEntryIds', () => {
-  it('returns primary list only', () => {
-    const entries = [
-      { id: '6', entry_number: 6, division_type: 'Duo', dance_type: 'Tap', group_members: ['Aa', 'Bcd'] },
-      { id: '18', entry_number: 18, division_type: 'Duo', dance_type: 'Tap', group_members: ['Bcd', 'Aa'] },
-    ];
-    const canon = getCanonicalPerformanceEntries(entries);
-    expect(canon).toHaveLength(1);
-    expect(canon[0].id).toBe('6');
-    const ids = getPerformanceScoreEntryIds(canon[0], entries);
-    expect([...ids].sort()).toEqual(['18', '6']);
-  });
-
-  it('getPerformanceScoreEntryIds prefers shared performance_id on entry rows', () => {
-    const all = [
-      { id: 'a', performance_id: 'p1', division_type: 'Duo', dance_type: 'Tap', group_members: ['x'] },
-      { id: 'b', performance_id: 'p1', division_type: 'Duo', dance_type: 'Tap', group_members: ['y'] },
-    ];
-    expect([...getPerformanceScoreEntryIds(all[0], all)].sort()).toEqual(['a', 'b']);
   });
 });
 

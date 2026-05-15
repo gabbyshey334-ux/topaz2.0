@@ -1,5 +1,4 @@
 import { jsPDF } from 'jspdf';
-import { groupEntries } from './entryFilters.js';
 
 /**
  * Check if an entry is a group (duo, trio, or group)
@@ -497,16 +496,11 @@ export const generateAllScorecards = async (entries, allScores, categories, ageD
   console.log('🏁 Generating all scorecards...');
   
   try {
-    const { primary, siblingMap } = groupEntries(entries || []);
     let generated = 0;
-    const total = primary.length;
+    const total = entries.length;
     
-    for (const entry of primary) {
-      const scoreIds = new Set([
-        entry.id,
-        ...(siblingMap.get(entry.id) ?? []).map((s) => s.id),
-      ]);
-      const entryScores = allScores.filter(s => scoreIds.has(s.entry_id));
+    for (const entry of entries) {
+      const entryScores = allScores.filter(s => s.entry_id === entry.id);
       if (entryScores.length === 0) {
         console.log(`⏭️  Skipping entry ${entry.entry_number} (no scores)`);
         continue;

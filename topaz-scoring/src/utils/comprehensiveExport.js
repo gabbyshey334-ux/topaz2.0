@@ -1,5 +1,4 @@
 import * as XLSX from 'xlsx';
-import { getCanonicalPerformanceEntries, getPerformanceScoreEntryIds } from './entryFilters.js';
 
 /**
  * Export comprehensive competition data to Excel with multiple sheets
@@ -15,8 +14,7 @@ export const exportComprehensiveExcel = async (
 ) => {
   try {
     const workbook = XLSX.utils.book_new();
-    const distinctPerformances = getCanonicalPerformanceEntries(entries).length;
-
+    
     // ============================================================================
     // SHEET 1: Competition Info
     // ============================================================================
@@ -73,8 +71,7 @@ export const exportComprehensiveExcel = async (
     competitionInfo.push(['']);
     competitionInfo.push(['EXPORT INFORMATION']);
     competitionInfo.push(['Generated:', new Date().toLocaleString()]);
-    competitionInfo.push(['Distinct performances:', distinctPerformances]);
-    competitionInfo.push(['Synced DB entry rows:', entries.length]);
+    competitionInfo.push(['Total Entries:', entries.length]);
     competitionInfo.push(['Total Scores:', scores.length]);
     competitionInfo.push(['Total Categories:', categories.length]);
     competitionInfo.push(['Total Age Divisions:', ageDivisions.length]);
@@ -180,17 +177,16 @@ export const exportComprehensiveExcel = async (
     // ============================================================================
     // SHEET 4: Rankings by Division
     // ============================================================================
-    const rankingsData = rankings.map((entry) => {
+    const rankingsData = rankings.map((entry, index) => {
       const category = categories.find(c => c.id === entry.category_id);
       const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
-      const scoreIds = getPerformanceScoreEntryIds(entry, entries);
-      const entryScores = scores.filter(s => scoreIds.has(s.entry_id));
+      const entryScores = scores.filter(s => s.entry_id === entry.id);
       const avgScore = entryScores.length > 0
         ? entryScores.reduce((sum, s) => sum + s.total_score, 0) / entryScores.length
         : 0;
       
       return {
-        'Rank': entry.rank != null ? entry.rank : '',
+        'Rank': index + 1,
         'Entry Number': entry.entry_number,
         'Competitor Name': entry.competitor_name,
         'Average Score': avgScore.toFixed(2),
@@ -277,9 +273,7 @@ export const exportToJSON = (
         version: '1.0',
         generated_at: new Date().toISOString(),
         competition_id: competition.id,
-        competition_name: competition.name,
-        distinct_performances: getCanonicalPerformanceEntries(entries).length,
-        synced_db_entry_rows: entries.length
+        competition_name: competition.name
       },
       competition: {
         id: competition.id,
@@ -339,15 +333,14 @@ export const exportToJSON = (
         created_at: score.created_at,
         updated_at: score.updated_at
       })),
-      rankings: rankings.map((entry) => {
-        const scoreIds = getPerformanceScoreEntryIds(entry, entries);
-        const entryScores = scores.filter(s => scoreIds.has(s.entry_id));
+      rankings: rankings.map((entry, index) => {
+        const entryScores = scores.filter(s => s.entry_id === entry.id);
         const avgScore = entryScores.length > 0
           ? entryScores.reduce((sum, s) => sum + s.total_score, 0) / entryScores.length
           : 0;
         
         return {
-          rank: entry.rank != null ? entry.rank : null,
+          rank: index + 1,
           entry_id: entry.id,
           entry_number: entry.entry_number,
           competitor_name: entry.competitor_name,

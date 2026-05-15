@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
+import PhotoUploadManager from '../components/PhotoUploadManager';
+import MusicUploadManager from '../components/MusicUploadManager';
 import { getCompetition } from '../supabase/competitions';
 import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
@@ -15,10 +17,12 @@ import {
   getDisplayCategoryName,
   getEntryAgeGroupLabel,
   getEntryDivisionType,
-  getCanonicalPerformanceEntries,
   matchesDivisionTypeFilter,
+  matchesSpecialCategoryDivisionFilter,
+  groupEntries,
   formatEntryName,
-  getAbilityLevel
+  getAbilityLevel,
+  getGroupMemberNamesLabel
 } from '../utils/entryFilters';
 
 function AdminDashboard() {
@@ -54,6 +58,8 @@ function AdminDashboard() {
   
   const [saving, setSaving] = useState(false);
   const [resettingMedalPoints, setResettingMedalPoints] = useState(false);
+  const [showPhotoManager, setShowPhotoManager] = useState(false);
+  const [showMusicManager, setShowMusicManager] = useState(false);
 
   // Redirect if no competitionId
   useEffect(() => {
@@ -135,11 +141,9 @@ function AdminDashboard() {
     };
   }, [competitionId]);
 
-  const canonicalPerformances = getCanonicalPerformanceEntries(allEntries);
-
   // Calculate filtered entries (preview what judges see)
   const filteredEntries = (() => {
-    let filtered = [...canonicalPerformances];
+    let filtered = [...allEntries];
 
     // Filter by category (UUID + normalized style for website-synced rows)
     if (adminFilters.category_filter) {
@@ -148,10 +152,11 @@ function AdminDashboard() {
       );
     }
 
-    // Filter by division type (entries.division_type — exact when column set)
+    // Filter by division type. Special Category options match by category, not routine division.
     if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
       filtered = filtered.filter((e) =>
-        matchesDivisionTypeFilter(e, adminFilters.division_type_filter)
+        matchesDivisionTypeFilter(e, adminFilters.division_type_filter) ||
+        matchesSpecialCategoryDivisionFilter(e, adminFilters.division_type_filter, categories)
       );
     }
 
@@ -167,7 +172,11 @@ function AdminDashboard() {
       filtered = filtered.filter((e) => abilitiesMatch(e.ability_level, adminFilters.ability_filter));
     }
 
-    return filtered;
+    // Match the judge screen: show one scoring card per routine.
+    // Duo/Trio/Group/Production entries may have multiple participant rows,
+    // but admins and judges should see one performance entry for filtering/scoring.
+    const { primary } = groupEntries(filtered);
+    return primary.sort((a, b) => (a.entry_number || 0) - (b.entry_number || 0));
   })();
 
   // Update a single filter
@@ -257,6 +266,14 @@ function AdminDashboard() {
     }
   };
 
+  const refreshEntries = async () => {
+    if (!competitionId) return;
+    const entriesResult = await getCompetitionEntries(competitionId);
+    if (entriesResult.success) {
+      setAllEntries(entriesResult.data || []);
+    }
+  };
+
   if (loading) {
     return (
       <Layout overlayOpacity="bg-white/80">
@@ -332,10 +349,33 @@ function AdminDashboard() {
             })}
             <button
               type="button"
-              onClick={() => navigate('/results', { state: { competitionId } })}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm transition-colors"
+              onClick={() => setShowPhotoManager(true)}
+              className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition-colors"
             >
-              View Results
+              📸 Manage Entry Photos
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMusicManager(true)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm transition-colors"
+            >
+              🎵 Manage Entry Music
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/results', {
+                state: {
+                  competitionId,
+                  isAdmin: true,
+                  competition,
+                  categories,
+                  ageDivisions,
+                  entries: allEntries
+                }
+              })}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm transition-colors"
+            >
+              📊 Admin View
             </button>
           </div>
         </div>
@@ -402,6 +442,8 @@ function AdminDashboard() {
                 <option value="Small Group">Small Group</option>
                 <option value="Large Group">Large Group</option>
                 <option value="Production">Production</option>
+                <option value="Student Choreography">Student Choreography</option>
+                <option value="Teacher/Student">Teacher/Student</option>
               </select>
             </div>
 
@@ -488,13 +530,10 @@ function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-lg font-bold text-teal-800">
-                  Showing {filteredEntries.length} of {canonicalPerformances.length} performances
-                  {canonicalPerformances.length !== allEntries.length
-                    ? ` (${allEntries.length} synced rows)`
-                    : ''}
+                  Showing {filteredEntries.length} of {allEntries.length} entries
                 </p>
                 <p className="text-sm text-teal-700 mt-1">
-                  All judges will see these {filteredEntries.length} performances on their scoring screens
+                  All judges will see these {filteredEntries.length} entries on their scoring screens
                 </p>
               </div>
               <div className="text-4xl">👥</div>
@@ -525,12 +564,17 @@ function AdminDashboard() {
                         {getEntryAgeGroupLabel(entry, ageDivisions)} •{' '}
                         {getAbilityLevel(entry)}
                       </div>
+                      {getEntryDivisionType(entry) !== 'Solo' && getGroupMemberNamesLabel(entry) && (
+                        <div className="text-sm text-gray-700 mt-1 font-medium">
+                          Dancers: {getGroupMemberNamesLabel(entry)}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
                 {filteredEntries.length > 50 && (
                   <div className="text-center text-gray-500 text-sm py-2">
-                    ... and {filteredEntries.length - 50} more performances
+                    ... and {filteredEntries.length - 50} more entries
                   </div>
                 )}
               </div>
@@ -538,6 +582,24 @@ function AdminDashboard() {
           )}
         </div>
       </div>
+      {showPhotoManager && (
+        <PhotoUploadManager
+          competitionId={competitionId}
+          onClose={async () => {
+            setShowPhotoManager(false);
+            await refreshEntries();
+          }}
+        />
+      )}
+      {showMusicManager && (
+        <MusicUploadManager
+          competitionId={competitionId}
+          onClose={async () => {
+            setShowMusicManager(false);
+            await refreshEntries();
+          }}
+        />
+      )}
     </Layout>
   );
 }

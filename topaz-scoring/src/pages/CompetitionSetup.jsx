@@ -16,7 +16,6 @@ import {
   bulkCreateEntries
 } from '../supabase';
 import { uploadEntryPhoto } from '../supabase/photos';
-import { getEntryDivisionType } from '../utils/entryFilters';
 
 function CompetitionSetup() {
   const navigate = useNavigate();
@@ -61,6 +60,13 @@ function CompetitionSetup() {
     { id: 'senior_adult', name: 'Senior Adult', minAge: 19, maxAge: 99, description: 'Senior Adult (19-99 years)' }
   ];
 
+  const getAgeDivisionForAge = (ageValue) => {
+    const age = parseInt(ageValue, 10);
+    if (!age || Number.isNaN(age)) return null;
+    return FIXED_AGE_DIVISIONS.find(div => age >= div.minAge && age <= div.maxAge) || null;
+  };
+
+
   // SECTION 4: Entries
   const [entries, setEntries] = useState([]);
   const [showAddEntryModal, setShowAddEntryModal] = useState(false);
@@ -74,7 +80,6 @@ function CompetitionSetup() {
     divisionType: 'Solo',
     isMedalProgram: true,
     photoFile: null,
-    photoFile2: null,
     groupMembers: [],
     studioName: '',
     teacherName: ''
@@ -82,6 +87,19 @@ function CompetitionSetup() {
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberAge, setNewMemberAge] = useState('');
   const [autoSelectedDivision, setAutoSelectedDivision] = useState(null);
+
+  const getLockedEntryAge = () => {
+    if (currentEntry.type === 'group') {
+      const ages = currentEntry.groupMembers
+        .map(m => parseInt(m.age, 10))
+        .filter(age => !Number.isNaN(age));
+      if (ages.length > 0) return Math.max(...ages);
+    }
+    return parseInt(currentEntry.age, 10);
+  };
+
+  const lockedEntryAge = getLockedEntryAge();
+  const lockedAgeDivision = getAgeDivisionForAge(lockedEntryAge);
 
   // UI State
   const [errors, setErrors] = useState({});
@@ -286,7 +304,6 @@ function CompetitionSetup() {
       divisionType: 'Solo',
       isMedalProgram: true,
       photoFile: null,
-      photoFile2: null,
       groupMembers: [],
       studioName: '',
       teacherName: ''
@@ -306,7 +323,6 @@ function CompetitionSetup() {
       divisionType: 'Solo',
       isMedalProgram: true,
       photoFile: null,
-      photoFile2: null,
       groupMembers: [],
       studioName: '',
       teacherName: ''
@@ -321,8 +337,7 @@ function CompetitionSetup() {
       ...currentEntry,
       type: type,
       divisionType: type === 'solo' ? 'Solo' : 'Duo',
-      groupMembers: [],
-      photoFile2: null,
+      groupMembers: []
     });
   };
 
@@ -331,7 +346,7 @@ function CompetitionSetup() {
     const age = parseInt(ageValue);
     
     // Find matching age division
-    let ageDivisionId = currentEntry.ageDivisionId;
+    let ageDivisionId = '';
     let autoDiv = null;
     
     if (age && !isNaN(age)) {
@@ -398,7 +413,7 @@ function CompetitionSetup() {
     console.log('👴 Oldest age:', oldestAge);
     
     // Find matching age division
-    let ageDivisionId = currentEntry.ageDivisionId;
+    let ageDivisionId = '';
     let autoDiv = null;
     
     if (oldestAge) {
@@ -475,7 +490,7 @@ function CompetitionSetup() {
     console.log('👴 New oldest age after delete:', oldestAge);
     
     // Find matching age division
-    let ageDivisionId = currentEntry.ageDivisionId;
+    let ageDivisionId = '';
     let autoDiv = null;
     
     if (oldestAge) {
@@ -607,13 +622,17 @@ function CompetitionSetup() {
       }
     }
 
-    // Warn if age doesn't match any division
-    const age = parseInt(currentEntry.age);
-    const hasMatchingDivision = FIXED_AGE_DIVISIONS.some(div => 
-      age >= div.minAge && age <= div.maxAge
-    );
-    if (!hasMatchingDivision && !currentEntry.ageDivisionId) {
-      toast.warning(`Age ${age} doesn't match any division. Entry will compete without age division.`);
+    // Lock age division from age. Entries cannot be saved outside the correct age division.
+    const lockedAgeForSave = currentEntry.type === 'group'
+      ? Math.max(...currentEntry.groupMembers.map(m => parseInt(m.age, 10)).filter(a => !Number.isNaN(a)), parseInt(currentEntry.age, 10) || 0)
+      : parseInt(currentEntry.age, 10);
+    const lockedDivisionForSave = getAgeDivisionForAge(lockedAgeForSave);
+    if (!lockedDivisionForSave) {
+      toast.error(`Age ${lockedAgeForSave || currentEntry.age} does not fit any age division. Please enter a valid age.`);
+      return;
+    }
+    if (currentEntry.ageDivisionId !== lockedDivisionForSave.id) {
+      setCurrentEntry(prev => ({ ...prev, ageDivisionId: lockedDivisionForSave.id, age: String(lockedAgeForSave) }));
     }
 
     if (currentEntry.type === 'group') {
@@ -673,7 +692,7 @@ function CompetitionSetup() {
     // Category name is the categoryId (no variety levels)
     const categoryName = currentEntry.categoryId;
     const categoryDisplayName = categoryName; // Display name is just the category name
-    const ageDivision = FIXED_AGE_DIVISIONS.find(d => d.id === currentEntry.ageDivisionId);
+    const ageDivision = getAgeDivisionForAge(lockedAgeForSave);
 
     // Clean group members data
     const cleanedGroupMembers = currentEntry.type === 'group' 
@@ -692,19 +711,17 @@ function CompetitionSetup() {
       number: entries.length + 1,
       type: currentEntry.type,
       name: currentEntry.name.trim() || `${currentEntry.divisionType} Group`,
-      age: parseInt(currentEntry.age),
+      age: lockedAgeForSave,
       categoryId: currentEntry.categoryId,
       categoryName: categoryDisplayName || '',
       categoryColor: categoryColors[categoryName] || 'bg-gray-100 text-gray-800',
-      ageDivisionId: currentEntry.ageDivisionId || null,
+      ageDivisionId: ageDivision?.id || null,
       ageDivisionName: ageDivision?.name || null,
       abilityLevel: currentEntry.abilityLevel,
       divisionType: currentEntry.divisionType,
       isMedalProgram: currentEntry.isMedalProgram,
       photoFile: currentEntry.photoFile,
-      photoFile2: currentEntry.photoFile2,
       photoPreview: currentEntry.photoFile ? URL.createObjectURL(currentEntry.photoFile) : null,
-      photoPreview2: currentEntry.photoFile2 ? URL.createObjectURL(currentEntry.photoFile2) : null,
       groupMembers: cleanedGroupMembers,
       isExpanded: false,
       studioName: currentEntry.studioName?.trim() || '',
@@ -931,23 +948,6 @@ function CompetitionSetup() {
             console.log('✅ Photo uploaded:', photoUrl);
           } else {
             console.error('❌ Photo upload failed:', photoResult.error);
-            toast.error(photoResult.error || 'Photo upload failed');
-          }
-        }
-
-        let photoUrl2 = null;
-        if (entry.photoFile2) {
-          const r2 = await uploadEntryPhoto(
-            entry.photoFile2,
-            entry.id,
-            competitionId
-          );
-          if (r2.success) {
-            photoUrl2 = r2.url;
-            console.log('✅ Second photo uploaded:', photoUrl2);
-          } else {
-            console.error('❌ Second photo upload failed:', r2.error);
-            toast.error(r2.error || 'Second photo upload failed');
           }
         }
 
@@ -985,14 +985,9 @@ function CompetitionSetup() {
           age_division_id: ageDivisionSupabaseId,
           ability_level: entry.abilityLevel,
           is_medal_program: entry.isMedalProgram,
-          division_type: getEntryDivisionType({
-            dance_type: entry.divisionType,
-            division_type: null,
-          }),
           dance_type: entry.divisionType,
           group_members: cleanedGroupMembers, // Send as separate field
           photo_url: photoUrl,
-          photo_url_2: photoUrl2,
           studio_name: entry.studioName || null,
           teacher_name: entry.teacherName || null
         };
@@ -1247,7 +1242,7 @@ function CompetitionSetup() {
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <input
                   type="file"
-                  accept="image/jpeg, image/png"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif"
                   multiple
                   onChange={handleBulkPhotoUpload}
                   disabled={entries.length === 0 || isBulkUploading}
@@ -1286,20 +1281,10 @@ function CompetitionSetup() {
                 </p>
                 <ul className="text-xs sm:text-sm text-gray-600 list-disc list-inside space-y-1 mt-2">
                   <li>Rename your photo files to match entry numbers (e.g., 1.jpg for Entry #1)</li>
-                  <li>Supported formats: JPG, PNG</li>
+                  <li>Supported formats: JPG, PNG, WEBP, GIF, HEIC, HEIF</li>
                   <li>Photos over 1MB will be automatically compressed</li>
                   <li>You can select all photos at once for faster upload</li>
                 </ul>
-              </div>
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs sm:text-sm text-blue-900 font-semibold">Photos not uploading? (Most common fix)</p>
-                <p className="text-xs sm:text-sm text-blue-800 mt-1">
-                  This app uses the Supabase <strong>anon</strong> key, not logged-in users. If the public bucket{' '}
-                  <code className="bg-white px-1 rounded">entry-photos</code> already exists, run only{' '}
-                  <code className="bg-white px-1 rounded text-[10px] sm:text-xs break-all">migrations/20250513_storage_entry_photos_anon_policies.sql</code>{' '}
-                  in the SQL Editor so <strong>anon</strong> can upload/update/delete there. Authenticated-only policies are not enough.
-                  If the bucket is missing, create it first (Storage → New bucket → public).
-                </p>
               </div>
             </div>
           </div>
@@ -1395,7 +1380,7 @@ function CompetitionSetup() {
                   SPECIAL CATEGORIES:
                 </h3>
                 <p className="text-sm text-gray-700 mb-4 font-medium">
-                  (Participation recognition only - not eligible for high scoring awards or medals)
+                  (Eligible for category placements/trophies - excluded only from overall/high score awards)
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {SPECIAL_CATEGORIES.map(category => {
@@ -1497,7 +1482,7 @@ function CompetitionSetup() {
                   >
                     <div className="flex items-start gap-4">
                       {/* Photo */}
-                      <div className="flex-shrink-0 flex gap-1">
+                      <div className="flex-shrink-0">
                         {entry.photoPreview ? (
                           <img
                             src={entry.photoPreview}
@@ -1509,13 +1494,6 @@ function CompetitionSetup() {
                             {entry.type === 'group' ? '👥' : '💃'}
                           </div>
                         )}
-                        {entry.divisionType === 'Duo' && entry.photoPreview2 ? (
-                          <img
-                            src={entry.photoPreview2}
-                            alt=""
-                            className="w-16 h-16 object-cover rounded-lg border border-teal-200"
-                          />
-                        ) : null}
                       </div>
 
                       {/* Info */}
@@ -1738,7 +1716,7 @@ function CompetitionSetup() {
                                 Special Category Selected
                               </p>
                               <p className="text-xs text-yellow-700">
-                                This category receives participation recognition only. Entries will be judged but will not be eligible for placement awards (1st/2nd/3rd), medal points, or high scoring awards.
+                                This category is judged and eligible for category placements/trophies. It is excluded only from overall/high score awards.
                               </p>
                             </div>
                           </div>
@@ -1798,24 +1776,17 @@ function CompetitionSetup() {
                 </select>
               </div>
 
-              {/* Age Division */}
+              {/* Age Division - locked from age */}
                 <div>
                   <label className="block text-gray-700 font-semibold mb-2 text-sm sm:text-base">
-                  Age Division {autoSelectedDivision ? '(Auto-selected - can override)' : '(Fixed Divisions)'}
+                    Age Division (Locked by Age)
                   </label>
-                  <select
-                    value={currentEntry.ageDivisionId}
-                    onChange={(e) => setCurrentEntry({ ...currentEntry, ageDivisionId: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
-                  >
-                    <option value="">None</option>
-                  {FIXED_AGE_DIVISIONS.map(div => (
-                      <option key={div.id} value={div.id}>
-                      {div.description}
-                      {autoSelectedDivision && div.id === autoSelectedDivision.id ? ' (recommended)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray-800 font-semibold min-h-[48px]">
+                    {lockedEntryAge ? (lockedAgeDivision?.description || 'No matching age division') : 'Enter age to auto-select division'}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Age division is automatically assigned from the dancer age{currentEntry.type === 'group' ? ' using the oldest dancer' : ''} and cannot be overridden.
+                  </p>
                 </div>
 
               {/* Ability Level */}
@@ -1846,14 +1817,7 @@ function CompetitionSetup() {
                 </label>
                 <select
                   value={currentEntry.divisionType}
-                  onChange={(e) => {
-                    const divisionType = e.target.value;
-                    setCurrentEntry({
-                      ...currentEntry,
-                      divisionType,
-                      ...(divisionType !== 'Duo' ? { photoFile2: null } : {}),
-                    });
-                  }}
+                  onChange={(e) => setCurrentEntry({ ...currentEntry, divisionType: e.target.value })}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
                 >
                   {getDivisionTypeOptions(currentEntry.type).map(divType => (
@@ -1910,21 +1874,8 @@ function CompetitionSetup() {
               {/* Photo Upload */}
               <PhotoUpload
                 onPhotoSelect={(file) => setCurrentEntry({ ...currentEntry, photoFile: file })}
-                label={
-                  currentEntry.type === 'group' && currentEntry.divisionType === 'Duo'
-                    ? 'First dancer photo (optional)'
-                    : currentEntry.type === 'group'
-                      ? 'Group / routine photo (optional)'
-                      : 'Entry photo (optional)'
-                }
+                existingPhotoUrl={currentEntry.photoFile ? URL.createObjectURL(currentEntry.photoFile) : null}
               />
-              {currentEntry.type === 'group' && currentEntry.divisionType === 'Duo' && (
-                <PhotoUpload
-                  key="duo-second-photo"
-                  onPhotoSelect={(file) => setCurrentEntry({ ...currentEntry, photoFile2: file })}
-                  label="Second dancer photo (optional)"
-                />
-              )}
 
               {/* Group Members */}
               {currentEntry.type === 'group' && (
@@ -1933,8 +1884,7 @@ function CompetitionSetup() {
                     Group Members *
                   </h4>
                   <p className="text-sm text-gray-600 mb-4">
-                    {currentEntry.divisionType === 'Duo' && 'Add exactly 2 members'}
-                    {currentEntry.divisionType === 'Trio' && 'Add exactly 3 members'}
+                    {currentEntry.divisionType === 'Duo/Trio' && 'Add 2-3 members'}
                     {currentEntry.divisionType === 'Small Group (4-10)' && 'Add 4-10 members'}
                     {currentEntry.divisionType === 'Large Group (11+)' && 'Add 11+ members'}
                     {currentEntry.divisionType === 'Production (10+)' && 'Add 10+ members'}

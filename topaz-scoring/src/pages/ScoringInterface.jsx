@@ -13,6 +13,7 @@ import { getCompetition } from '../supabase/competitions';
 import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
 import { getCompetitionEntries } from '../supabase/entries';
+import { unlockJudgeMode, verifyAdminPassword } from '../utils/accessControl';
 import {
   ageFilterMatchesEntry,
   abilitiesMatch,
@@ -21,12 +22,14 @@ import {
   getEntryDivisionType,
   getEntryAgeGroupLabel,
   matchesDivisionTypeFilter,
+  matchesSpecialCategoryDivisionFilter,
   groupEntries,
   formatEntryName,
   getAbilityLevel,
   entryMatchesSearchQuery,
   getMemberCount,
-  isGroupDivisionForScoring
+  getGroupMemberNamesLabel,
+  cleanDisplayText
 } from '../utils/entryFilters';
 import { pickReconciledJudgeScore } from '../utils/scoreReconciliation';
 
@@ -106,7 +109,6 @@ function ScoringInterface() {
   // State - UI
   const [showEntryList, setShowEntryList] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState(false);
-  const [hideJudgeNavBack, setHideJudgeNavBack] = useState(false);
 
   const siblingMapRef = useRef(new Map());
 
@@ -187,39 +189,6 @@ function ScoringInterface() {
     };
   }, [competitionId]);
 
-  // After correct judge PIN, hide "Back" on scoring so judges stay in the flow (admins use other nav).
-  useEffect(() => {
-    if (!competitionId || judgeNumber == null) {
-      setHideJudgeNavBack(false);
-      return;
-    }
-    const comp = stateData.competition || loadedCompetition;
-    if (!comp) {
-      setHideJudgeNavBack(false);
-      return;
-    }
-    const pins = comp.judge_pins;
-    const pinForJudge =
-      pins && typeof pins === 'object' && !Array.isArray(pins)
-        ? String(pins[String(judgeNumber)] ?? '').trim()
-        : '';
-    if (!pinForJudge) {
-      setHideJudgeNavBack(false);
-      return;
-    }
-    try {
-      const raw = sessionStorage.getItem('topaz_judge_pin_verified');
-      if (!raw) {
-        setHideJudgeNavBack(false);
-        return;
-      }
-      const o = JSON.parse(raw);
-      setHideJudgeNavBack(o.competitionId === competitionId && o.judgeNumber === judgeNumber);
-    } catch {
-      setHideJudgeNavBack(false);
-    }
-  }, [competitionId, judgeNumber, stateData.competition, loadedCompetition]);
-
   // Redirect if missing ids; otherwise collapse group routines to primary rows only
   useEffect(() => {
     if (!competitionId || !judgeNumber) {
@@ -260,7 +229,8 @@ function ScoringInterface() {
 
     if (adminFilters.division_type_filter && adminFilters.division_type_filter !== 'all') {
       filtered = filtered.filter((e) =>
-        matchesDivisionTypeFilter(e, adminFilters.division_type_filter)
+        matchesDivisionTypeFilter(e, adminFilters.division_type_filter) ||
+        matchesSpecialCategoryDivisionFilter(e, adminFilters.division_type_filter, categories)
       );
     }
 
@@ -413,40 +383,25 @@ function ScoringInterface() {
         notes: notes.trim() || null
       };
 
-      const routineTargets = [
-        currentEntry,
-        ...(siblingMapRef.current.get(currentEntry.id) || [])
-      ];
+      // Groups/duos/trios are scored as ONE performance entry.
+      // Sibling rows may exist from older imports, but the canonical saved score
+      // belongs only to the primary/current entry to avoid duplicate score rows.
+      const result = await upsertJudgeScore({
+        ...scorePayload,
+        entry_id: currentEntry.id
+      });
 
-      // Non-solo grouped routines: one score row (primary entry_id only).
-      const saveTargets = isGroupDivisionForScoring(currentEntry)
-        ? [currentEntry]
-        : routineTargets;
-
-      let primaryScoreId = null;
-
-      for (const ent of saveTargets) {
-        const result = await upsertJudgeScore({
-          ...scorePayload,
-          entry_id: ent.id
-        });
-
-        if (!result.success) {
-          throw new Error(result.error);
-        }
-
-        if (ent.id === currentEntry.id) {
-          primaryScoreId = result.data?.id ?? null;
-        }
+      if (!result.success) {
+        throw new Error(result.error);
       }
 
-      setExistingScoreId(primaryScoreId);
+      setExistingScoreId(result.data?.id ?? null);
 
       toast.success('Score saved!');
-
+      
       setScoredEntries((prev) => {
         const next = new Set(prev);
-        routineTargets.forEach((t) => next.add(t.id));
+        next.add(currentEntry.id);
         return next;
       });
 
@@ -519,12 +474,19 @@ function ScoringInterface() {
     const base = formatEntryName(entry);
     const div = getEntryDivisionType(entry);
     if (!div || div === 'Solo') return base;
+    const names = getGroupMemberNamesLabel(entry);
     const memberCount = getMemberCount(entry);
-    const memberPart = memberCount > 0 ? ` • ${memberCount} members` : '';
-    return `${base} (${div}${memberPart})`;
+    const memberPart = names || (memberCount > 0 ? `${memberCount} members` : '');
+    return memberPart ? `${base} (${div} • ${memberPart})` : `${base} (${div})`;
   };
 
   const isNonSoloDivision = (entry) => getEntryDivisionType(entry) !== 'Solo';
+
+  const displayValue = (value) => cleanDisplayText(value, 'N/A');
+
+  const getStudioName = (entry) => displayValue(entry?.studio_name || entry?.studio || entry?.school_name);
+  const getTeacherName = (entry) => displayValue(entry?.teacher_name || entry?.teacher || entry?.instructor_name);
+  const getEntryAgeValue = (entry) => displayValue(entry?.age ?? entry?.participant_age);
 
   // Calculate progress
   const calculateProgress = () => {
@@ -560,8 +522,8 @@ function ScoringInterface() {
     if (Array.isArray(gm) && gm.length > 0) {
       return gm.map((m) =>
         typeof m === 'string'
-          ? { name: m }
-          : { name: m?.name || '', age: m?.age }
+          ? { name: cleanDisplayText(m, '') }
+          : { name: cleanDisplayText(m?.name, ''), age: cleanDisplayText(m?.age, '') }
       );
     }
     return parseGroupMembersFromDanceType(entry?.dance_type);
@@ -644,19 +606,11 @@ function ScoringInterface() {
           <EmptyState
             icon="🎭"
             title="No Entries to Score"
-            description={
-              hideJudgeNavBack
-                ? 'No entries match the current filters. The competition admin can change filters from the Admin Control Panel.'
-                : 'No entries match the current filters. Try adjusting your category or age division filters.'
-            }
-            action={
-              hideJudgeNavBack
-                ? null
-                : {
-                    label: 'Back to Judge Selection',
-                    onClick: () => navigate('/judge-selection', { state: { competitionId } }),
-                  }
-            }
+            description="No entries match the current filters. Try adjusting your category or age division filters."
+            action={{
+              label: "Back to Judge Selection",
+              onClick: () => navigate('/judge-selection', { state: { competitionId } })
+            }}
           />
         </div>
       </Layout>
@@ -675,17 +629,21 @@ function ScoringInterface() {
       <div className="flex-1 flex flex-col p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full">
         {/* HEADER SECTION */}
         <div className="flex items-center justify-between mb-6">
-          {!hideJudgeNavBack ? (
-            <button
-              type="button"
-              onClick={() => navigate('/judge-selection', { state: { competitionId } })}
-              className="text-gray-600 hover:text-gray-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px]"
-            >
-              ← Back
-            </button>
-          ) : (
-            <span className="min-w-[5rem] min-h-[44px]" aria-hidden="true" />
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              const password = prompt('Admin password required to exit judge mode');
+              if (verifyAdminPassword(password)) {
+                unlockJudgeMode();
+                navigate('/');
+              } else {
+                alert('Incorrect admin password');
+              }
+            }}
+            className="text-red-600 hover:text-red-800 text-base sm:text-lg font-semibold flex items-center min-h-[44px]"
+          >
+            Exit Judge Mode
+          </button>
 
           <div className="text-center flex-1 px-4">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -835,8 +793,8 @@ function ScoringInterface() {
             {/* ENTRY DISPLAY */}
             <div className="mb-6 pb-6 border-b-2 border-gray-200">
               <div className="flex flex-col sm:flex-row items-start gap-4">
-                {/* Photo(s) — duo: two headshots when photo_url_2 is set */}
-                <div className="flex-shrink-0 flex flex-row gap-2">
+                {/* Photo */}
+                <div className="flex-shrink-0">
                   {currentEntry.photo_url ? (
                     <LazyLoadImage
                       src={currentEntry.photo_url}
@@ -854,19 +812,6 @@ function ScoringInterface() {
                       {isNonSoloDivision(currentEntry) ? '👥' : '💃'}
                     </div>
                   )}
-                  {getEntryDivisionType(currentEntry) === 'Duo' && currentEntry.photo_url_2 ? (
-                    <LazyLoadImage
-                      src={currentEntry.photo_url_2}
-                      alt=""
-                      effect="blur"
-                      className="w-32 h-32 sm:w-40 sm:h-40 object-cover rounded-lg border-2 border-teal-300"
-                      placeholder={
-                        <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gray-200 rounded-lg flex items-center justify-center text-5xl animate-pulse">
-                          👥
-                        </div>
-                      }
-                    />
-                  ) : null}
                 </div>
 
                 {/* Entry Info */}
@@ -875,11 +820,13 @@ function ScoringInterface() {
                     <div className="flex-1">
                       <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
                         {formatEntryName(currentEntry)}
-                        {currentEntry?.age != null && currentEntry?.age !== ''
-                          ? ` (${currentEntry.age})`
-                          : ' (N/A)'}
                       </h2>
-                      <div className="flex flex-wrap gap-2">
+                      {getEntryDivisionType(currentEntry) !== 'Solo' && getGroupMemberNamesLabel(currentEntry) && (
+                        <p className="text-base sm:text-lg text-gray-700 font-semibold mb-3">
+                          Dancers: {getGroupMemberNamesLabel(currentEntry)}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2 mb-4">
                         <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold">
                           {getCategoryNameForEntry(currentEntry)}
                         </span>
@@ -890,6 +837,21 @@ function ScoringInterface() {
                         <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
                           {getEntryDivisionType(currentEntry)}
                         </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                          <p className="text-xs uppercase tracking-wide text-gray-500 font-bold">Age</p>
+                          <p className="text-gray-800 font-semibold">{getEntryAgeValue(currentEntry)}</p>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                          <p className="text-xs uppercase tracking-wide text-gray-500 font-bold">Teacher</p>
+                          <p className="text-gray-800 font-semibold truncate" title={getTeacherName(currentEntry)}>{getTeacherName(currentEntry)}</p>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                          <p className="text-xs uppercase tracking-wide text-gray-500 font-bold">Studio</p>
+                          <p className="text-gray-800 font-semibold truncate" title={getStudioName(currentEntry)}>{getStudioName(currentEntry)}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -908,7 +870,7 @@ function ScoringInterface() {
                         <ul className="mt-2 ml-4 space-y-1">
                           {groupMembers.map((member, idx) => (
                             <li key={idx} className="text-sm text-gray-600">
-                              • {member.name} {member.age && `(${member.age} years)`}
+                              • {cleanDisplayText(member.name, 'Dancer')} {cleanDisplayText(member.age, '') && `(${cleanDisplayText(member.age, '')} years)`}
                             </li>
                           ))}
                         </ul>

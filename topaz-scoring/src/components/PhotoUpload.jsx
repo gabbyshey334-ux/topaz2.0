@@ -1,34 +1,24 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import imageCompression from 'browser-image-compression';
 import { toast } from 'react-toastify';
 
-function PhotoUpload({
-  onPhotoSelect,
-  existingPhotoUrl = null,
-  label = 'Entry Photo (Optional)',
-  description = 'Max size: 1MB • Formats: JPG, PNG • Auto-compressed if needed',
-}) {
+function PhotoUpload({ onPhotoSelect, existingPhotoUrl = null }) {
   const [preview, setPreview] = useState(existingPhotoUrl);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    if (existingPhotoUrl) {
-      setPreview(existingPhotoUrl);
-    }
-  }, [existingPhotoUrl]);
 
   const handleFileSelect = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file (JPG or PNG)');
+      toast.error('Please select an image file');
       return;
     }
 
-    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
-      toast.error('Only JPG and PNG formats are supported');
+    if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'].includes(file.type)) {
+      toast.error('Supported photo formats: JPG, PNG, WEBP, GIF, HEIC, HEIF');
       return;
     }
 
@@ -36,16 +26,17 @@ function PhotoUpload({
       setIsProcessing(true);
       let processedFile = file;
 
+      // Check file size and compress if needed
       const fileSizeInMB = file.size / (1024 * 1024);
-
+      
       if (fileSizeInMB > 1) {
         toast.info('Compressing image...');
-
+        
         const options = {
           maxSizeMB: 0.8,
           maxWidthOrHeight: 1024,
           useWebWorker: true,
-          fileType: 'image/jpeg',
+          fileType: 'image/jpeg'
         };
 
         try {
@@ -59,12 +50,14 @@ function PhotoUpload({
         }
       }
 
+      // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result);
       };
       reader.readAsDataURL(processedFile);
 
+      // Call parent callback with processed file
       if (onPhotoSelect) {
         onPhotoSelect(processedFile);
       }
@@ -93,14 +86,17 @@ function PhotoUpload({
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-semibold text-gray-700">{label}</label>
+      <label className="block text-sm font-semibold text-gray-700">
+        Entry Photo (Optional)
+      </label>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        {/* Preview */}
         {preview && (
           <div className="relative">
             <img
               src={preview}
-              alt=""
+              alt="Entry preview"
               className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300"
             />
             <button
@@ -114,22 +110,25 @@ function PhotoUpload({
           </div>
         )}
 
+        {/* Upload Button */}
         <div className="flex-1">
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/jpg,image/png"
+            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.gif,.heic,.heif"
             onChange={handleFileSelect}
             className="hidden"
             disabled={isProcessing}
           />
-
+          
           <button
             type="button"
             onClick={handleButtonClick}
             disabled={isProcessing}
             className={`px-4 py-2 rounded-lg font-semibold text-white min-h-[44px] transition-colors ${
-              isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-teal-500 hover:bg-teal-600'
+              isProcessing
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-teal-500 hover:bg-teal-600'
             }`}
           >
             {isProcessing ? (
@@ -144,7 +143,9 @@ function PhotoUpload({
             )}
           </button>
 
-          <p className="text-xs text-gray-500 mt-2">{description}</p>
+          <p className="text-xs text-gray-500 mt-2">
+            Max size: 1MB • Formats: JPG, PNG, WEBP, GIF, HEIC, HEIF • Auto-compressed if needed
+          </p>
         </div>
       </div>
     </div>

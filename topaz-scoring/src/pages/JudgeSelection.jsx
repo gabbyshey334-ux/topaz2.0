@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
@@ -6,7 +6,8 @@ import { getCompetition } from '../supabase/competitions';
 import { getCompetitionCategories } from '../supabase/categories';
 import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
 import { getCompetitionEntries } from '../supabase/entries';
-import { entryMatchesCategory, getCanonicalPerformanceEntries } from '../utils/entryFilters';
+import { entryMatchesCategory } from '../utils/entryFilters';
+import { lockJudgeMode } from '../utils/accessControl';
 
 function JudgeSelection() {
   const navigate = useNavigate();
@@ -30,11 +31,6 @@ function JudgeSelection() {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const performanceRows = useMemo(
-    () => getCanonicalPerformanceEntries(entries),
-    [entries]
-  );
 
   const [showPinModal, setShowPinModal] = useState(false);
   const [selectedJudgeNumber, setSelectedJudgeNumber] = useState(null);
@@ -162,19 +158,11 @@ function JudgeSelection() {
   }
 
   const navigateToScoring = (judgeNum) => {
-    const pins = getJudgePinsObject();
-    const pinForJudge = pins[String(judgeNum)] ?? '';
-    if (String(pinForJudge).trim() === '') {
-      try {
-        sessionStorage.removeItem('topaz_judge_pin_verified');
-      } catch (e) {
-        /* ignore */
-      }
-    }
     try {
       sessionStorage.setItem('topaz_active_competition_id', competitionId);
       sessionStorage.setItem('topaz_active_judge_number', String(judgeNum));
     } catch (e) { /* ignore */ }
+    lockJudgeMode();
     navigate('/scoring', {
       state: {
         competitionId,
@@ -214,15 +202,6 @@ function JudgeSelection() {
     const correct = pins[String(selectedJudgeNumber)] ?? '';
     if (pinInput === String(correct)) {
       setShowPinModal(false);
-      // Scoring screen reads this to hide "← Back" / judge-selection escape (so judges stay in scoring after PIN).
-      try {
-        sessionStorage.setItem(
-          'topaz_judge_pin_verified',
-          JSON.stringify({ competitionId, judgeNumber: selectedJudgeNumber }),
-        );
-      } catch (e) {
-        /* ignore */
-      }
       navigateToScoring(selectedJudgeNumber);
       return;
     }
@@ -248,12 +227,12 @@ function JudgeSelection() {
   const getCategoryEntryCount = (categoryId) => {
     const cat = categories.find((c) => c.id === categoryId);
     if (!cat) return 0;
-    return performanceRows.filter((e) => entryMatchesCategory(e, cat)).length;
+    return entries.filter((e) => entryMatchesCategory(e, cat)).length;
   };
 
   // Get entry count for an age division
   const getAgeDivisionEntryCount = (divisionId) => {
-    return performanceRows.filter(e => e.age_division_id === divisionId).length;
+    return entries.filter(e => e.age_division_id === divisionId).length;
   };
 
   return (
@@ -328,11 +307,7 @@ function JudgeSelection() {
               {competition?.name}
             </p>
             <p className="text-sm sm:text-base text-gray-600 mt-2 px-4">
-              {performanceRows.length} {performanceRows.length === 1 ? 'performance' : 'performances'}
-              {entries.length !== performanceRows.length
-                ? ` (${entries.length} synced rows)`
-                : ''}{' '}
-              • {competition?.judges_count} {competition?.judges_count === 1 ? 'judge' : 'judges'}
+              {entries.length} total {entries.length === 1 ? 'entry' : 'entries'} • {competition?.judges_count} {competition?.judges_count === 1 ? 'judge' : 'judges'}
             </p>
           </div>
 

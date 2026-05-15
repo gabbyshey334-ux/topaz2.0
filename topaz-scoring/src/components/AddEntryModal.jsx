@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { createEntry, getNextEntryNumber } from '../supabase/entries';
-import { getEntryDivisionType } from '../utils/entryFilters';
 
 const DANCE_CATEGORIES = [
   { name: 'Tap', type: 'dance' },
@@ -30,6 +29,49 @@ const SPECIAL_CATEGORIES = [
 function getDivisionTypeOptions(entryType) {
   if (entryType === 'solo') return ['Solo'];
   return ['Duo', 'Trio', 'Small Group (4-10)', 'Large Group (11+)', 'Production (10+)'];
+}
+
+function normalizeDivisionTypeForSave(divisionType) {
+  if (!divisionType) return 'Solo';
+  if (divisionType.includes('Small Group')) return 'Small Group';
+  if (divisionType.includes('Large Group')) return 'Large Group';
+  if (divisionType.includes('Production')) return 'Production';
+  return divisionType;
+}
+
+function buildRoutineDisplayName(entry, members) {
+  const typedName = entry.name?.trim();
+  if (typedName) return typedName;
+  if (entry.type === 'solo') return typedName;
+  const memberNames = members.map((m) => m.name).filter(Boolean);
+  if (memberNames.length > 0) return memberNames.join(' + ');
+  return `${normalizeDivisionTypeForSave(entry.divisionType)} Routine`;
+}
+
+function getOldestMemberAge(members) {
+  const ages = members.map((m) => parseInt(m.age, 10)).filter((n) => !Number.isNaN(n));
+  return ages.length ? Math.max(...ages) : null;
+}
+
+
+function formatAgeDivisionLabel(division) {
+  if (!division) return 'No matching age division';
+  const name = division.name || division.label || 'Age Division';
+  const minAge = division.min_age ?? division.minAge;
+  const maxAge = division.max_age ?? division.maxAge;
+  if (minAge != null && maxAge != null) return `${name} (${minAge}-${maxAge})`;
+  return name;
+}
+
+function findMatchingAgeDivision(ageValue, ageDivisions = []) {
+  const age = parseInt(ageValue, 10);
+  if (!age || Number.isNaN(age)) return null;
+
+  return ageDivisions.find((division) => {
+    const minAge = parseInt(division.min_age ?? division.minAge ?? 0, 10);
+    const maxAge = parseInt(division.max_age ?? division.maxAge ?? 999, 10);
+    return age >= minAge && age <= maxAge;
+  }) || null;
 }
 
 export default function AddEntryModal({
@@ -113,8 +155,23 @@ export default function AddEntryModal({
       toast.error('Please enter dancer name');
       return;
     }
-    if (!entry.age || entry.age < 1 || entry.age > 99) {
-      toast.error('Please enter a valid age (1-99)');
+    const groupMembersForValidation = entry.type === 'group'
+      ? entry.groupMembers.map(m => ({ name: m.name || '', age: m.age ? parseInt(m.age) : null }))
+      : [];
+    const oldestGroupAge = getOldestMemberAge(groupMembersForValidation);
+    const resolvedAge = entry.type === 'group' ? (parseInt(entry.age, 10) || oldestGroupAge) : parseInt(entry.age, 10);
+
+    if (!resolvedAge || resolvedAge < 1 || resolvedAge > 99) {
+      toast.error(entry.type === 'group'
+        ? 'Please enter a valid oldest-member age, or add ages for the group members.'
+        : 'Please enter a valid age (1-99)'
+      );
+      return;
+    }
+
+    const matchingAgeDivision = findMatchingAgeDivision(resolvedAge, ageDivisions);
+    if (!matchingAgeDivision) {
+      toast.error(`Age ${resolvedAge} does not fit any configured age division. Please correct the age division setup before saving.`);
       return;
     }
     if (!entry.categoryId) {
@@ -169,23 +226,22 @@ export default function AddEntryModal({
 
       const cleanedGroupMembers = entry.type === 'group' && entry.groupMembers.length > 0
         ? entry.groupMembers.map(m => ({ name: m.name || '', age: m.age ? parseInt(m.age) : null }))
-        : null;
+        : [];
+      const savedDivisionType = normalizeDivisionTypeForSave(entry.divisionType);
+      const performanceName = buildRoutineDisplayName(entry, cleanedGroupMembers);
 
       const entryData = {
         competition_id: competitionId,
         entry_number: entryNumber,
-        competitor_name: entry.name.trim() || `${entry.divisionType} Group`,
-        age: parseInt(entry.age),
+        competitor_name: performanceName,
+        age: resolvedAge,
         category_id: entry.categoryId || null,
-        age_division_id: entry.ageDivisionId || null,
+        age_division_id: matchingAgeDivision.id,
         ability_level: entry.abilityLevel,
         is_medal_program: entry.isMedalProgram,
-        division_type: getEntryDivisionType({
-          dance_type: entry.type === 'group' ? entry.divisionType : 'Solo',
-          division_type: null,
-        }),
-        dance_type: entry.divisionType,
-        group_members: cleanedGroupMembers,
+        division_type: entry.type === 'solo' ? 'Solo' : savedDivisionType,
+        dance_type: categoryName || savedDivisionType,
+        group_members: entry.type === 'group' ? cleanedGroupMembers : null,
         photo_url: null,
         studio_name: entry.studioName?.trim() || null,
         teacher_name: entry.teacherName?.trim() || null
@@ -210,6 +266,12 @@ export default function AddEntryModal({
   const danceCats = categories.filter(c => DANCE_CATEGORIES.some(d => d.name === c.name));
   const varietyCats = categories.filter(c => VARIETY_CATEGORIES.some(v => v.name === c.name));
   const specialCats = categories.filter(c => SPECIAL_CATEGORIES.some(s => s.name === c.name));
+  const cleanedMembersForAgeLock = entry.type === 'group'
+    ? entry.groupMembers.map(m => ({ name: m.name || '', age: m.age ? parseInt(m.age, 10) : null }))
+    : [];
+  const oldestAgeForLock = getOldestMemberAge(cleanedMembersForAgeLock);
+  const lockedAge = entry.type === 'group' ? (oldestAgeForLock || parseInt(entry.age, 10)) : parseInt(entry.age, 10);
+  const lockedAgeDivision = findMatchingAgeDivision(lockedAge, ageDivisions);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
@@ -289,21 +351,15 @@ export default function AddEntryModal({
             </select>
           </div>
 
-          {/* Age Division */}
+          {/* Age Division - locked from age */}
           <div>
             <label className="block text-gray-700 font-semibold mb-2">Age Division</label>
-            <select
-              value={entry.ageDivisionId}
-              onChange={(e) => setEntry({ ...entry, ageDivisionId: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none"
-            >
-              <option value="">None</option>
-              {ageDivisions.map(d => (
-                <option key={d.id} value={d.id}>
-                  {d.description || (d.min_age != null && d.max_age != null ? `${d.name} (${d.min_age}-${d.max_age})` : d.name)}
-                </option>
-              ))}
-            </select>
+            <div className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray-800 font-semibold">
+              {lockedAge ? formatAgeDivisionLabel(lockedAgeDivision) : 'Enter age to auto-select division'}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Age division is locked automatically by age{entry.type === 'group' ? ' using the oldest dancer age' : ''}.
+            </p>
           </div>
 
           {/* Ability Level */}

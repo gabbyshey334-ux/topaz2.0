@@ -44,14 +44,6 @@ export {
   getNextEntryNumber
 } from './entries';
 
-// Performance model (canonical routine + participants)
-export {
-  performancePayloadFromEntry,
-  replaceParticipantsForPerformance,
-  createPerformanceForEntry,
-  ensurePerformancesLinked,
-} from './performances';
-
 // Score functions
 export {
   createScore,
@@ -85,3 +77,10 @@ export {
   unsubscribeFromAllChannels
 } from './realtime';
 
+
+// Music functions
+export {
+  uploadEntryMusic,
+  deleteEntryMusic,
+  validateMusicFile
+} from './music';

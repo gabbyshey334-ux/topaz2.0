@@ -1,3 +1,4 @@
+console.log('TOPAZ verified white-screen fix build 2026-05-12: no isGroup runtime reference');
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

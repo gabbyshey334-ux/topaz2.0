@@ -531,7 +531,7 @@ export default function EditCompetitionModal({
               <div className="bg-gradient-to-r from-gray-50 to-amber-50 rounded-xl p-5 border-2 border-amber-200">
                 <h4 className="text-lg font-bold text-amber-800 mb-2">SPECIAL CATEGORIES:</h4>
                 <p className="text-sm text-gray-700 mb-3 font-medium">
-                  (Participation recognition only - not eligible for high scoring awards or medals)
+                  (Eligible for category placements/trophies - excluded only from overall/high score awards)
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {SPECIAL_CATEGORIES.map(category => {

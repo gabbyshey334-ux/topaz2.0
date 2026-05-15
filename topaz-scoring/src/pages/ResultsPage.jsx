@@ -29,7 +29,8 @@ import {
   getDivisionTypeEmoji,
   getDivisionTypeDisplayName
 } from '../utils/calculations';
-import { formatEntryName, groupEntries } from '../utils/entryFilters';
+import { formatEntryName, groupEntries, cleanDisplayText } from '../utils/entryFilters';
+import { pickReconciledJudgeScore, getScoreRowTotal } from '../utils/scoreReconciliation';
 
 // Helper function to check if a category is special (should not get awards/medals)
 const isSpecialCategory = (category) => {
@@ -40,6 +41,31 @@ const isSpecialCategory = (category) => {
          categoryName === 'Teacher/Student' ||
          category.is_special_category === true ||
          category.type === 'special';
+};
+
+const assignPlacementRanks = (entriesToRank = []) => {
+  const sorted = [...entriesToRank].sort((a, b) => b.averageScore - a.averageScore);
+  let currentRank = 1;
+
+  sorted.forEach((entry, index) => {
+    if (index > 0 && entry.averageScore === sorted[index - 1].averageScore) {
+      entry.rank = sorted[index - 1].rank;
+    } else {
+      entry.rank = currentRank;
+    }
+    currentRank++;
+  });
+
+  return sorted;
+};
+
+const getPlacementLabel = (rank) => {
+  if (!rank) return '';
+  const suffix = rank % 10 === 1 && rank % 100 !== 11 ? 'st'
+    : rank % 10 === 2 && rank % 100 !== 12 ? 'nd'
+    : rank % 10 === 3 && rank % 100 !== 13 ? 'rd'
+    : 'th';
+  return `${rank}${suffix} Place`;
 };
 
 function ResultsPage() {
@@ -153,21 +179,42 @@ function ResultsPage() {
     return () => unsubscribeFromChannel(channel);
   }, [competitionId]);
 
+  // Collapse duo/trio/group/production rows into one routine for results.
+  // Scores saved on older sibling rows are reconciled by judge, but each routine appears once.
+  const routineEntriesData = useMemo(() => {
+    const { primary, siblingMap } = groupEntries(entries);
+    return { primary, siblingMap };
+  }, [entries]);
+
+  const getRoutineScores = (entry) => {
+    const routineRows = [entry, ...(routineEntriesData.siblingMap.get(entry.id) || [])];
+    const byJudge = new Map();
+
+    for (const row of routineRows) {
+      const rowScores = scores.filter((s) => s.entry_id === row.id);
+      for (const score of rowScores) {
+        const judge = score.judge_number ?? 'unknown';
+        if (!byJudge.has(judge)) byJudge.set(judge, []);
+        byJudge.get(judge).push({ entry: row, score });
+      }
+    }
+
+    return [...byJudge.values()]
+      .map((candidates) => pickReconciledJudgeScore(candidates, entry.id))
+      .filter(Boolean);
+  };
+
   // Calculate ranked results (EXCLUDE SPECIAL CATEGORIES from rankings)
   const rankedResults = useMemo(() => {
-    if (entries.length === 0 || scores.length === 0) return [];
+    if (routineEntriesData.primary.length === 0 || scores.length === 0) return [];
 
-    const { primary: canonicalRows, siblingMap } = groupEntries(entries);
-
-    const entriesWithAverages = canonicalRows.map((entry) => {
-      const siblingIds = (siblingMap.get(entry.id) ?? []).map((s) => s.id);
-      const idSet = new Set([entry.id, ...siblingIds]);
-      const entryScores = scores.filter((s) => idSet.has(s.entry_id));
+    const entriesWithAverages = routineEntriesData.primary.map(entry => {
+      const entryScores = getRoutineScores(entry);
       if (entryScores.length === 0) {
-        return { ...entry, averageScore: 0, judgeCount: 0, hasScores: false };
+        return { ...entry, averageScore: 0, judgeCount: 0, hasScores: false, scores: [] };
       }
 
-      const avgScore = entryScores.reduce((sum, s) => sum + s.total_score, 0) / entryScores.length;
+      const avgScore = entryScores.reduce((sum, s) => sum + getScoreRowTotal(s), 0) / entryScores.length;
       const category = categories.find(c => c.id === entry.category_id);
       
       return {
@@ -187,36 +234,31 @@ function ResultsPage() {
       return !isSpecialCategory(category);
     });
 
-    // Separate special categories (for display only, no rankings)
+    // Separate special categories. They receive category placement trophies,
+    // but are excluded from Overall/High Score winner trophies.
     const specialCategoryEntries = entriesWithAverages.filter(e => {
       if (!e.hasScores) return false;
       const category = categories.find(c => c.id === e.category_id);
       return isSpecialCategory(category);
     });
 
-    // Sort eligible entries by score (highest first)
-    eligibleEntries.sort((a, b) => b.averageScore - a.averageScore);
+    // Regular categories rank overall as before.
+    const rankedEligibleEntries = assignPlacementRanks(eligibleEntries);
 
-    // Assign ranks only to eligible entries
-    let currentRank = 1;
-    eligibleEntries.forEach((entry, index) => {
-      if (index > 0 && entry.averageScore === eligibleEntries[index - 1].averageScore) {
-        entry.rank = eligibleEntries[index - 1].rank;
-      } else {
-        entry.rank = currentRank;
-      }
-      currentRank++;
+    // Special categories rank only within their own exact category/age/ability/division group.
+    const specialGroups = groupByExactCombination(specialCategoryEntries, categories, ageDivisions);
+    const rankedSpecialEntries = [];
+    Object.values(specialGroups).forEach((group) => {
+      assignPlacementRanks(group.entries).forEach((entry) => {
+        entry.isSpecialCategory = true;
+        entry.specialPlacementOnly = true;
+        rankedSpecialEntries.push(entry);
+      });
     });
 
-    // Special categories get no rank
-    specialCategoryEntries.forEach(entry => {
-      entry.rank = null;
-      entry.isSpecialCategory = true;
-    });
-
-    // Return both eligible (ranked) and special (unranked) entries
-    return [...eligibleEntries, ...specialCategoryEntries];
-  }, [entries, scores, categories]);
+    // Return both: regular ranked results + special placement-only results.
+    return [...rankedEligibleEntries, ...rankedSpecialEntries];
+  }, [routineEntriesData, scores, categories, ageDivisions]);
 
   // Separate special categories from regular results
   const specialCategoryResults = useMemo(() => {
@@ -246,7 +288,7 @@ function ResultsPage() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(e => 
         formatEntryName(e).toLowerCase().includes(query) ||
-        e.competitor_name.toLowerCase().includes(query) ||
+        cleanDisplayText(e.competitor_name, '').toLowerCase().includes(query) ||
         e.entry_number.toString().includes(query)
       );
     }
@@ -356,12 +398,11 @@ function ResultsPage() {
 
   // Generate all scorecards in one PDF
   const handleGenerateAllScorecards = async () => {
-    const routineCount = groupEntries(entries).primary.length;
-    if (!window.confirm(`Generate scorecards for all ${routineCount} performances?\n\nThis may take a few minutes.`)) return;
+    if (!window.confirm(`Generate scorecards for all ${entries.length} entries?\n\nThis may take a few minutes.`)) return;
 
     try {
       setGeneratingPdf(true);
-      setPrintProgress({ current: 0, total: routineCount });
+      setPrintProgress({ current: 0, total: entries.length });
       toast.info('Generating all scorecards... Please wait.');
 
       const result = await generateAllScorecards(
@@ -465,7 +506,9 @@ function ResultsPage() {
   };
 
   const handleExport = () => {
-    exportResultsToExcel(filteredResults, scores, competition, categories, ageDivisions, entries);
+    const category = selectedCategory ? categories.find(c => c.id === selectedCategory) : null;
+    const ageDivision = selectedAgeDivision ? ageDivisions.find(d => d.id === selectedAgeDivision) : null;
+    exportResultsToExcel(filteredResults, categories, ageDivisions, competition, category, ageDivision);
     toast.success('Results exported to Excel!');
   };
 
@@ -602,7 +645,7 @@ function ResultsPage() {
               <h3 className="text-3xl font-bold text-teal-600 mb-2">{competition.name}</h3>
               <p className="text-lg text-gray-600 mb-4">{new Date(competition.date).toLocaleDateString()}</p>
               <p className="text-gray-500">
-                {rankedResults.length} performances • {competition.judges_count} judges • {categories.length} categories
+                {rankedResults.length} total entries • {competition.judges_count} judges • {categories.length} categories
               </p>
             </div>
           </div>
@@ -1319,18 +1362,18 @@ function ResultsPage() {
                               {isExpanded && entry.scores && entry.scores.length > 0 && (
                                 <div className="p-6 bg-gray-50 border-t-2 border-gray-200">
                                   {/* Studio and Teacher Info */}
-                                  {(entry.studio_name || entry.teacher_name) && (
+                                  {(cleanDisplayText(entry.studio_name, '') || cleanDisplayText(entry.teacher_name, '')) && (
                                     <div className="mb-4 p-4 bg-white rounded-xl border-2 border-teal-100">
                                       <h4 className="text-sm font-bold text-teal-600 mb-2 uppercase tracking-wider">Studio & Teacher</h4>
                                       <div className="space-y-1">
-                                        {entry.studio_name && (
+                                        {cleanDisplayText(entry.studio_name, '') && (
                                           <p className="text-gray-700">
-                                            <span className="font-semibold">Studio:</span> {entry.studio_name}
+                                            <span className="font-semibold">Studio:</span> {cleanDisplayText(entry.studio_name, '')}
                                           </p>
                                         )}
-                                        {entry.teacher_name && (
+                                        {cleanDisplayText(entry.teacher_name, '') && (
                                           <p className="text-gray-700">
-                                            <span className="font-semibold">Teacher/Choreographer:</span> {entry.teacher_name}
+                                            <span className="font-semibold">Teacher/Choreographer:</span> {cleanDisplayText(entry.teacher_name, '')}
                                           </p>
                                         )}
                                       </div>
@@ -1523,23 +1566,23 @@ function ResultsPage() {
                   {isExpanded && (
                         <div className="mt-6 pt-6 border-t-2 border-gray-200 bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6">
                           {/* Studio and Teacher Info */}
-                          {(entry.studio_name || entry.teacher_name) && (
+                          {(cleanDisplayText(entry.studio_name, '') || cleanDisplayText(entry.teacher_name, '')) && (
                             <div className="mb-6 p-5 bg-white rounded-xl border-2 border-teal-200 shadow-sm">
                               <h4 className="text-lg font-bold text-teal-600 mb-3 flex items-center gap-2">
                                 <span>🏫</span>
                                 <span>Studio & Teacher Information</span>
                               </h4>
                               <div className="space-y-2">
-                                {entry.studio_name && (
+                                {cleanDisplayText(entry.studio_name, '') && (
                                   <div className="flex items-start gap-2">
                                     <span className="text-gray-500 font-semibold min-w-[100px]">Studio:</span>
-                                    <span className="text-gray-800 font-medium">{entry.studio_name}</span>
+                                    <span className="text-gray-800 font-medium">{cleanDisplayText(entry.studio_name, '')}</span>
                                   </div>
                                 )}
-                                {entry.teacher_name && (
+                                {cleanDisplayText(entry.teacher_name, '') && (
                                   <div className="flex items-start gap-2">
                                     <span className="text-gray-500 font-semibold min-w-[100px]">Teacher:</span>
-                                    <span className="text-gray-800 font-medium">{entry.teacher_name}</span>
+                                    <span className="text-gray-800 font-medium">{cleanDisplayText(entry.teacher_name, '')}</span>
                                   </div>
                                 )}
                               </div>
@@ -1716,7 +1759,7 @@ function ResultsPage() {
             </div>
           )}
 
-          {/* SPECIAL CATEGORIES SECTION (Participation Recognition Only) */}
+          {/* SPECIAL CATEGORIES SECTION (Placement Trophy Only) */}
           {specialCategoryResults.length > 0 && (
             <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl shadow-2xl p-8 mb-12 border-4 border-gray-300">
               <div className="text-center mb-8">
@@ -1724,7 +1767,7 @@ function ResultsPage() {
                   🎭 Special Categories
                 </h2>
                 <p className="text-lg text-gray-600 font-semibold bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 inline-block">
-                  Participation Recognition Only - Not Eligible for Placement Awards or Medals
+                  Category Awards Eligible - Excluded Only from Overall/High Score Awards
                 </p>
               </div>
 
@@ -1779,8 +1822,13 @@ function ResultsPage() {
                           </div>
                         </div>
 
-                        {/* Average Score */}
+                        {/* Special placement + average score */}
                         <div className="text-center">
+                          {entry.rank && (
+                            <div className="mb-2 px-4 py-2 bg-yellow-100 border-2 border-yellow-400 rounded-xl text-yellow-800 font-black">
+                              🏆 {getPlacementLabel(entry.rank)}
+                            </div>
+                          )}
                           <div className="text-3xl font-black text-gray-700">
                             {entry.averageScore.toFixed(2)}
                           </div>

@@ -12,6 +12,24 @@ export function normalizeFilterText(str) {
   return String(str).toLowerCase().trim().replace(/[-\s]+/g, ' ');
 }
 
+
+export function cleanDisplayText(value, fallback = '') {
+  if (value === null || value === undefined) return fallback;
+  const text = String(value).trim();
+  if (!text) return fallback;
+  const lowered = text.toLowerCase();
+  if (lowered === 'undefined' || lowered === 'null' || lowered === 'nan') return fallback;
+  return text;
+}
+
+export function firstDisplayValue(...values) {
+  for (const value of values) {
+    const cleaned = cleanDisplayText(value, '');
+    if (cleaned) return cleaned;
+  }
+  return '';
+}
+
 export function getAgeGroup(age) {
   const n = parseInt(age, 10);
   if (Number.isNaN(n)) return 'Unknown';
@@ -57,17 +75,18 @@ export function normalizeDivisionCompare(str) {
     .replace(/[-_\s()/]/g, '');
 }
 
-export function getEntryDivisionType(entry) {
-  if (entry?.division_type != null && String(entry.division_type).trim() !== '') {
-    return String(entry.division_type).trim();
-  }
-
-  if (entry?.dance_type == null || entry.dance_type === '') return 'Solo';
-
-  let divisionType = String(entry.dance_type);
+function normalizeDivisionLabel(raw) {
+  if (raw == null || raw === '') return '';
+  let divisionType = String(raw).trim();
   const pipeIndex = divisionType.indexOf('|');
   if (pipeIndex > -1) {
-    divisionType = divisionType.substring(0, pipeIndex);
+    const beforePipe = divisionType.substring(0, pipeIndex).trim();
+    const afterPipe = divisionType.substring(pipeIndex + 1).trim();
+    const beforeNorm = normalizeDivisionCompare(beforePipe);
+    const afterNorm = normalizeDivisionCompare(afterPipe);
+    const beforeLooksLikeDivision = /solo|duo|trio|smallgroup|largegroup|production/.test(beforeNorm);
+    const afterLooksLikeDivision = /solo|duo|trio|smallgroup|largegroup|production/.test(afterNorm);
+    divisionType = beforeLooksLikeDivision ? beforePipe : afterLooksLikeDivision ? afterPipe : beforePipe;
   }
 
   divisionType = divisionType.replace(/\s*\([^)]*\)\s*$/, '').trim();
@@ -81,26 +100,79 @@ export function getEntryDivisionType(entry) {
   if (lower.includes('student choreography')) return 'Student Choreography';
   if (lower.includes('teacher') && lower.includes('student')) return 'Teacher/Student';
   if (lower.includes('solo')) return 'Solo';
+  return '';
+}
 
-  // dance_type holds only performance category (e.g. "Vocal") — division lives in entries.division_type
+export function getEntryDivisionType(entry) {
+  const direct = normalizeDivisionLabel(entry?.division_type);
+  if (direct) return direct;
+
+  const danceText = normalizeDivisionLabel(entry?.dance_type);
+  if (danceText) return danceText;
+
+  // Last-resort fallback for imported group records where dance_type stores only the style
+  // (for example "Vocal") but group_members tells us this is a Duo/Trio/Group.
+  const memberCount = Array.isArray(entry?.group_members) ? entry.group_members.length : 0;
+  if (memberCount === 2) return 'Duo';
+  if (memberCount === 3) return 'Trio';
+  if (memberCount >= 4 && memberCount <= 10) return 'Small Group';
+  if (memberCount >= 11) return 'Large Group';
+
   return 'Solo';
 }
 
+export function getGroupMemberNames(entry) {
+  const gm = entry?.group_members;
+  if (Array.isArray(gm) && gm.length > 0) {
+    return gm
+      .map((m) => (typeof m === 'string' ? m : m?.name))
+      .map((name) => cleanDisplayText(name, ''))
+      .filter(Boolean);
+  }
+
+  const dt = entry?.dance_type;
+  if (typeof dt === 'string') {
+    try {
+      const match = dt.match(/Members: (\[.*?\])/);
+      if (match) {
+        const parsed = JSON.parse(match[1]);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((m) => (typeof m === 'string' ? m : m?.name))
+            .map((name) => cleanDisplayText(name, ''))
+            .filter(Boolean);
+        }
+      }
+    } catch {
+      /* ignore malformed legacy member data */
+    }
+  }
+
+  return [];
+}
+
+export function getGroupMemberNamesLabel(entry) {
+  const names = getGroupMemberNames(entry);
+  return names.length ? names.join(' + ') : '';
+}
+
 /**
- * Display label: "#{entry_number} {competitor_name}"
+ * Display label: "#{entry_number} {routine/group name}".
+ * For duos/trios/groups, competitor_name is treated as the routine/group name
+ * and group_members holds the actual dancer entry names.
  */
 export function formatEntryName(entry) {
-  if (!entry) return 'Unknown Entry';
-  const num = entry.entry_number ?? '?';
-  const name = entry.competitor_name ?? 'Unknown';
-  return '#' + num + ' ' + name;
+  if (!entry) return 'Entry';
+  const num = cleanDisplayText(entry.entry_number, '?');
+  const routineName = getRoutineDisplayTitle(entry) || 'Untitled Entry';
+  return '#' + num + ' ' + routineName;
 }
 
 /** @deprecated Use formatEntryName — same implementation */
 export const formatEntryNameWithNumber = formatEntryName;
 
 export function getAbilityLevel(entry) {
-  return entry?.ability_level ?? 'Not specified';
+  return cleanDisplayText(entry?.ability_level, 'Not specified');
 }
 
 export function getMemberCount(entry) {
@@ -112,8 +184,8 @@ export function getMemberCount(entry) {
   if (d === 'Duo') return 2;
   if (d === 'Trio') return 3;
   if (d === 'Small Group') return 6;
-  if (d === 'Large Group') return 10;
-  if (d === 'Production') return 12;
+  if (d === 'Large Group') return 11;
+  if (d === 'Production') return 10;
   return 0;
 }
 
@@ -140,8 +212,7 @@ export function sharesMemberBetweenEntries(a, b) {
 
 /**
  * Group DB rows into one scoring routine.
- * Non-Solo rows with group_members: same effective division type + same dance_type + overlapping member names → one primary + siblings.
- * Effective division uses entries.division_type when set, else inferred from dance_type (see getEntryDivisionType).
+ * Non-Solo rows with group_members: same division_type + same dance_type + overlapping member names → one primary + siblings.
  * Solos, or rows without group member data, stay standalone (incl. Production with null group_members).
  */
 export function groupEntries(entries) {
@@ -156,33 +227,38 @@ export function groupEntries(entries) {
   const primary = [];
   const siblingMap = new Map();
   const assignedIds = new Set();
-
-  const danceKey = (e) => String(e?.dance_type ?? '');
+  const sameScoringDivision = (a, b) =>
+    getEntryDivisionType(a) === getEntryDivisionType(b) &&
+    normalizeMatchKey(getEntryStyleLabelForCategoryMatch(a) || a?.dance_type || '') ===
+      normalizeMatchKey(getEntryStyleLabelForCategoryMatch(b) || b?.dance_type || '') &&
+    (a?.category_id || '') === (b?.category_id || '') &&
+    (a?.age_division_id || '') === (b?.age_division_id || '');
 
   for (const entry of sorted) {
-    if (!entry || entry.id == null) continue;
-    if (assignedIds.has(entry.id)) continue;
+    if (!entry || entry.id == null || assignedIds.has(entry.id)) continue;
 
-    const divType = getEntryDivisionType(entry);
-    const gm = entry.group_members;
-    const hasGroupMembers = Array.isArray(gm) && gm.length > 0;
-
-    if (divType === 'Solo' || !hasGroupMembers) {
+    if (!isGroupDivisionForScoring(entry)) {
       primary.push(entry);
       siblingMap.set(entry.id, []);
       assignedIds.add(entry.id);
       continue;
     }
 
+    const routineKey = getRoutineGroupKey(entry);
     const siblings = [];
+
     for (const other of sorted) {
-      if (other.id === entry.id) continue;
-      if (assignedIds.has(other.id)) continue;
-      if (getEntryDivisionType(other) !== divType) continue;
-      if (danceKey(other) !== danceKey(entry)) continue;
-      const ogm = other.group_members;
-      if (!Array.isArray(ogm) || ogm.length === 0) continue;
-      if (sharesMemberBetweenEntries(entry, other)) {
+      if (!other || other.id === entry.id || assignedIds.has(other.id)) continue;
+      if (!isGroupDivisionForScoring(other)) continue;
+      if (!sameScoringDivision(entry, other)) continue;
+
+      const sameRoutineKey = getRoutineGroupKey(other) === routineKey;
+      const sameMembers = sharesMemberBetweenEntries(entry, other);
+
+      // Imported website rows may create one row per dancer/entry number.
+      // Merge them into one scoring card when they are the same routine by
+      // routine key, or when the member lists overlap within the same style/division.
+      if (sameRoutineKey || sameMembers) {
         siblings.push(other);
         assignedIds.add(other.id);
       }
@@ -196,36 +272,59 @@ export function groupEntries(entries) {
   return { primary, siblingMap };
 }
 
-/**
- * One row per judge-scored performance (primary row for each merged group; every solo / non-merged row).
- * Use for rankings, exports, and counts so sibling DB rows are not double-counted.
- */
-export function getCanonicalPerformanceEntries(entries) {
-  if (!entries || !Array.isArray(entries)) return [];
-  return groupEntries(entries).primary;
-}
-
-/** All `entries.id` rows whose judge scores apply to this performance (primary + merged siblings). */
-export function getPerformanceScoreEntryIds(entry, allEntries) {
-  if (!entry?.id) return new Set();
-  const pid = entry.performance_id;
-  if (pid && allEntries && Array.isArray(allEntries) && allEntries.length > 0) {
-    const linked = allEntries.filter((e) => e.performance_id === pid).map((e) => e.id).filter(Boolean);
-    if (linked.length > 0) return new Set(linked);
-  }
-  if (!allEntries || !Array.isArray(allEntries) || allEntries.length === 0) {
-    return new Set([entry.id]);
-  }
-  const { siblingMap } = groupEntries(allEntries);
-  const sibs = siblingMap.get(entry.id) ?? [];
-  return new Set([entry.id, ...sibs.map((s) => s.id)]);
-}
-
-/** Division type filter — uses effective division (column or inferred from dance_type). */
+/** Division type filter — exact match on entries.division_type (null/undefined treated as Solo). */
 export function matchesDivisionTypeFilter(entry, filter) {
   if (!filter || filter === 'all') return true;
   if (!entry) return false;
-  return getEntryDivisionType(entry) === filter;
+
+  const selected = normalizeDivisionCompare(filter);
+  const normalizedDivision = normalizeDivisionCompare(getEntryDivisionType(entry));
+
+  if (normalizedDivision === selected) return true;
+
+  // Fallback for imported/legacy records where the division may be embedded
+  // in dance_type instead of division_type, e.g. "Vocal | Duo" or "Duo - Jazz".
+  const rawText = normalizeDivisionCompare(
+    [entry.division_type, entry.dance_type, entry.category_name, entry.name]
+      .filter(Boolean)
+      .join(' ')
+  );
+
+  if (selected === 'duo') return rawText.includes('duo') && !rawText.includes('trio');
+  if (selected === 'trio') return rawText.includes('trio');
+  if (selected === 'smallgroup') return rawText.includes('smallgroup');
+  if (selected === 'largegroup') return rawText.includes('largegroup');
+  if (selected === 'production') return rawText.includes('production');
+  if (selected === 'studentchoreography') return rawText.includes('studentchoreography');
+  if (selected === 'teacherstudent') return rawText.includes('teacherstudent');
+  if (selected === 'solo') {
+    return !rawText.includes('duo') &&
+      !rawText.includes('trio') &&
+      !rawText.includes('smallgroup') &&
+      !rawText.includes('largegroup') &&
+      !rawText.includes('production');
+  }
+
+  return false;
+}
+
+
+export const SPECIAL_CATEGORY_DIVISION_FILTERS = [
+  'Production',
+  'Student Choreography',
+  'Teacher/Student'
+];
+
+export function matchesSpecialCategoryDivisionFilter(entry, filter, categoriesList = []) {
+  if (!entry || !filter || !SPECIAL_CATEGORY_DIVISION_FILTERS.includes(filter)) return false;
+  const selected = normalizeMatchKey(filter);
+  const categoryNames = [
+    entry.category_name,
+    entry.category?.name,
+    categoriesList?.find((c) => c.id === entry.category_id)?.name,
+    getEntryStyleLabelForCategoryMatch(entry)
+  ];
+  return categoryNames.some((name) => normalizeMatchKey(name) === selected);
 }
 
 export function matchesCategoryFilter(entry, filter) {
@@ -334,18 +433,18 @@ export function ageFilterMatchesEntry(entry, filterAgeDivisionId, ageDivisionsLi
 
 /** Resolve label for UI when category_id is missing (e.g. website sync). */
 export function getDisplayCategoryName(entry, categoriesList) {
-  if (!entry) return 'Unknown';
+  if (!entry) return 'N/A';
   const direct = categoriesList?.find((c) => c.id === entry.category_id);
-  if (direct) return direct.name;
-  const style = getEntryStyleLabelForCategoryMatch(entry);
+  if (direct) return cleanDisplayText(direct.name, 'N/A');
+  const style = cleanDisplayText(getEntryStyleLabelForCategoryMatch(entry), '');
   if (style) {
     const byStyle = categoriesList?.find(
       (c) => normalizeMatchKey(c.name) === normalizeMatchKey(style)
     );
-    if (byStyle) return byStyle.name;
+    if (byStyle) return cleanDisplayText(byStyle.name, 'N/A');
     return style;
   }
-  return 'Unknown';
+  return 'N/A';
 }
 
 /** Division types that score as one routine (multiple DB rows may exist per routine). */
@@ -409,7 +508,7 @@ export function getRoutineGroupKey(entry) {
   const routineNorm = normalizeMatchKey(routineLabel);
   const identity = membersKey ? `${routineNorm}::${membersKey}` : routineNorm;
   return [
-    entry.category_id || '',
+    entry.category_id || normalizeMatchKey(getEntryStyleLabelForCategoryMatch(entry) || entry.dance_type || ''),
     entry.age_division_id || '',
     normalizeMatchKey(getEntryDivisionType(entry)),
     identity
@@ -436,24 +535,29 @@ export function getSiblingRoutineEntries(entry, allEntries) {
 /** Primary headline for group cards: explicit routine title when synced/admin adds it. */
 export function getRoutineDisplayTitle(entry) {
   if (!entry) return '';
-  const t = entry.routine_name != null ? String(entry.routine_name).trim() : '';
-  if (t) return t;
-  return String(entry.competitor_name ?? '').trim();
+  return firstDisplayValue(
+    entry.routine_name,
+    entry.performance_name,
+    entry.performanceTitle,
+    entry.title,
+    entry.competitor_name,
+    entry.name
+  );
 }
 
 /** Match search query against routine title and group member names. */
 export function entryMatchesSearchQuery(entry, queryLower) {
   if (!queryLower) return true;
   if (!entry) return false;
-  if ((entry.competitor_name ?? '').toLowerCase().includes(queryLower)) return true;
+  if (cleanDisplayText(entry.competitor_name, '').toLowerCase().includes(queryLower)) return true;
   if (String(entry.entry_number ?? '').includes(queryLower)) return true;
-  const routine = (entry.routine_name || '').toLowerCase();
+  const routine = cleanDisplayText(entry.routine_name, '').toLowerCase();
   if (routine.includes(queryLower)) return true;
   const gm = entry.group_members;
   if (Array.isArray(gm)) {
     for (const m of gm) {
-      const n = typeof m === 'string' ? m : m?.name;
-      if (n && String(n).toLowerCase().includes(queryLower)) return true;
+      const n = cleanDisplayText(typeof m === 'string' ? m : m?.name, '');
+      if (n && n.toLowerCase().includes(queryLower)) return true;
     }
   }
   return false;

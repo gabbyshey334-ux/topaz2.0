@@ -1,16 +1,7 @@
 import * as XLSX from 'xlsx';
-import { getCanonicalPerformanceEntries, getPerformanceScoreEntryIds } from './entryFilters.js';
 
-export const exportResultsToExcel = (
-  entries,
-  allScores,
-  competition,
-  categories,
-  ageDivisions,
-  allEntriesForGrouping = null
-) => {
+export const exportResultsToExcel = (entries, allScores, competition, categories, ageDivisions) => {
   try {
-    const pool = allEntriesForGrouping && allEntriesForGrouping.length ? allEntriesForGrouping : entries;
     // Prepare data for Excel
     const excelData = entries.map(entry => {
       // Get category info
@@ -76,8 +67,8 @@ export const exportResultsToExcel = (
         }
       }
       
-      const scoreIds = getPerformanceScoreEntryIds(entry, pool);
-      const entryScores = allScores.filter(s => scoreIds.has(s.entry_id));
+      // Get all scores for this entry
+      const entryScores = allScores.filter(s => s.entry_id === entry.id);
       
       // Calculate average
       const avgScore = entryScores.length > 0
@@ -152,10 +143,9 @@ export const exportResultsToExcel = (
     ];
     
     // Add widths for judge columns (will be dynamic based on number of judges)
-    const maxJudges = Math.max(
-      0,
-      ...entries.map((e) => allScores.filter((s) => getPerformanceScoreEntryIds(e, pool).has(s.entry_id)).length)
-    );
+    const maxJudges = Math.max(...entries.map(e => 
+      allScores.filter(s => s.entry_id === e.id).length
+    ));
     
     for (let i = 0; i < maxJudges; i++) {
       columnWidths.push(
@@ -177,8 +167,6 @@ export const exportResultsToExcel = (
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
     
-    const distinctPerformances = getCanonicalPerformanceEntries(pool).length;
-
     // Add a summary sheet
     const summaryData = [
       ['TOPAZ 2.0 Competition Results'],
@@ -187,9 +175,7 @@ export const exportResultsToExcel = (
       ['Date:', competition.date ? new Date(competition.date).toLocaleDateString() : 'N/A'],
       ['Venue:', competition.venue || 'N/A'],
       ['Number of Judges:', competition.judges_count || 'N/A'],
-      ['Performances in this export:', entries.length],
-      ['Distinct performances (competition):', distinctPerformances],
-      ['Synced DB rows (all):', pool.length],
+      ['Total Entries:', entries.length],
       [''],
       ['Generated:', new Date().toLocaleString()],
       [''],
