@@ -1,3 +1,8 @@
+/**
+ * Website (topaz-2-0) Edge Function — invoke after deploy:
+ * https://tklkexenzewscgdszlrq.supabase.co/functions/v1/sync-to-scoring-app
+ * POST JSON: { "registrationId": "<uuid>" } (JWT / verify_jwt per dashboard setting).
+ */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const SCORING_APP_URL = Deno.env.get('SCORING_APP_URL')!;
