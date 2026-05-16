@@ -521,13 +521,11 @@ function ScoringInterface() {
   const parseGroupMembersFromEntry = (entry) => {
     const gm = entry?.group_members;
     if (Array.isArray(gm) && gm.length > 0) {
-      return gm.map((m) =>
-        typeof m === 'string'
-          ? { name: cleanDisplayText(m, '') }
-          : { name: cleanDisplayText(m?.name, ''), age: cleanDisplayText(m?.age, '') }
-      );
+      return gm.map((m) => normalizeGroupMemberRow(m));
     }
-    return parseGroupMembersFromDanceType(entry?.dance_type);
+    return parseGroupMembersFromDanceType(entry?.dance_type).map((m) =>
+      normalizeGroupMemberRow(m)
+    );
   };
 
   if (loading) {
