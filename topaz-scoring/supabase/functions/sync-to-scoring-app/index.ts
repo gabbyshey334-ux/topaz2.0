@@ -35,6 +35,9 @@ const getAgeDivisionId = (age: number): string => {
 const CATEGORY_MAP: Record<string, string> = {
   ballet: 'fb9c9d73-f18d-4fdd-adde-5ae63e2b77af',
   'hip hop': '30509f90-d0e8-48b7-96dd-746b25bcb0f1',
+  jazz: 'f33b2718-1502-422d-b724-79f6054eb2f9',
+  'lyrical/contemporary': '3302f445-1e1f-4ca6-aec1-7d5c06e11a68',
+  acting: '8e4e3051-8e3b-4aac-b342-fc27dbe51a01',
   production: 'b01e1706-f917-4e4c-aada-dda2ae20d7e4',
   'student choreography': '01f04932-2667-4692-b2a7-a77ee0e5ae2a',
   tap: '211d5c0e-3356-43e2-8be0-4da157a8e72d',
@@ -80,12 +83,19 @@ const getCategoryId = (category: string): string | null => {
   return CATEGORY_MAP[mapKey] ?? null;
 };
 
-/** Website performance categories that currently have no UUID in CATEGORY_MAP (add to scoring app / map here). */
-const WEBSITE_CATEGORIES_WITHOUT_SCORING_ID: readonly string[] = [
-  'JAZZ',
-  'LYRICAL/CONTEMPORARY',
-  'ACTING',
-];
+/**
+ * Scoring app `entries.ability_level` has a CHECK constraint that allows
+ * ONLY the bare labels: 'Beginning' | 'Intermediate' | 'Advanced'. The
+ * website registration form stores the long descriptive form.
+ */
+const normalizeAbilityLevel = (raw: unknown): 'Beginning' | 'Intermediate' | 'Advanced' => {
+  if (typeof raw !== 'string' || !raw.trim()) return 'Intermediate';
+  const lower = raw.toLowerCase().trim();
+  if (lower.startsWith('beginning')) return 'Beginning';
+  if (lower.startsWith('intermediate')) return 'Intermediate';
+  if (lower.startsWith('advanced')) return 'Advanced';
+  return 'Intermediate';
+};
 
 /** Scoring DB only uses Solo | Duo | Trio | Production for division_type. */
 const getDivisionType = (groupSize: string): 'Solo' | 'Duo' | 'Trio' | 'Production' => {
@@ -121,6 +131,7 @@ function parseParticipantAge(p: Record<string, unknown>): number | null {
   return null;
 }
 
+/** Names + ages from website `participants_json` for scoring `group_members` JSONB. */
 const buildGroupMembers = (reg: Record<string, unknown>): GroupMemberForSync[] => {
   const raw = reg.participants_json;
   if (raw == null) return [];
@@ -225,11 +236,26 @@ Deno.serve(async (req: Request) => {
   const competitionId = COMPETITION_ID;
 
   const categoryRaw = typeof reg.category === 'string' ? reg.category : '';
-  const categoryId = getCategoryId(categoryRaw);
+  const websiteCategory = categoryRaw.trim();
+  let categoryId = getCategoryId(categoryRaw);
+
+  // Dynamic fallback: if static map misses, look up by name in scoring app
+  if (!categoryId && websiteCategory) {
+    const { data: cat } = await scoringClient
+      .from('categories')
+      .select('id, name')
+      .eq('competition_id', competitionId)
+      .ilike('name', websiteCategory)
+      .maybeSingle();
+    if (cat?.id) {
+      categoryId = cat.id as string;
+    }
+  }
 
   if (!categoryId) {
     const msg =
-      `No scoring category_id for website category "${categoryRaw}". Add this category to the scoring app competition and extend CATEGORY_MAP in sync-to-scoring-app. Known unmapped labels: ${WEBSITE_CATEGORIES_WITHOUT_SCORING_ID.join(', ')}.`;
+      `No scoring category for "${websiteCategory}". ` +
+      'Add it to the scoring app competition first.';
     await updateSyncStatus(websiteClient, registrationId, 'failed', null, msg);
     return new Response(JSON.stringify({ error: msg, category: categoryRaw }), {
       status: 422,
@@ -241,6 +267,7 @@ Deno.serve(async (req: Request) => {
   const groupSize = typeof reg.group_size === 'string' ? reg.group_size : 'Solo';
   const groupMembers = buildGroupMembers(reg as Record<string, unknown>);
   const divisionType = getDivisionType(groupSize);
+  const abilityLevel = normalizeAbilityLevel(reg.ability_level);
 
   const competitorName =
     divisionType === 'Solo'
@@ -257,6 +284,7 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: msg }), { status: 422, headers: JSON_HEADERS });
   }
 
+  // If a row for this registration already exists, treat as success (idempotent).
   const { data: existing } = await scoringClient
     .from('entries')
     .select('id')
@@ -292,7 +320,7 @@ Deno.serve(async (req: Request) => {
     age_division_id: getAgeDivisionId(age),
     age,
     dance_type: categoryRaw,
-    ability_level: reg.ability_level || 'Intermediate',
+    ability_level: abilityLevel,
     studio_name: reg.studio_name || '',
     teacher_name: reg.teacher_name || '',
     group_members: groupMembers.length > 0 ? groupMembers : null,
@@ -356,7 +384,7 @@ Deno.serve(async (req: Request) => {
     age_division_id: getAgeDivisionId(age),
     age,
     dance_type: categoryRaw,
-    ability_level: reg.ability_level || 'Intermediate',
+    ability_level: abilityLevel,
     studio_name: reg.studio_name || '',
     teacher_name: reg.teacher_name || '',
     group_members: groupMembers.length > 0 ? groupMembers : null,
