@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { normalizeGroupMemberRow } from './entryFilters';
 
 /**
  * Check if an entry is a group (duo, trio, or group)
@@ -218,9 +219,10 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       
-      entry.group_members.forEach((member, index) => {
-        const memberName = member.name || 'Unknown';
-        const memberAge = member.age !== null && member.age !== undefined ? member.age : 'N/A';
+      entry.group_members.forEach((member) => {
+        const { name, age } = normalizeGroupMemberRow(member);
+        const memberName = name || 'Unknown';
+        const memberAge = age != null ? age : 'N/A';
         doc.text(`• ${memberName} (Age ${memberAge})`, 25, yPos);
         yPos += 6;
       });

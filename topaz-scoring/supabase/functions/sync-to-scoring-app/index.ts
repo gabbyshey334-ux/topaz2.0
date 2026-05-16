@@ -97,26 +97,52 @@ const getDivisionType = (groupSize: string): 'Solo' | 'Duo' | 'Trio' | 'Producti
   return 'Solo';
 };
 
-const buildGroupMembers = (reg: Record<string, unknown>): string[] => {
+type GroupMemberForSync = { name: string; age: number | null };
+
+const MIN_PERFORMER_AGE = 1;
+const MAX_PERFORMER_AGE = 120;
+
+function parseParticipantAge(p: Record<string, unknown>): number | null {
+  const keys = [
+    'age',
+    'participant_age',
+    'dancer_age',
+    'member_age',
+    'contestant_age',
+    'dancerAge',
+    'Age',
+  ];
+  for (const k of keys) {
+    const raw = p[k];
+    if (raw == null || raw === '') continue;
+    const n = typeof raw === 'number' ? raw : parseInt(String(raw).trim(), 10);
+    if (Number.isFinite(n) && n >= MIN_PERFORMER_AGE && n <= MAX_PERFORMER_AGE) return n;
+  }
+  return null;
+}
+
+const buildGroupMembers = (reg: Record<string, unknown>): GroupMemberForSync[] => {
   const raw = reg.participants_json;
   if (raw == null) return [];
   try {
     const participants =
       typeof raw === 'string' ? JSON.parse(raw) : raw;
     if (!Array.isArray(participants)) return [];
-    return participants
-      .map((p: unknown) => {
-        if (p && typeof p === 'object' && 'name' in p) {
-          const n = (p as { name?: unknown }).name;
-          if (typeof n === 'string' && n.trim() !== '') return n.trim();
-        }
-        if (p && typeof p === 'object' && 'competitor_name' in p) {
-          const n = (p as { competitor_name?: unknown }).competitor_name;
-          if (typeof n === 'string' && n.trim() !== '') return n.trim();
-        }
-        return typeof p === 'string' ? p : '';
-      })
-      .filter(Boolean);
+    const out: GroupMemberForSync[] = [];
+    for (const p of participants) {
+      if (p && typeof p === 'object') {
+        const o = p as Record<string, unknown>;
+        let name = '';
+        const n1 = o.name;
+        const n2 = o.competitor_name;
+        if (typeof n1 === 'string' && n1.trim() !== '') name = n1.trim();
+        else if (typeof n2 === 'string' && n2.trim() !== '') name = n2.trim();
+        if (name) out.push({ name, age: parseParticipantAge(o) });
+      } else if (typeof p === 'string' && p.trim() !== '') {
+        out.push({ name: p.trim(), age: null });
+      }
+    }
+    return out;
   } catch {
     return [];
   }
@@ -293,9 +319,16 @@ Deno.serve(async (req: Request) => {
 
   const participantRows: { performance_id: string; display_name: string; age: number | null; sort_order: number }[] = [];
   if (groupMembers.length > 0) {
-    groupMembers.forEach((name, idx) => {
-      const n = typeof name === 'string' ? name.trim() : '';
-      if (n) participantRows.push({ performance_id: performanceId, display_name: n, age: null, sort_order: idx });
+    groupMembers.forEach((member, idx) => {
+      const n = member.name.trim();
+      if (n) {
+        participantRows.push({
+          performance_id: performanceId,
+          display_name: n,
+          age: member.age,
+          sort_order: idx,
+        });
+      }
     });
   }
   if (participantRows.length === 0) {

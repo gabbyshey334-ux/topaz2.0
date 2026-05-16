@@ -30,6 +30,55 @@ export function firstDisplayValue(...values) {
   return '';
 }
 
+/** Reasonable bounds for dancer ages shown to judges (filters bad data like 241). */
+const PERFORMER_AGE_MIN = 1;
+const PERFORMER_AGE_MAX = 120;
+
+/**
+ * Parse and validate a single age value for display or storage.
+ * @returns {number|null}
+ */
+export function sanitizePerformerAge(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = typeof value === 'number' ? value : parseInt(String(value).trim(), 10);
+  if (!Number.isFinite(n)) return null;
+  if (n < PERFORMER_AGE_MIN || n > PERFORMER_AGE_MAX) return null;
+  return n;
+}
+
+function firstAgeFromMemberObject(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const keys = ['age', 'participant_age', 'dancer_age', 'member_age', 'contestant_age'];
+  for (const k of keys) {
+    if (raw[k] != null && raw[k] !== '') return raw[k];
+  }
+  return null;
+}
+
+/**
+ * Normalize one group_members row from DB (string legacy, or { name, age } from app/sync).
+ * @returns {{ name: string, age: number|null }}
+ */
+export function normalizeGroupMemberRow(raw) {
+  if (raw == null) return { name: '', age: null };
+  if (typeof raw === 'string') {
+    const s = String(raw).trim();
+    const paren = s.match(/^(.+?)\s*\((\d{1,3})\)\s*$/);
+    if (paren) {
+      const nm = cleanDisplayText(paren[1], '');
+      const ag = sanitizePerformerAge(paren[2]);
+      return { name: nm, age: ag };
+    }
+    return { name: cleanDisplayText(s, ''), age: null };
+  }
+  if (typeof raw === 'object') {
+    const name = firstDisplayValue(raw.name, raw.competitor_name, raw.display_name);
+    const rawAge = firstAgeFromMemberObject(raw);
+    return { name: cleanDisplayText(name, ''), age: sanitizePerformerAge(rawAge) };
+  }
+  return { name: '', age: null };
+}
+
 export function getAgeGroup(age) {
   const n = parseInt(age, 10);
   if (Number.isNaN(n)) return 'Unknown';

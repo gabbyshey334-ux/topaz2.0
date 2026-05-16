@@ -29,7 +29,8 @@ import {
   entryMatchesSearchQuery,
   getMemberCount,
   getGroupMemberNamesLabel,
-  cleanDisplayText
+  cleanDisplayText,
+  normalizeGroupMemberRow
 } from '../utils/entryFilters';
 import { pickReconciledJudgeScore } from '../utils/scoreReconciliation';
 
@@ -867,13 +868,23 @@ function ScoringInterface() {
                         {expandedGroup ? '▼' : '▶'} Group of {groupMembers.length} members
                       </button>
                       {expandedGroup && (
-                        <ul className="mt-2 ml-4 space-y-1">
-                          {groupMembers.map((member, idx) => (
-                            <li key={idx} className="text-sm text-gray-600">
-                              • {cleanDisplayText(member.name, 'Dancer')} {cleanDisplayText(member.age, '') && `(${cleanDisplayText(member.age, '')} years)`}
-                            </li>
-                          ))}
-                        </ul>
+                        <>
+                          <ul className="mt-2 ml-4 space-y-1">
+                            {groupMembers.map((member, idx) => (
+                              <li key={idx} className="text-sm text-gray-600">
+                                • {cleanDisplayText(member.name, 'Dancer')}
+                                {member.age != null ? ` (${member.age} years)` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                          {groupMembers.some((m) => m.age == null) &&
+                            getEntryAgeValue(currentEntry) !== 'N/A' && (
+                              <p className="text-xs text-gray-500 mt-2 ml-4 max-w-md">
+                                Members without an individual age use the routine/oldest age in the card above for this
+                                entry.
+                              </p>
+                            )}
+                        </>
                       )}
                     </div>
                   )}

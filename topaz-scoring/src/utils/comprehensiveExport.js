@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { normalizeGroupMemberRow } from './entryFilters';
 
 /**
  * Export comprehensive competition data to Excel with multiple sheets
@@ -91,7 +92,10 @@ export const exportComprehensiveExcel = async (
       let groupMembers = '';
       if (entry.group_members && Array.isArray(entry.group_members)) {
         groupMembers = entry.group_members
-          .map(m => m.age ? `${m.name} (age ${m.age})` : m.name)
+          .map((m) => {
+            const { name, age } = normalizeGroupMemberRow(m);
+            return age != null ? `${name} (age ${age})` : name;
+          })
           .join('; ');
       }
       
