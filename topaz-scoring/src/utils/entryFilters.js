@@ -30,6 +30,14 @@ export function firstDisplayValue(...values) {
   return '';
 }
 
+/** Join label parts for UI; drops null/undefined/empty/"undefined" so titles never show "Foo undefined". */
+export function joinDisplayParts(...parts) {
+  return parts
+    .map((p) => cleanDisplayText(p, ''))
+    .filter(Boolean)
+    .join(' ');
+}
+
 /** Reasonable bounds for dancer ages shown to judges (filters bad data like 241). */
 const PERFORMER_AGE_MIN = 1;
 const PERFORMER_AGE_MAX = 120;

@@ -350,10 +350,9 @@ function ResultsPage() {
         
         medalGroups.push({
           key: key,
-          category: group.category,
-          variety: group.variety,
-          ageDivision: group.ageDivision,
-          abilityLevel: group.abilityLevel,
+          category: cleanDisplayText(group.category, 'Unknown'),
+          ageDivision: cleanDisplayText(group.ageDivision, 'No Division'),
+          abilityLevel: cleanDisplayText(group.abilityLevel, 'Unknown'),
           results: medalEntries.slice(0, 4) // Top 4
         });
       }
@@ -432,11 +431,13 @@ function ResultsPage() {
 
   // Helper functions
   const getCategoryName = (categoryId) => {
-    return categories.find(c => c.id === categoryId)?.name || 'Unknown';
+    const name = categories.find(c => c.id === categoryId)?.name;
+    return cleanDisplayText(name, 'Unknown');
   };
 
   const getAgeDivisionName = (divisionId) => {
-    return ageDivisions.find(d => d.id === divisionId)?.name || '';
+    const name = ageDivisions.find(d => d.id === divisionId)?.name;
+    return cleanDisplayText(name, 'No Division');
   };
 
   const getRankColor = (rank) => {
@@ -1053,11 +1054,11 @@ function ResultsPage() {
                     {medalProgramResults.map((group) => (
                       <div key={group.key} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border-2 border-amber-100 shadow-md">
                         <h3 className="text-xl font-bold text-amber-900 mb-2 border-b-2 border-amber-100 pb-3 flex items-center gap-2">
-                          <span>✨</span> {group.category} {group.variety !== 'None' ? group.variety : ''} - Top 4
+                          <span>✨</span> {cleanDisplayText(group.category, 'Unknown')} - Top 4
                         </h3>
                         <p className="text-sm text-amber-700 mb-4 flex gap-2 flex-wrap">
-                          <span className="px-2 py-1 bg-amber-50 rounded">📅 {group.ageDivision}</span>
-                          <span className="px-2 py-1 bg-amber-50 rounded">⭐ {group.abilityLevel}</span>
+                          <span className="px-2 py-1 bg-amber-50 rounded">📅 {cleanDisplayText(group.ageDivision, 'No Division')}</span>
+                          <span className="px-2 py-1 bg-amber-50 rounded">⭐ {cleanDisplayText(group.abilityLevel, 'Unknown')}</span>
                         </p>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1256,15 +1257,14 @@ function ResultsPage() {
                       {/* Group Header */}
                       <div className="bg-gradient-to-r from-teal-600 via-cyan-500 to-teal-600 p-8">
                         <h2 className="text-3xl font-extrabold text-white mb-3 drop-shadow-lg">
-                          🏆 {group.category}
-                          {group.variety !== 'None' && ` ${group.variety}`}
+                          🏆 {cleanDisplayText(group.category, 'Unknown')}
                         </h2>
                         <div className="flex flex-wrap gap-3 mb-3">
                           <span className="px-4 py-2 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
-                            📅 {group.ageDivision}
+                            📅 {cleanDisplayText(group.ageDivision, 'No Division')}
                           </span>
                           <span className="px-4 py-2 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
-                            ⭐ {group.abilityLevel}
+                            ⭐ {cleanDisplayText(group.abilityLevel, 'Unknown')}
                           </span>
                           <span className="px-4 py-2 bg-yellow-400/90 backdrop-blur rounded-full text-sm font-black text-gray-800 border-2 border-yellow-500">
                             {getDivisionTypeEmoji(group.divisionType)} {getDivisionTypeDisplayName(group.divisionType)}

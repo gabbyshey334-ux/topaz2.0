@@ -1,3 +1,5 @@
+import { cleanDisplayText } from './entryFilters.js';
+
 /**
  * Calculate average score from multiple judges
  * @param {Array} scores - Array of score objects with total field
@@ -479,16 +481,16 @@ export const getDivisionTypeEmoji = (divisionType) => {
  * @returns {string} - Clean display name
  */
 export const getDivisionTypeDisplayName = (divisionType) => {
-  if (!divisionType) return 'Solo';
-  
-  // Clean up the division type for display
-  if (divisionType.includes('Solo')) return 'Solo';
-  if (divisionType.includes('Duo') && !divisionType.includes('Trio')) return 'Duo';
-  if (divisionType.includes('Trio')) return 'Trio';
-  if (divisionType.includes('Small Group')) return 'Small Group';
-  if (divisionType.includes('Large Group')) return 'Large Group';
-  if (divisionType.includes('Production')) return 'Production';
-  
-  return divisionType;
+  const type = cleanDisplayText(divisionType, 'Solo');
+  if (!type) return 'Solo';
+
+  if (type.includes('Solo')) return 'Solo';
+  if (type.includes('Duo') && !type.includes('Trio')) return 'Duo';
+  if (type.includes('Trio')) return 'Trio';
+  if (type.includes('Small Group')) return 'Small Group';
+  if (type.includes('Large Group')) return 'Large Group';
+  if (type.includes('Production')) return 'Production';
+
+  return type;
 };
 

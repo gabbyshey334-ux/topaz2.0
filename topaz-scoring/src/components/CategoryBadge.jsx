@@ -1,7 +1,11 @@
+import { cleanDisplayText } from '../utils/entryFilters';
+
 function CategoryBadge({ categoryName, varietyLevel = null }) {
+  const label = cleanDisplayText(categoryName, 'Unknown');
+  const variety = cleanDisplayText(varietyLevel, '');
   // Special categories list
   const specialCategories = ['Production', 'Student Choreography', 'Teacher/Student'];
-  const isSpecial = specialCategories.includes(categoryName);
+  const isSpecial = specialCategories.includes(label);
 
   const getCategoryColor = (name) => {
     const lowerName = name.toLowerCase();
@@ -30,19 +34,19 @@ function CategoryBadge({ categoryName, varietyLevel = null }) {
     }
   };
 
-  const colorClass = getCategoryColor(categoryName);
+  const colorClass = getCategoryColor(label);
 
   return (
     <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border-2 ${colorClass} font-semibold text-sm`}>
-      <span>{categoryName}</span>
+      <span>{label}</span>
       {isSpecial && (
         <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full" title="Not eligible for high score awards">
           SPECIAL
         </span>
       )}
-      {varietyLevel && varietyLevel !== 'None' && (
+      {variety && variety !== 'None' && (
         <span className="text-xs px-2 py-0.5 bg-white/50 rounded-full">
-          {varietyLevel}
+          {variety}
         </span>
       )}
     </div>
