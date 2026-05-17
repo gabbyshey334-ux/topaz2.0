@@ -189,10 +189,12 @@ function WelcomePage() {
           </div>
         </div>
 
-        {/* Title Section - Responsive font sizes */}
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent mb-3 text-center px-4">
-          TOPAZ 2.0 Scoring System
-        </h1>
+        {/* Title Section — extra pb + line-height so gradient clip does not cut descenders (g, y) */}
+        <div className="text-center px-4 mb-3 w-full overflow-visible">
+          <h1 className="inline-block text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent pb-2 sm:pb-3 leading-[1.2]">
+            TOPAZ 2.0 Scoring System
+          </h1>
+        </div>
         <p className="text-base sm:text-lg md:text-xl text-teal-600 font-semibold mb-8 md:mb-12 text-center">
           Since 1972 - Modernized for Today
         </p>
