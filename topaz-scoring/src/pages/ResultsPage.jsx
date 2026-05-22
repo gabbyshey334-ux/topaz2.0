@@ -644,7 +644,7 @@ function ResultsPage() {
             {/* Competition Info Card */}
             <div className="bg-white rounded-2xl shadow-xl p-8 max-w-3xl mx-auto mb-8">
               <h3 className="text-3xl font-bold text-teal-600 mb-2">{competition.name}</h3>
-              <p className="text-lg text-gray-600 mb-4">{new Date(competition.date).toLocaleDateString()}</p>
+              <p className="text-lg text-gray-600 mb-4">{competition.date ? new Date(competition.date + 'T00:00:00').toLocaleDateString() : ''}</p>
               <p className="text-gray-500">
                 {rankedResults.length} total entries • {competition.judges_count} judges • {categories.length} categories
               </p>

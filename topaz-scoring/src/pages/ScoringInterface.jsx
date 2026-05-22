@@ -585,7 +585,10 @@ function ScoringInterface() {
               {competitionId && (
                 <button
                   type="button"
-                  onClick={() => navigate('/judge-selection', { state: { competitionId } })}
+                  onClick={() => {
+                    unlockJudgeMode();
+                    navigate('/judge-selection', { state: { competitionId } });
+                  }}
                   className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   Select Judge
@@ -608,7 +611,10 @@ function ScoringInterface() {
             description="No entries match the current filters. Try adjusting your category or age division filters."
             action={{
               label: "Back to Judge Selection",
-              onClick: () => navigate('/judge-selection', { state: { competitionId } })
+              onClick: () => {
+                unlockJudgeMode();
+                navigate('/judge-selection', { state: { competitionId } });
+              }
             }}
           />
         </div>
