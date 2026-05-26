@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Music, AlertTriangle, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import LoadingSpinner from './LoadingSpinner';
 import { getCompetitionEntries, updateEntry } from '../supabase/entries';
@@ -93,7 +94,10 @@ function MusicUploadManager({ competitionId, onClose }) {
         <div className="sticky top-0 bg-gradient-to-r from-indigo-700 to-purple-600 p-6 rounded-t-2xl z-10">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-bold text-white mb-2">🎵 Music Upload Manager</h2>
+              <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
+                <Music size={32} />
+                Music Upload Manager
+              </h2>
               <p className="text-white/90">Upload or replace audio files for each entry</p>
             </div>
             <button
@@ -102,7 +106,7 @@ function MusicUploadManager({ competitionId, onClose }) {
               className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
               aria-label="Close music upload manager"
             >
-              <span className="text-3xl">×</span>
+              <X size={28} />
             </button>
           </div>
         </div>
@@ -157,8 +161,18 @@ function MusicUploadManager({ competitionId, onClose }) {
                       {getGroupMemberNamesLabel(entry) && (
                         <p className="text-sm text-gray-700 font-medium">Dancers: {getGroupMemberNamesLabel(entry)}</p>
                       )}
-                      <p className={`text-sm font-semibold mt-2 ${entry.music_url ? 'text-green-700' : 'text-orange-700'}`}>
-                        {entry.music_url ? `🎵 ${musicLabel}` : '⚠️ No audio uploaded'}
+                      <p className={`text-sm font-semibold mt-2 flex items-center gap-1 ${entry.music_url ? 'text-green-700' : 'text-orange-700'}`}>
+                        {entry.music_url ? (
+                          <>
+                            <Music size={16} />
+                            {musicLabel}
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle size={16} />
+                            No audio uploaded
+                          </>
+                        )}
                       </p>
                       {entry.music_url && (
                         <audio controls src={entry.music_url} className="w-full mt-3" preload="metadata">

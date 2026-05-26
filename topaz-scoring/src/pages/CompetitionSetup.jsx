@@ -1,5 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Drama,
+  Scale,
+  Camera,
+  Lightbulb,
+  Upload,
+  AlertTriangle,
+  Check,
+  Star,
+  Users,
+  PersonStanding,
+  X,
+} from 'lucide-react';
 import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
 import PhotoUpload from '../components/PhotoUpload';
@@ -823,11 +836,11 @@ function CompetitionSetup() {
 
     // Show results
     if (results.success.length > 0) {
-      toast.success(`✅ ${results.success.length} photos uploaded successfully!`);
+      toast.success(`${results.success.length} photos uploaded successfully!`);
     }
 
     if (results.failed.length > 0) {
-      toast.error(`❌ ${results.failed.length} photos failed to upload`);
+      toast.error(`${results.failed.length} photos failed to upload`);
       console.log('Failed uploads:', results.failed);
     }
 
@@ -1014,7 +1027,7 @@ function CompetitionSetup() {
       }
 
       // Success!
-      toast.success('🎉 Competition created successfully!');
+      toast.success('Competition created successfully!');
       
       console.log('✅ All data saved, preparing navigation...');
       console.log('📍 Navigation state:', {
@@ -1139,7 +1152,8 @@ function CompetitionSetup() {
               {/* Judge Names Section */}
               <div className="bg-teal-50/50 rounded-xl p-4 sm:p-6 border-2 border-teal-100 mt-4">
                 <h3 className="text-lg font-bold text-teal-700 mb-2 flex items-center gap-2">
-                  <span>⚖️</span> Judge Names (Optional)
+                  <Scale size={20} aria-hidden />
+                  Judge Names (Optional)
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">
                   Enter names to display on score sheets and results. Leave blank to use "Judge 1", "Judge 2", etc.
@@ -1197,7 +1211,7 @@ function CompetitionSetup() {
           {/* BULK PHOTO UPLOAD SECTION */}
           <div className="bg-gradient-to-br from-teal-50/90 to-cyan-50/90 backdrop-blur-sm rounded-2xl shadow-lg p-5 sm:p-8 mb-6 border-2 border-teal-200">
             <div className="flex items-start gap-3 mb-4">
-              <span className="text-3xl">📸</span>
+              <Camera size={32} className="text-teal-600 shrink-0" aria-hidden />
               <div className="flex-1">
                 <h2 className="text-xl sm:text-2xl font-bold text-teal-700 mb-2">
                   Photo Upload Options
@@ -1213,7 +1227,10 @@ function CompetitionSetup() {
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 sm:p-6 border-2 border-purple-200 mb-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
-                    <h3 className="font-bold text-purple-800 text-lg mb-1">📸 Photo Upload Manager</h3>
+                    <h3 className="font-bold text-purple-800 text-lg mb-1 flex items-center gap-2">
+                      <Camera size={20} aria-hidden />
+                      Photo Upload Manager
+                    </h3>
                     <p className="text-sm text-gray-700">
                       Recommended for competition day! Upload photos and automatically match them to entries.
                     </p>
@@ -1230,8 +1247,9 @@ function CompetitionSetup() {
 
             {!savedCompetitionId && (
               <div className="bg-amber-50 rounded-xl p-4 border-2 border-amber-200 mb-4">
-                <p className="text-amber-800 text-sm font-semibold">
-                  💡 Save your competition first to unlock the Photo Upload Manager
+                <p className="text-amber-800 text-sm font-semibold flex items-center gap-2">
+                  <Lightbulb size={16} className="shrink-0" aria-hidden />
+                  Save your competition first to unlock the Photo Upload Manager
                 </p>
               </div>
             )}
@@ -1262,7 +1280,7 @@ function CompetitionSetup() {
                     </>
                   ) : (
                     <>
-                      <span className="mr-2">📤</span>
+                      <Upload size={18} className="mr-2" aria-hidden />
                       Select Multiple Photos
                     </>
                   )}
@@ -1270,14 +1288,18 @@ function CompetitionSetup() {
               </div>
 
               {entries.length === 0 && (
-                <p className="text-amber-600 text-sm mt-3 text-center font-semibold">
-                  ⚠️ Please add entries first before uploading photos
+                <p className="text-amber-600 text-sm mt-3 text-center font-semibold flex items-center justify-center gap-2">
+                  <AlertTriangle size={16} aria-hidden />
+                  Please add entries first before uploading photos
                 </p>
               )}
 
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <p className="text-xs sm:text-sm text-gray-600">
-                  <strong>💡 Tips:</strong>
+                  <strong className="inline-flex items-center gap-1">
+                    <Lightbulb size={14} aria-hidden />
+                    Tips:
+                  </strong>
                 </p>
                 <ul className="text-xs sm:text-sm text-gray-600 list-disc list-inside space-y-1 mt-2">
                   <li>Rename your photo files to match entry numbers (e.g., 1.jpg for Entry #1)</li>
@@ -1412,8 +1434,9 @@ function CompetitionSetup() {
               {/* Selected Categories Summary with Remove Buttons */}
               {getSelectedCategoriesArray().length > 0 && (
                 <div className="bg-teal-50 rounded-xl p-5 border-2 border-teal-200">
-                  <p className="text-sm font-semibold text-teal-800 mb-3">
-                    ✅ Selected Categories ({getSelectedCategoriesArray().length}):
+                  <p className="text-sm font-semibold text-teal-800 mb-3 flex items-center gap-2">
+                    <Check size={16} className="text-teal-600" aria-hidden />
+                    Selected Categories ({getSelectedCategoriesArray().length}):
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {getSelectedCategoriesArray().map(cat => (
@@ -1434,8 +1457,9 @@ function CompetitionSetup() {
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-teal-700 mt-3">
-                    💡 Tip: Click the × to remove categories
+                  <p className="text-xs text-teal-700 mt-3 flex items-center gap-1">
+                    <Lightbulb size={12} aria-hidden />
+                    Tip: Click the X to remove categories
                   </p>
                 </div>
               )}
@@ -1467,8 +1491,9 @@ function CompetitionSetup() {
             </div>
 
             {getSelectedCategoriesArray().length === 0 && (
-              <p className="text-yellow-600 bg-yellow-50 border border-yellow-200 px-4 py-3 rounded-lg text-sm">
-                ⚠️ Please select at least one category before adding entries
+              <p className="text-yellow-600 bg-yellow-50 border border-yellow-200 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                <AlertTriangle size={16} className="shrink-0" aria-hidden />
+                Please select at least one category before adding entries
               </p>
             )}
 
@@ -1490,8 +1515,12 @@ function CompetitionSetup() {
                             className="w-16 h-16 object-cover rounded-lg"
                           />
                         ) : (
-                          <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center text-2xl">
-                            {entry.type === 'group' ? '👥' : '💃'}
+                          <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                            {entry.type === 'group' ? (
+                              <Users size={28} className="text-gray-500" aria-hidden />
+                            ) : (
+                              <PersonStanding size={28} className="text-gray-500" aria-hidden />
+                            )}
                           </div>
                         )}
                       </div>
@@ -1514,16 +1543,15 @@ function CompetitionSetup() {
                               }
                             </span>
                             {entry.isMedalProgram && (
-                              <span className="text-yellow-500 text-lg" title="Medal Program">
-                                ⭐
-                              </span>
+                              <Star size={18} className="text-yellow-500 fill-yellow-400" title="Medal Program" aria-hidden />
                             )}
                           </div>
                           <button
                             onClick={() => handleDeleteEntry(entry.id)}
-                            className="text-red-500 hover:text-red-700 font-bold"
+                            className="text-red-500 hover:text-red-700"
+                            aria-label="Delete entry"
                           >
-                            ×
+                            <X size={20} />
                           </button>
                         </div>
 
@@ -1573,7 +1601,7 @@ function CompetitionSetup() {
               </div>
             ) : (
               <EmptyState
-                icon="🎭"
+                icon={<Drama size={48} className="text-gray-400" />}
                 title="No Entries Yet"
                 description="Click the '+ Add Entry' button above to add your first dancer or group."
               />
@@ -1621,10 +1649,10 @@ function CompetitionSetup() {
               <h3 id="modal-title" className="text-2xl font-bold text-gray-800">Add Entry</h3>
               <button
                 onClick={handleCloseAddEntry}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+                className="text-gray-500 hover:text-gray-700"
                 aria-label="Close modal"
               >
-                ×
+                <X size={24} />
               </button>
             </div>
 
@@ -1685,13 +1713,15 @@ function CompetitionSetup() {
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:outline-none min-h-[48px]"
                 />
                 {autoSelectedDivision && (
-                  <p className="text-sm text-teal-600 mt-1 font-semibold">
-                    ✓ Age {currentEntry.age} → {autoSelectedDivision.name} Division (auto-selected)
+                  <p className="text-sm text-teal-600 mt-1 font-semibold flex items-center gap-1">
+                    <Check size={14} aria-hidden />
+                    Age {currentEntry.age} → {autoSelectedDivision.name} Division (auto-selected)
                   </p>
                 )}
                 {currentEntry.age && !autoSelectedDivision && (
-                  <p className="text-sm text-orange-600 mt-1">
-                    ⚠️ Age {currentEntry.age} doesn't match any division
+                  <p className="text-sm text-orange-600 mt-1 flex items-center gap-1">
+                    <AlertTriangle size={14} aria-hidden />
+                    Age {currentEntry.age} doesn't match any division
                   </p>
                 )}
               </div>
@@ -1710,7 +1740,7 @@ function CompetitionSetup() {
                       {isSpecial && (
                         <div className="mb-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
                           <div className="flex items-start gap-2">
-                            <span className="text-xl">⚠️</span>
+                            <AlertTriangle size={20} className="text-yellow-600 shrink-0 mt-0.5" aria-hidden />
                             <div>
                               <p className="text-sm font-bold text-yellow-800 mb-1">
                                 Special Category Selected
@@ -1803,10 +1833,15 @@ function CompetitionSetup() {
                   <option value="Intermediate">Intermediate (2-4 years)</option>
                   <option value="Advanced">Advanced (5+ years)</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {currentEntry.type === 'group' 
-                    ? '⚠️ For groups: Select the ability level of your most experienced member'
-                    : 'Select based on years of training'}
+                <p className="text-xs text-gray-500 mt-1 flex items-start gap-1">
+                  {currentEntry.type === 'group' ? (
+                    <>
+                      <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden />
+                      <span>For groups: Select the ability level of your most experienced member</span>
+                    </>
+                  ) : (
+                    'Select based on years of training'
+                  )}
                 </p>
               </div>
 
@@ -1837,8 +1872,9 @@ function CompetitionSetup() {
                     onChange={(e) => setCurrentEntry({ ...currentEntry, isMedalProgram: e.target.checked })}
                     className="w-5 h-5"
                   />
-                  <span className="text-gray-700 font-semibold text-sm sm:text-base">
-                    Include in Medal Program ⭐
+                  <span className="text-gray-700 font-semibold text-sm sm:text-base inline-flex items-center gap-1">
+                    Include in Medal Program
+                    <Star size={16} className="text-yellow-500 fill-yellow-400" aria-hidden />
                   </span>
                 </label>
               </div>
@@ -1937,8 +1973,9 @@ function CompetitionSetup() {
                             <button
                               onClick={() => handleDeleteGroupMember(member.id)}
                               className="text-red-500 hover:text-red-700"
+                              aria-label={`Remove ${member.name}`}
                             >
-                              ×
+                              <X size={18} />
                             </button>
                           </div>
                         ))}
@@ -1961,7 +1998,7 @@ function CompetitionSetup() {
                         {/* Age calculation info */}
                         <div className="p-4 bg-teal-50 border-2 border-teal-300 rounded-lg">
                           <p className="font-semibold text-teal-700 flex items-center gap-2">
-                            <span>✓</span>
+                            <Check size={16} aria-hidden />
                             <span>Age Range: {youngestAge === oldestAge ? `${youngestAge}` : `${youngestAge}-${oldestAge}`} years</span>
                           </p>
                           <p className="text-sm text-teal-600 mt-1">
@@ -1973,7 +2010,7 @@ function CompetitionSetup() {
                         {hasMismatch && (
                           <div className="p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg">
                             <p className="text-yellow-800 font-semibold flex items-center gap-2">
-                              <span>⚠️</span>
+                              <AlertTriangle size={16} aria-hidden />
                               <span>Age Mismatch Detected!</span>
                             </p>
                             <p className="text-sm text-yellow-700 mt-1">

@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import {
+  AlertTriangle,
+  BarChart3,
+  ChevronRight,
+  Drama,
+  Music2,
+  PersonStanding,
+  SlidersHorizontal,
+} from 'lucide-react';
 import Layout from '../components/Layout';
 import { getCompetition } from '../supabase/competitions';
 import { getCompetitionCategories } from '../supabase/categories';
@@ -8,6 +17,28 @@ import { getCompetitionAgeDivisions } from '../supabase/ageDivisions';
 import { getCompetitionEntries } from '../supabase/entries';
 import { entryMatchesCategory } from '../utils/entryFilters';
 import { lockJudgeMode } from '../utils/accessControl';
+
+function BrandedImage({ src, alt, className, fallbackIcon: FallbackIcon, fallbackClassName }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <FallbackIcon
+        className={`opacity-40 ${fallbackClassName}`}
+        aria-hidden
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setHasError(true)}
+    />
+  );
+}
 
 function JudgeSelection() {
   const navigate = useNavigate();
@@ -131,7 +162,7 @@ function JudgeSelection() {
       <Layout overlayOpacity="bg-white/80">
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center max-w-md">
-            <div className="text-6xl mb-4">⚠️</div>
+            <AlertTriangle size={56} className="mx-auto mb-4 text-amber-500" aria-hidden />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">No Competition Found</h2>
             <p className="text-gray-600 mb-2">Unable to load competition data.</p>
             {error && (
@@ -251,45 +282,30 @@ function JudgeSelection() {
           {/* Header Branding - Horizontal Three Logos */}
           <div className="flex flex-row items-center justify-center gap-3 sm:gap-6 animate-fade-in flex-1 px-4">
             <div className="w-10 h-14 sm:w-12 sm:h-16 flex items-center justify-center">
-              <img 
-                src={leftImagePath} 
-                alt="" 
+              <BrandedImage
+                src={leftImagePath}
+                alt=""
                 className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  const parent = e.target.parentNode;
-                  if (parent) {
-                    parent.innerHTML = '<span class="text-2xl sm:text-3xl opacity-40">🩰</span>';
-                  }
-                }}
+                fallbackIcon={Music2}
+                fallbackClassName="w-6 h-6 sm:w-8 sm:h-8"
               />
             </div>
             <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center">
-              <img 
-                src={logoPath} 
-                alt="Logo" 
+              <BrandedImage
+                src={logoPath}
+                alt="Logo"
                 className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  const parent = e.target.parentNode;
-                  if (parent) {
-                    parent.innerHTML = '<span class="text-3xl sm:text-4xl opacity-40">🎭</span>';
-                  }
-                }}
+                fallbackIcon={Drama}
+                fallbackClassName="w-7 h-7 sm:w-9 sm:h-9"
               />
             </div>
             <div className="w-10 h-14 sm:w-12 sm:h-16 flex items-center justify-center">
-              <img 
-                src={rightImagePath} 
-                alt="" 
+              <BrandedImage
+                src={rightImagePath}
+                alt=""
                 className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  const parent = e.target.parentNode;
-                  if (parent) {
-                    parent.innerHTML = '<span class="text-2xl sm:text-3xl opacity-40">💃</span>';
-                  }
-                }}
+                fallbackIcon={PersonStanding}
+                fallbackClassName="w-6 h-6 sm:w-8 sm:h-8"
               />
             </div>
           </div>
@@ -362,7 +378,7 @@ function JudgeSelection() {
                              hover:from-cyan-500 hover:to-teal-600 active:scale-95 
                              transition-all shadow-xl hover:shadow-2xl min-h-[120px]"
                 >
-                  <span className="text-4xl sm:text-5xl md:text-6xl mb-2 sm:mb-3">🎭</span>
+                  <Drama size={48} className="mb-2 sm:mb-3 sm:w-14 sm:h-14 md:w-16 md:h-16" aria-hidden />
                   <span className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight">{judgeName}</span>
                 </button>
               );
@@ -381,7 +397,7 @@ function JudgeSelection() {
                            hover:from-blue-700 hover:to-blue-900 active:scale-95 
                            transition-all shadow-lg flex items-center justify-center gap-3 min-h-[56px]"
               >
-                <span className="text-xl sm:text-2xl">📊</span>
+                <BarChart3 size={24} className="sm:w-7 sm:h-7" aria-hidden />
                 <span>Admin View</span>
               </button>
               <button
@@ -392,7 +408,7 @@ function JudgeSelection() {
                            hover:from-indigo-700 hover:to-indigo-900 active:scale-95 
                            transition-all shadow-lg flex items-center justify-center gap-3 min-h-[56px]"
               >
-                <span className="text-xl sm:text-2xl">🎛️</span>
+                <SlidersHorizontal size={24} className="sm:w-7 sm:h-7" aria-hidden />
                 <span>Admin Control Panel</span>
               </button>
             </div>
@@ -401,14 +417,17 @@ function JudgeSelection() {
 
           {/* Guidelines Section - Optimized for small screens */}
           <div className="mt-8 sm:mt-12 mb-8 bg-white/60 backdrop-blur-sm rounded-xl p-4 sm:p-6 max-w-2xl mx-auto border-2 border-teal-200">
-            <p className="text-teal-800 text-sm sm:text-base text-left">
-              <span className="inline-block mr-1">👉</span> <strong>Judges:</strong> Select your judge number to begin scoring.
+            <p className="text-teal-800 text-sm sm:text-base text-left flex items-start gap-1">
+              <ChevronRight size={16} className="inline mt-0.5 shrink-0" aria-hidden />
+              <span><strong>Judges:</strong> Select your judge number to begin scoring.</span>
             </p>
-            <p className="text-teal-800 text-sm sm:text-base mt-2 text-left">
-              <span className="inline-block mr-1">👉</span> <strong>Admin View:</strong> See rankings and results.
+            <p className="text-teal-800 text-sm sm:text-base mt-2 text-left flex items-start gap-1">
+              <ChevronRight size={16} className="inline mt-0.5 shrink-0" aria-hidden />
+              <span><strong>Admin View:</strong> See rankings and results.</span>
             </p>
-            <p className="text-teal-800 text-sm sm:text-base mt-2 text-left">
-              <span className="inline-block mr-1">👉</span> <strong>Admin Control Panel:</strong> Control what judges see (filters apply to all judge screens).
+            <p className="text-teal-800 text-sm sm:text-base mt-2 text-left flex items-start gap-1">
+              <ChevronRight size={16} className="inline mt-0.5 shrink-0" aria-hidden />
+              <span><strong>Admin Control Panel:</strong> Control what judges see (filters apply to all judge screens).</span>
             </p>
           </div>
 

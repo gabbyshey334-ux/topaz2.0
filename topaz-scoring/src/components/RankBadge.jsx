@@ -1,3 +1,5 @@
+import { RankIcon } from './AppIcons';
+
 function RankBadge({ rank, isTied = false }) {
   const getRankStyle = () => {
     switch (rank) {
@@ -5,25 +7,25 @@ function RankBadge({ rank, isTied = false }) {
         return {
           bg: 'bg-gradient-to-br from-yellow-400 to-yellow-600',
           text: 'text-yellow-900',
-          emoji: '🥇'
+          showMedal: true
         };
       case 2:
         return {
           bg: 'bg-gradient-to-br from-gray-300 to-gray-500',
           text: 'text-gray-900',
-          emoji: '🥈'
+          showMedal: true
         };
       case 3:
         return {
           bg: 'bg-gradient-to-br from-orange-400 to-orange-600',
           text: 'text-orange-900',
-          emoji: '🥉'
+          showMedal: true
         };
       default:
         return {
           bg: 'bg-gradient-to-br from-gray-200 to-gray-400',
           text: 'text-gray-800',
-          emoji: null
+          showMedal: false
         };
     }
   };
@@ -32,8 +34,8 @@ function RankBadge({ rank, isTied = false }) {
 
   return (
     <div className={`${style.bg} rounded-xl p-4 flex flex-col items-center justify-center min-w-[100px] shadow-lg`}>
-      {style.emoji && (
-        <span className="text-4xl mb-1">{style.emoji}</span>
+      {style.showMedal && (
+        <RankIcon rank={rank} size={36} className="mb-1" />
       )}
       <div className={`text-3xl font-bold ${style.text}`}>
         {rank}
@@ -55,5 +57,3 @@ function RankBadge({ rank, isTied = false }) {
 }
 
 export default RankBadge;
-
-

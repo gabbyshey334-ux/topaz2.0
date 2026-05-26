@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  SlidersHorizontal,
+  Camera,
+  Music,
+  BarChart3,
+  Info,
+  Users,
+  AlertTriangle
+} from 'lucide-react';
 import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
 import PhotoUploadManager from '../components/PhotoUploadManager';
@@ -121,7 +130,7 @@ function AdminDashboard() {
     if (!competitionId) return;
 
     const channel = subscribeToAdminFilters(competitionId, (newFilters) => {
-      console.log('🔔 Admin panel received filter sync:', newFilters);
+      console.log('Admin panel received filter sync:', newFilters);
       const rawDiv = newFilters.division_type_filter;
       const divFilter =
         rawDiv == null || rawDiv === '' || String(rawDiv).toLowerCase() === 'all'
@@ -181,7 +190,7 @@ function AdminDashboard() {
 
   // Update a single filter
   const handleFilterChange = async (filterType, value) => {
-    console.log('🎛️ Admin filter change:', { filterType, value });
+    console.log('Admin filter change:', { filterType, value });
     const newFilters = {
       ...adminFilters,
       [filterType]: value === 'all' ? null : value
@@ -197,13 +206,13 @@ function AdminDashboard() {
     try {
       const result = await updateAdminFilters(competitionId, newFilters);
       if (result.success) {
-        console.log('🎛️ Filters saved successfully, judges will receive via realtime');
+        console.log('Filters saved successfully, judges will receive via realtime');
         toast.success('Filters updated! Judge screens will update within 1–2 seconds.', { autoClose: 2500 });
       } else {
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('🎛️ Filter update failed:', error);
+      console.error('Filter update failed:', error);
       toast.error(`Failed to update filters: ${error.message}`);
       setAdminFilters(adminFilters); // Revert on error
     } finally {
@@ -321,8 +330,9 @@ function AdminDashboard() {
             </button>
 
             <div className="text-center flex-1 px-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-                🎛️ Admin Control Panel
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center justify-center gap-2">
+                <SlidersHorizontal size={24} />
+                Admin Control Panel
               </h1>
               <p className="text-teal-600 font-semibold text-sm sm:text-base">
                 {competition.name}
@@ -350,16 +360,18 @@ function AdminDashboard() {
             <button
               type="button"
               onClick={() => setShowPhotoManager(true)}
-              className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition-colors"
+              className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-lg text-sm transition-colors inline-flex items-center gap-2"
             >
-              📸 Manage Entry Photos
+              <Camera size={16} />
+              Manage Entry Photos
             </button>
             <button
               type="button"
               onClick={() => setShowMusicManager(true)}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm transition-colors"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-sm transition-colors inline-flex items-center gap-2"
             >
-              🎵 Manage Entry Music
+              <Music size={16} />
+              Manage Entry Music
             </button>
             <button
               type="button"
@@ -373,16 +385,20 @@ function AdminDashboard() {
                   entries: allEntries
                 }
               })}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm transition-colors"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm transition-colors inline-flex items-center gap-2"
             >
-              📊 Admin View
+              <BarChart3 size={16} />
+              Admin View
             </button>
           </div>
         </div>
 
         {/* Info Banner */}
         <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6">
-          <h3 className="text-lg font-bold text-blue-800 mb-2">ℹ️ How This Works</h3>
+          <h3 className="text-lg font-bold text-blue-800 mb-2 flex items-center gap-2">
+            <Info size={20} />
+            How This Works
+          </h3>
           <p className="text-sm text-blue-700">
             These filters control what <strong>ALL judges</strong> see on their scoring screens. 
             Changes apply immediately and update all judge screens in real-time. 
@@ -515,7 +531,7 @@ function AdminDashboard() {
               </>
             ) : (
               <>
-                <span>⚠️</span>
+                <AlertTriangle size={18} />
                 Reset Medal Points for This Competition
               </>
             )}
@@ -536,7 +552,7 @@ function AdminDashboard() {
                   All judges will see these {filteredEntries.length} entries on their scoring screens
                 </p>
               </div>
-              <div className="text-4xl">👥</div>
+              <Users size={36} className="text-teal-600" />
             </div>
           </div>
 

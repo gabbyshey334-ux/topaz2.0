@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Archive, RefreshCw, Trash2, Loader, Eye } from 'lucide-react';
+import { Archive, RefreshCw, Trash2, Loader, Eye, Calendar, MapPin, Package } from 'lucide-react';
 import Layout from '../components/Layout';
 import { getArchivedCompetitions, restoreCompetition, deleteCompetition } from '../supabase/competitions';
 import { supabase } from '../supabase/config';
@@ -47,12 +47,12 @@ function ArchivedCompetitions() {
         );
 
         setArchivedCompetitions(compsWithCounts);
-        console.log('✅ Loaded archived competitions:', compsWithCounts.length);
+        console.log('Loaded archived competitions:', compsWithCounts.length);
       } else {
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('❌ Error loading archived competitions:', error);
+      console.error('Error loading archived competitions:', error);
       toast.error('Failed to load archived competitions');
     } finally {
       setLoading(false);
@@ -61,7 +61,7 @@ function ArchivedCompetitions() {
 
   const handleRestore = async (comp) => {
     const confirmed = window.confirm(
-      `🔄 RESTORE "${comp.name}"?\n\n` +
+      `RESTORE "${comp.name}"?\n\n` +
       `This will move the competition back to your active list.\n` +
       `All ${comp.entry_count || 0} entries and data will be restored.\n\n` +
       `Continue?`
@@ -90,7 +90,7 @@ function ArchivedCompetitions() {
 
   const handlePermanentDelete = async (comp) => {
     const firstConfirm = window.confirm(
-      `⚠️ PERMANENTLY DELETE "${comp.name}"?\n\n` +
+      `PERMANENTLY DELETE "${comp.name}"?\n\n` +
       `This will PERMANENTLY delete:\n` +
       `• ${comp.entry_count || 0} entries\n` +
       `• All scores and results\n` +
@@ -102,7 +102,7 @@ function ArchivedCompetitions() {
     if (!firstConfirm) return;
     
     const secondConfirm = window.confirm(
-      `🚨 FINAL WARNING 🚨\n\n` +
+      `FINAL WARNING\n\n` +
       `You are about to PERMANENTLY delete "${comp.name}".\n\n` +
       `This is your last chance to cancel!\n\n` +
       `Type OK to confirm deletion.`
@@ -167,8 +167,9 @@ function ArchivedCompetitions() {
         </div>
 
         {/* Title */}
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-teal-500 mb-4 text-center">
-          📦 Archived Competitions
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-teal-500 mb-4 text-center flex items-center justify-center gap-3">
+          <Archive size={36} className="text-cyan-500" />
+          Archived Competitions
         </h1>
         <p className="text-gray-600 text-sm sm:text-base mb-8 text-center max-w-2xl">
           These competitions have been archived to keep your main page clean. You can restore them anytime or permanently delete them.
@@ -205,11 +206,13 @@ function ArchivedCompetitions() {
                         </h3>
                         <div className="flex flex-wrap gap-3 text-sm text-gray-600">
                           <span className="flex items-center gap-1">
-                            📅 {formatDate(comp.date)}
+                            <Calendar size={14} />
+                            {formatDate(comp.date)}
                           </span>
                           {comp.venue && (
                             <span className="flex items-center gap-1">
-                              📍 {comp.venue}
+                              <MapPin size={14} />
+                              {comp.venue}
                             </span>
                           )}
                           <span className="flex items-center gap-1">
@@ -220,8 +223,9 @@ function ArchivedCompetitions() {
                           </span>
                         </div>
                       </div>
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-600">
-                        📦 Archived
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-600 inline-flex items-center gap-1">
+                        <Package size={12} />
+                        Archived
                       </span>
                     </div>
 
@@ -279,7 +283,7 @@ function ArchivedCompetitions() {
         ) : (
           <div className="w-full max-w-2xl px-4">
             <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-8 text-center border-2 border-dashed border-gray-300">
-              <div className="text-4xl mb-3">📦</div>
+              <Archive size={48} className="text-gray-400 mx-auto mb-3" />
               <p className="text-gray-600 font-semibold mb-2">No Archived Competitions</p>
               <p className="text-sm text-gray-500">Your archive is empty. Archived competitions will appear here.</p>
             </div>

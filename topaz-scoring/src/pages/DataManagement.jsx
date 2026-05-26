@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, Flame } from 'lucide-react';
 import { toast } from 'react-toastify';
 import Layout from '../components/Layout';
 import {
@@ -112,7 +113,7 @@ function DataManagement() {
 
   const handleNuclearReset = async () => {
     const confirmed = window.confirm(
-      '🔥 NUCLEAR RESET 🔥\n\n' +
+      'NUCLEAR RESET\n\n' +
       'This will DELETE EVERYTHING:\n' +
       '• All competitions\n' +
       '• All entries\n' +
@@ -161,8 +162,9 @@ function DataManagement() {
           ← Back to Home
         </button>
 
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-          ⚠️ Data Management
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+          <AlertTriangle size={28} className="text-amber-600" />
+          Data Management
         </h1>
         <p className="text-gray-600 mb-8">
           Clear test data, reset medal leaderboard, or start fresh for a new season.
@@ -225,8 +227,9 @@ function DataManagement() {
 
           {/* Nuclear Reset */}
           <div className="bg-red-50 border-2 border-red-300 rounded-xl p-6">
-            <h3 className="text-lg font-bold text-red-900 mb-2">
-              🔥 Nuclear Reset (Delete Everything)
+            <h3 className="text-lg font-bold text-red-900 mb-2 flex items-center gap-2">
+              <Flame size={20} className="text-red-600" />
+              Nuclear Reset (Delete Everything)
             </h3>
             <p className="text-sm text-red-800 font-bold mb-4">
               WARNING: This deletes ALL competitions, entries, scores, and medal data. This CANNOT be undone.
@@ -237,7 +240,12 @@ function DataManagement() {
               disabled={!!loading}
               className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading === 'nuclear' ? 'Deleting...' : '🔥 Delete Everything and Start Over'}
+              {loading === 'nuclear' ? 'Deleting...' : (
+                <span className="inline-flex items-center gap-2">
+                  <Flame size={18} />
+                  Delete Everything and Start Over
+                </span>
+              )}
             </button>
           </div>
         </div>

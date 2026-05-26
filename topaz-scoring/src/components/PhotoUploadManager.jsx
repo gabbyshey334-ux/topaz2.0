@@ -1,9 +1,20 @@
 import { useState, useEffect } from 'react';
+import {
+  Camera,
+  Upload,
+  FolderOpen,
+  Lightbulb,
+  Check,
+  AlertTriangle,
+  RefreshCw,
+  X
+} from 'lucide-react';
 import { toast } from 'react-toastify';
 import { getCompetitionEntries, updateEntry } from '../supabase/entries';
 import { formatEntryName, getEntryDivisionType } from '../utils/entryFilters';
 import { uploadEntryPhoto } from '../supabase/photos';
 import LoadingSpinner from './LoadingSpinner';
+import { DivisionTypeIcon } from './AppIcons';
 
 function PhotoUploadManager({ competitionId, onClose }) {
   const [entries, setEntries] = useState([]);
@@ -29,7 +40,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
 
   const getEntryPhotoLabel = (entry) => {
     const div = getEntryDivisionType(entry);
-    return div && div !== 'Solo' ? '👥' : '👤';
+    return <DivisionTypeIcon divisionType={div} size={24} className="text-gray-500" />;
   };
 
   // Load entries
@@ -142,7 +153,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
 
     // Show results
     if (results.success.length > 0) {
-      toast.success(`✅ ${results.success.length} photos uploaded successfully!`);
+      toast.success(`${results.success.length} photos uploaded successfully!`);
       await loadEntries(); // Reload entries
       setShowPreview(false);
       setSelectedFiles([]);
@@ -150,7 +161,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
     }
 
     if (results.failed.length > 0) {
-      toast.error(`❌ ${results.failed.length} photos failed to upload`);
+      toast.error(`${results.failed.length} photos failed to upload`);
       console.log('Failed uploads:', results.failed);
     }
   };
@@ -213,14 +224,17 @@ function PhotoUploadManager({ competitionId, onClose }) {
         <div className="sticky top-0 bg-gradient-to-r from-teal-600 to-cyan-500 p-6 rounded-t-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-3xl font-bold text-white mb-2">📸 Photo Upload Manager</h2>
+              <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
+                <Camera size={32} />
+                Photo Upload Manager
+              </h2>
               <p className="text-white/90">Competition Day - Quick Photo Upload</p>
             </div>
             <button
               onClick={onClose}
               className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
             >
-              <span className="text-3xl">×</span>
+              <X size={28} />
             </button>
           </div>
         </div>
@@ -247,7 +261,8 @@ function PhotoUploadManager({ competitionId, onClose }) {
           {/* BULK UPLOAD SECTION */}
           <div className="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-2xl p-6 mb-6 border-2 border-teal-200">
             <h3 className="text-xl font-bold text-teal-800 mb-2 flex items-center gap-2">
-              <span>📤</span> Bulk Photo Upload / Replace
+              <Upload size={22} />
+              Bulk Photo Upload / Replace
             </h3>
             <p className="text-sm text-gray-700 mb-4">
               Upload multiple photos at once. Name files as: <span className="font-mono bg-white px-2 py-1 rounded">5.jpg</span> for Entry #5. Existing photos will be replaced.
@@ -269,11 +284,19 @@ function PhotoUploadManager({ competitionId, onClose }) {
                 uploadingBulk ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
               }`}
             >
-              {uploadingBulk ? 'Uploading...' : '📁 Select Multiple Photos'}
+              {uploadingBulk ? 'Uploading...' : (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <FolderOpen size={20} />
+                  Select Multiple Photos
+                </span>
+              )}
             </label>
 
             <div className="mt-4 p-3 bg-white rounded-lg">
-              <p className="text-xs text-gray-600 font-semibold mb-2">💡 Tips:</p>
+              <p className="text-xs text-gray-600 font-semibold mb-2 flex items-center gap-1">
+                <Lightbulb size={14} />
+                Tips:
+              </p>
               <ul className="text-xs text-gray-600 list-disc list-inside space-y-1">
                 <li>Rename files to match entry numbers (e.g., 1.jpg, 2.jpg, 3.jpg)</li>
                 <li>Supported formats: JPG, PNG, WEBP, GIF, HEIC, HEIF</li>
@@ -297,7 +320,11 @@ function PhotoUploadManager({ competitionId, onClose }) {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{match.matched ? '✓' : '⚠️'}</span>
+                      {match.matched ? (
+                        <Check size={24} className="text-green-600 flex-shrink-0" />
+                      ) : (
+                        <AlertTriangle size={24} className="text-red-600 flex-shrink-0" />
+                      )}
                       <div>
                         <p className="font-semibold text-gray-800">{match.file.name}</p>
                         <p className="text-sm text-gray-600">
@@ -377,7 +404,7 @@ function PhotoUploadManager({ competitionId, onClose }) {
                       {entry.photo_url ? (
                         <img src={entry.photo_url} alt={formatEntryName(entry)} className="w-full h-full object-cover" />
                       ) : (
-                        <span>{getEntryPhotoLabel(entry)}</span>
+                        getEntryPhotoLabel(entry)
                       )}
                     </div>
                     <div className="min-w-0">
@@ -422,9 +449,15 @@ function PhotoUploadManager({ competitionId, onClose }) {
                           Uploading...
                         </>
                       ) : entry.photo_url ? (
-                        <>🔁 Replace Photo</>
+                        <>
+                          <RefreshCw size={16} />
+                          Replace Photo
+                        </>
                       ) : (
-                        <>📷 Upload Photo</>
+                        <>
+                          <Camera size={16} />
+                          Upload Photo
+                        </>
                       )}
                     </label>
                   </div>
@@ -437,8 +470,9 @@ function PhotoUploadManager({ competitionId, onClose }) {
         {/* Footer */}
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 rounded-b-2xl border-t border-gray-200">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              💡 Tip: Use bulk upload for fastest results on competition day
+            <p className="text-sm text-gray-600 flex items-center gap-1">
+              <Lightbulb size={14} className="flex-shrink-0" />
+              Tip: Use bulk upload for fastest results on competition day
             </p>
             <button
               onClick={onClose}

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { Camera, Loader2, X } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { toast } from 'react-toastify';
 
@@ -11,7 +12,6 @@ function PhotoUpload({ onPhotoSelect, existingPhotoUrl = null }) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
       return;
@@ -26,12 +26,11 @@ function PhotoUpload({ onPhotoSelect, existingPhotoUrl = null }) {
       setIsProcessing(true);
       let processedFile = file;
 
-      // Check file size and compress if needed
       const fileSizeInMB = file.size / (1024 * 1024);
-      
+
       if (fileSizeInMB > 1) {
         toast.info('Compressing image...');
-        
+
         const options = {
           maxSizeMB: 0.8,
           maxWidthOrHeight: 1024,
@@ -50,14 +49,12 @@ function PhotoUpload({ onPhotoSelect, existingPhotoUrl = null }) {
         }
       }
 
-      // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result);
       };
       reader.readAsDataURL(processedFile);
 
-      // Call parent callback with processed file
       if (onPhotoSelect) {
         onPhotoSelect(processedFile);
       }
@@ -91,7 +88,6 @@ function PhotoUpload({ onPhotoSelect, existingPhotoUrl = null }) {
       </label>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        {/* Preview */}
         {preview && (
           <div className="relative">
             <img
@@ -102,15 +98,14 @@ function PhotoUpload({ onPhotoSelect, existingPhotoUrl = null }) {
             <button
               type="button"
               onClick={handleRemove}
-              className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold hover:bg-red-600"
+              className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-red-600"
               aria-label="Remove photo"
             >
-              ✕
+              <X size={14} />
             </button>
           </div>
         )}
 
-        {/* Upload Button */}
         <div className="flex-1">
           <input
             ref={fileInputRef}
@@ -120,26 +115,27 @@ function PhotoUpload({ onPhotoSelect, existingPhotoUrl = null }) {
             className="hidden"
             disabled={isProcessing}
           />
-          
+
           <button
             type="button"
             onClick={handleButtonClick}
             disabled={isProcessing}
-            className={`px-4 py-2 rounded-lg font-semibold text-white min-h-[44px] transition-colors ${
+            className={`px-4 py-2 rounded-lg font-semibold text-white min-h-[44px] transition-colors inline-flex items-center gap-2 ${
               isProcessing
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-teal-500 hover:bg-teal-600'
             }`}
           >
             {isProcessing ? (
-              <span className="flex items-center gap-2">
-                <span className="animate-spin">⚙️</span>
+              <>
+                <Loader2 className="animate-spin" size={18} />
                 Processing...
-              </span>
-            ) : preview ? (
-              '📷 Change Photo'
+              </>
             ) : (
-              '📷 Upload Photo'
+              <>
+                <Camera size={18} />
+                {preview ? 'Change Photo' : 'Upload Photo'}
+              </>
             )}
           </button>
 

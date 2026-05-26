@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AlertTriangle, Scale, Plus, Loader2, Save } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { updateCompetition } from '../supabase/competitions';
 import { getCompetitionCategories, createCategory, deleteCategory } from '../supabase/categories';
@@ -281,7 +282,7 @@ export default function EditCompetitionModal({
       // Check if category has entries
       const entriesInCategory = entries.filter(e => e.category_id === cat.id);
       if (entriesInCategory.length > 0) {
-        console.warn(`⚠️ Skipping removal of "${cat.name}" - has ${entriesInCategory.length} entries`);
+        console.warn(`Skipping removal of "${cat.name}" - has ${entriesInCategory.length} entries`);
         return false; // Don't remove categories with entries
       }
       
@@ -336,7 +337,10 @@ export default function EditCompetitionModal({
           {/* Warnings */}
           {warnings.length > 0 && (
             <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
-              <h3 className="font-semibold text-yellow-800 mb-2">⚠️ Warnings</h3>
+              <h3 className="font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+                <AlertTriangle size={18} />
+                Warnings
+              </h3>
               <ul className="list-disc list-inside text-yellow-700 text-sm">
                 {warnings.map((warning, i) => (
                   <li key={i}>{warning}</li>
@@ -407,7 +411,10 @@ export default function EditCompetitionModal({
 
               {/* Judge Names */}
               <div className="bg-teal-50 rounded-xl p-4 border-2 border-teal-100">
-                <h4 className="text-lg font-bold text-teal-700 mb-2">⚖️ Judge Names (Optional)</h4>
+                <h4 className="text-lg font-bold text-teal-700 mb-2 flex items-center gap-2">
+                  <Scale size={20} />
+                  Judge Names (Optional)
+                </h4>
                 <p className="text-sm text-gray-600 mb-4">
                   Enter names to display on score sheets and results.
                 </p>
@@ -573,7 +580,7 @@ export default function EditCompetitionModal({
                 onClick={() => setShowAddEntryModal(true)}
                 className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold rounded-xl hover:from-teal-600 hover:to-cyan-600 transition-all shadow-md flex items-center gap-2"
               >
-                <span>➕</span>
+                <Plus size={18} />
                 Add New Entry
               </button>
               <p className="text-sm text-teal-700 self-center">
@@ -598,12 +605,12 @@ export default function EditCompetitionModal({
           >
             {loading ? (
               <>
-                <span className="animate-spin">⏳</span>
+                <Loader2 className="animate-spin" size={18} />
                 <span>Saving...</span>
               </>
             ) : (
               <>
-                <span>💾</span>
+                <Save size={18} />
                 <span>Save Changes</span>
               </>
             )}

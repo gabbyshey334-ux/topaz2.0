@@ -227,22 +227,11 @@ export const getMedalType = (rank) => {
 };
 
 /**
- * Get medal emoji based on rank
- * @param {number} rank - Rank position
- * @returns {string} - Medal emoji
+ * @deprecated Use RankIcon from AppIcons instead. Returns null for backward compatibility.
  */
-export const getMedalEmoji = (rank) => {
-  switch (rank) {
-    case 1:
-      return '🥇';
-    case 2:
-      return '🥈';
-    case 3:
-      return '🥉';
-    default:
-      return '';
-  }
-};
+export const getMedalEmoji = (_rank) => null;
+
+export { RankIcon, MedalLevelIcon, DivisionTypeIcon } from '../components/AppIcons.jsx';
 
 /**
  * Calculate completion percentage for scoring
@@ -449,31 +438,9 @@ export const calculateTop4Overall = (entries) => {
 };
 
 /**
- * Get division type emoji
- * @param {string} divisionType - Division type (Solo, Duo/Trio, etc.)
- * @returns {string} - Emoji representing the division type
+ * @deprecated Use DivisionTypeIcon from AppIcons instead. Returns null for backward compatibility.
  */
-export const getDivisionTypeEmoji = (divisionType) => {
-  if (!divisionType) return '👤';
-  
-  const type = divisionType.toLowerCase();
-  
-  if (type.includes('solo')) {
-    return '👤';
-  } else if (type.includes('duo')) {
-    return '👥';
-  } else if (type.includes('trio')) {
-    return '👥👥';
-  } else if (type.includes('small group')) {
-    return '👥👥';
-  } else if (type.includes('large group')) {
-    return '👥👥👥';
-  } else if (type.includes('production')) {
-    return '🎭';
-  }
-  
-  return '👥';
-};
+export const getDivisionTypeEmoji = (_divisionType) => null;
 
 /**
  * Get division type display name

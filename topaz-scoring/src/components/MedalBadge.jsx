@@ -1,9 +1,10 @@
 import React from 'react';
+import { MedalLevelIcon } from './AppIcons';
 
 /**
  * MedalBadge Component
  * Displays medal achievement badges with appropriate styling
- * 
+ *
  * @param {string} medalLevel - "None", "Bronze", "Silver", or "Gold"
  * @param {number} points - Current total points
  * @param {string} size - "sm", "md", or "lg" (default: "md")
@@ -12,8 +13,7 @@ import React from 'react';
 function MedalBadge({ medalLevel, points = 0, size = 'md', showProgress = false }) {
   if (!medalLevel || medalLevel === 'None') {
     if (!showProgress) return null;
-    
-    // Show progress toward Bronze
+
     return (
       <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-semibold border-2 border-gray-300">
         Working toward Bronze ({points}/25)
@@ -21,55 +21,56 @@ function MedalBadge({ medalLevel, points = 0, size = 'md', showProgress = false 
     );
   }
 
-  // Medal colors and icons
   const medalConfig = {
-    'Bronze': {
-      color: 'bg-amber-100 text-amber-800 border-amber-400',
-      icon: '🥉',
-      emoji: '🥉'
+    Bronze: {
+      color: 'bg-amber-100 text-amber-800 border-amber-400'
     },
-    'Silver': {
-      color: 'bg-slate-200 text-slate-800 border-slate-400',
-      icon: '🥈',
-      emoji: '🥈'
+    Silver: {
+      color: 'bg-slate-200 text-slate-800 border-slate-400'
     },
-    'Gold': {
-      color: 'bg-yellow-100 text-yellow-800 border-yellow-400',
-      icon: '🥇',
-      emoji: '🥇'
+    Gold: {
+      color: 'bg-yellow-100 text-yellow-800 border-yellow-400'
     }
   };
 
-  // Size classes
   const sizeMap = {
-    'sm': 'px-2 py-0.5 text-xs',
-    'md': 'px-3 py-1 text-sm',
-    'lg': 'px-4 py-1.5 text-base'
+    sm: 'px-2 py-0.5 text-xs',
+    md: 'px-3 py-1 text-sm',
+    lg: 'px-4 py-1.5 text-base'
+  };
+
+  const iconSizeMap = {
+    sm: 14,
+    md: 16,
+    lg: 18
   };
 
   const config = medalConfig[medalLevel];
   if (!config) return null;
 
-  const sizeClass = sizeMap[size] || sizeMap['md'];
+  const sizeClass = sizeMap[size] || sizeMap.md;
+  const iconSize = iconSizeMap[size] || iconSizeMap.md;
 
-  // Get next level progress
   const getProgressText = () => {
     if (medalLevel === 'Gold') {
-      return `${config.emoji} Gold Medal Achieved!`;
-    } else if (medalLevel === 'Silver') {
-      return `${config.emoji} Silver Medal - Working toward Gold (${points}/50)`;
-    } else if (medalLevel === 'Bronze') {
-      return `${config.emoji} Bronze Medal - Working toward Silver (${points}/35)`;
+      return 'Gold Medal Achieved!';
     }
-    return `${config.emoji} ${medalLevel} Medal`;
+    if (medalLevel === 'Silver') {
+      return `Silver Medal - Working toward Gold (${points}/50)`;
+    }
+    if (medalLevel === 'Bronze') {
+      return `Bronze Medal - Working toward Silver (${points}/35)`;
+    }
+    return `${medalLevel} Medal`;
   };
 
   return (
-    <span 
+    <span
       className={`inline-flex items-center gap-1 rounded-full font-semibold border-2 ${config.color} ${sizeClass}`}
       title={`${medalLevel} Medal - ${points} points`}
     >
-      {showProgress ? getProgressText() : `${config.emoji} ${medalLevel}`}
+      <MedalLevelIcon level={medalLevel} size={iconSize} />
+      {showProgress ? getProgressText() : medalLevel}
     </span>
   );
 }
@@ -85,19 +86,19 @@ export const getMedalLevel = (points) => {
 };
 
 /**
- * Helper function to get progress text
+ * Helper function to get progress text (plain text, no icons)
  */
 export const getMedalProgress = (points) => {
   if (points >= 50) {
-    return '🥇 Gold Medal Achieved!';
-  } else if (points >= 35) {
-    return `🥈 Silver Medal - Working toward Gold (${points}/50)`;
-  } else if (points >= 25) {
-    return `🥉 Bronze Medal - Working toward Silver (${points}/35)`;
-  } else {
-    return `Working toward Bronze (${points}/25)`;
+    return 'Gold Medal Achieved!';
   }
+  if (points >= 35) {
+    return `Silver Medal - Working toward Gold (${points}/50)`;
+  }
+  if (points >= 25) {
+    return `Bronze Medal - Working toward Silver (${points}/35)`;
+  }
+  return `Working toward Bronze (${points}/25)`;
 };
 
 export default MedalBadge;
-

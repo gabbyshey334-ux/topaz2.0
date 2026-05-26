@@ -1,11 +1,47 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Archive, Loader } from 'lucide-react';
+import {
+  Archive,
+  Loader,
+  AlertTriangle,
+  ClipboardList,
+  Calendar,
+  MapPin,
+  Circle,
+  Drama,
+  Plus,
+  BookOpen,
+  Check,
+  Music2,
+  PersonStanding,
+} from 'lucide-react';
 import Layout from '../components/Layout';
 import { supabase } from '../supabase/config';
 import { subscribeToTable, unsubscribeFromChannel } from '../supabase/realtime';
 import { archiveCompetition } from '../supabase/competitions';
+
+function BrandedImage({ src, alt, className, fallbackIcon: FallbackIcon, fallbackClassName }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <FallbackIcon
+        className={`opacity-40 drop-shadow-sm ${fallbackClassName}`}
+        aria-hidden
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setHasError(true)}
+    />
+  );
+}
 
 function WelcomePage() {
   const navigate = useNavigate();
@@ -28,7 +64,7 @@ function WelcomePage() {
   // Real-time subscription for competition updates
   useEffect(() => {
     const channel = subscribeToTable('competitions', () => {
-      console.log('🔄 Competition list updated - reloading...');
+      console.log('Competition list updated - reloading...');
       loadCompetitions();
       toast.info('Competition list updated!', { autoClose: 2000 });
     });
@@ -69,9 +105,9 @@ function WelcomePage() {
       );
 
       setCompetitions(compsWithCounts);
-      console.log('✅ Loaded active competitions:', compsWithCounts.length);
+      console.log('Loaded active competitions:', compsWithCounts.length);
     } catch (error) {
-      console.error('❌ Error loading competitions:', error);
+      console.error('Error loading competitions:', error);
       toast.error('Failed to load competitions');
     } finally {
       setLoading(false);
@@ -103,9 +139,8 @@ function WelcomePage() {
   };
 
   const handleArchiveCompetition = async (comp) => {
-    // Confirmation dialog
     const confirmed = window.confirm(
-      `📦 ARCHIVE "${comp.name}"?\n\n` +
+      `ARCHIVE "${comp.name}"?\n\n` +
       `This will move the competition to the archive:\n` +
       `• ${comp.entry_count || 0} entries will be preserved\n` +
       `• All scores and data will be saved\n` +
@@ -142,49 +177,34 @@ function WelcomePage() {
         <div className="mb-8 md:mb-12 animate-fade-in flex flex-row items-center justify-center gap-4 sm:gap-12 w-full">
           {/* Left Side Image - Scaled for all devices */}
           <div className="w-16 h-20 xs:w-24 xs:h-32 md:w-32 md:h-40 flex items-center justify-center">
-            <img 
-              src={leftImagePath} 
-              alt="" 
+            <BrandedImage
+              src={leftImagePath}
+              alt=""
               className="w-full h-full object-contain"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                const parent = e.target.parentNode;
-                if (parent) {
-                  parent.innerHTML = '<span class="text-3xl xs:text-4xl md:text-6xl drop-shadow-sm opacity-40">🩰</span>';
-                }
-              }}
+              fallbackIcon={Music2}
+              fallbackClassName="w-8 h-8 xs:w-10 xs:h-10 md:w-14 md:h-14"
             />
           </div>
 
           {/* Center Logo - Scaled for all devices */}
           <div className="w-16 h-16 xs:w-20 xs:h-20 md:w-24 md:h-24 flex items-center justify-center">
-            <img 
-              src={logoPath} 
-              alt="TOPAZ 2.0 Logo" 
+            <BrandedImage
+              src={logoPath}
+              alt="TOPAZ 2.0 Logo"
               className="w-full h-full object-contain"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                const parent = e.target.parentNode;
-                if (parent) {
-                  parent.innerHTML = '<span class="text-4xl xs:text-5xl md:text-7xl drop-shadow-sm opacity-40">🎭</span>';
-                }
-              }}
+              fallbackIcon={Drama}
+              fallbackClassName="w-10 h-10 xs:w-12 xs:h-12 md:w-16 md:h-16"
             />
           </div>
 
           {/* Right Side Image - Scaled for all devices */}
           <div className="w-16 h-20 xs:w-24 xs:h-32 md:w-32 md:h-40 flex items-center justify-center">
-            <img 
-              src={rightImagePath} 
-              alt="" 
+            <BrandedImage
+              src={rightImagePath}
+              alt=""
               className="w-full h-full object-contain"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                const parent = e.target.parentNode;
-                if (parent) {
-                  parent.innerHTML = '<span class="text-3xl xs:text-4xl md:text-6xl drop-shadow-sm opacity-40">💃</span>';
-                }
-              }}
+              fallbackIcon={PersonStanding}
+              fallbackClassName="w-8 h-8 xs:w-10 xs:h-10 md:w-14 md:h-14"
             />
           </div>
         </div>
@@ -218,7 +238,8 @@ function WelcomePage() {
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border-2 border-teal-100">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="text-xl sm:text-2xl font-bold text-teal-600 flex items-center gap-2">
-                  <span>📋</span> Available Competitions
+                  <ClipboardList size={22} aria-hidden />
+                  Available Competitions
                 </h2>
                 {competitions.length > 3 && (
                   <button
@@ -245,7 +266,8 @@ function WelcomePage() {
                   onClick={() => navigate('/data-management')}
                   className="px-4 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 text-sm font-semibold transition-all flex items-center gap-2"
                 >
-                  ⚠️ Data Management
+                  <AlertTriangle size={16} />
+                  Data Management
                 </button>
               </div>
 
@@ -263,21 +285,28 @@ function WelcomePage() {
                           </h3>
                           <div className="flex flex-wrap gap-2 text-sm text-gray-600">
                             <span className="flex items-center gap-1">
-                              📅 {formatDate(comp.date)}
+                              <Calendar size={14} aria-hidden />
+                              {formatDate(comp.date)}
                             </span>
                             {comp.venue && (
                               <span className="flex items-center gap-1">
-                                📍 {comp.venue}
+                                <MapPin size={14} aria-hidden />
+                                {comp.venue}
                               </span>
                             )}
                           </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
                           comp.status === 'active' 
                             ? 'bg-green-100 text-green-700' 
                             : 'bg-gray-100 text-gray-600'
                         }`}>
-                          {comp.status === 'active' ? '🟢 Active' : '⚪ Completed'}
+                          <Circle
+                            size={8}
+                            className={comp.status === 'active' ? 'fill-green-500 text-green-500' : 'fill-gray-400 text-gray-400'}
+                            aria-hidden
+                          />
+                          {comp.status === 'active' ? 'Active' : 'Completed'}
                         </span>
                       </div>
 
@@ -335,7 +364,7 @@ function WelcomePage() {
         ) : (
           <div className="w-full max-w-2xl px-4 mb-8">
             <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-8 text-center border-2 border-dashed border-gray-300">
-              <div className="text-4xl mb-3">🎭</div>
+              <Drama size={40} className="mx-auto mb-3 text-gray-400" aria-hidden />
               <p className="text-gray-600 font-semibold mb-2">No Competitions Yet</p>
               <p className="text-sm text-gray-500">Create your first competition to get started!</p>
             </div>
@@ -349,18 +378,20 @@ function WelcomePage() {
             onClick={() => navigate('/setup')}
             className="w-full py-4 sm:py-5 px-6 sm:px-8 bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-lg sm:text-xl font-bold rounded-xl 
                        hover:from-cyan-600 hover:to-teal-600 active:scale-95 transition-all shadow-lg 
-                       hover:shadow-cyan-500/50 min-h-[56px]"
+                       hover:shadow-cyan-500/50 min-h-[56px] flex items-center justify-center gap-2"
           >
-            ➕ Start New Competition
+            <Plus size={22} aria-hidden />
+            Start New Competition
           </button>
           
           <button
             type="button"
             onClick={() => setShowInstructions(true)}
             className="w-full py-4 sm:py-5 px-6 sm:px-8 bg-white/80 backdrop-blur-sm text-teal-600 text-lg sm:text-xl font-semibold rounded-xl 
-                       border-2 border-teal-500 hover:bg-teal-50 active:scale-95 transition-all shadow-md min-h-[56px]"
+                       border-2 border-teal-500 hover:bg-teal-50 active:scale-95 transition-all shadow-md min-h-[56px] flex items-center justify-center gap-2"
           >
-            📖 View Instructions
+            <BookOpen size={22} aria-hidden />
+            View Instructions
           </button>
         </div>
 
@@ -378,19 +409,19 @@ function WelcomePage() {
               <h2 className="text-xl sm:text-2xl font-bold text-teal-600 mb-4">Quick Start Guide</h2>
               <ul className="text-gray-700 text-sm sm:text-base space-y-3 mb-6">
                 <li className="flex items-start gap-2">
-                  <span className="text-teal-500 font-bold">✓</span>
+                  <Check size={18} className="text-teal-500 shrink-0 mt-0.5" aria-hidden />
                   <span>Set up competition details and dancers</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-teal-500 font-bold">✓</span>
+                  <Check size={18} className="text-teal-500 shrink-0 mt-0.5" aria-hidden />
                   <span>Select judge and enter scores per category</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-teal-500 font-bold">✓</span>
+                  <Check size={18} className="text-teal-500 shrink-0 mt-0.5" aria-hidden />
                   <span>System calculates totals automatically</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-teal-500 font-bold">✓</span>
+                  <Check size={18} className="text-teal-500 shrink-0 mt-0.5" aria-hidden />
                   <span>View rankings and export results</span>
                 </li>
               </ul>

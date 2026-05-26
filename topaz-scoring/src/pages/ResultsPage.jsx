@@ -26,11 +26,37 @@ import {
   calculateRankingsPerGroup, 
   extractVarietyLevel,
   calculateTop4Overall,
-  getDivisionTypeEmoji,
   getDivisionTypeDisplayName
 } from '../utils/calculations';
 import { formatEntryName, groupEntries, cleanDisplayText } from '../utils/entryFilters';
 import { pickReconciledJudgeScore, getScoreRowTotal } from '../utils/scoreReconciliation';
+import { RankIcon, MedalLevelIcon, DivisionTypeIcon } from '../components/AppIcons';
+import {
+  SlidersHorizontal,
+  Settings,
+  Printer,
+  BarChart3,
+  Package,
+  FileText,
+  Plus,
+  Search,
+  Star,
+  Award,
+  Crown,
+  Trophy,
+  Sparkles,
+  Calendar,
+  User,
+  Users,
+  Folder,
+  Cake,
+  School,
+  Target,
+  Drama,
+  Shirt,
+  ClipboardList,
+  Lightbulb,
+} from 'lucide-react';
 
 // Helper function to check if a category is special (should not get awards/medals)
 const isSpecialCategory = (category) => {
@@ -372,7 +398,7 @@ function ResultsPage() {
       
       if (result.success) {
         toast.success(
-          `✅ Successfully awarded points to ${result.totalAwarded} participants ` +
+          `Successfully awarded points to ${result.totalAwarded} participants ` +
           `from ${result.firstPlaceCount} first-place entries!`,
           { autoClose: 5000 }
         );
@@ -416,7 +442,7 @@ function ResultsPage() {
       );
 
       if (result.success) {
-        toast.success(`✅ Generated ${result.count} scorecards successfully!`);
+        toast.success(`Generated ${result.count} scorecards successfully!`);
       } else {
         throw new Error(result.error || 'Failed to generate scorecards');
       }
@@ -452,13 +478,6 @@ function ResultsPage() {
     if (rank === 2) return 'border-gray-300';
     if (rank === 3) return 'border-orange-400';
     return 'border-gray-200';
-  };
-
-  const getMedalEmoji = (rank) => {
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
-    return '';
   };
 
   const getScoreColor = (score) => {
@@ -672,7 +691,7 @@ function ResultsPage() {
               onClick={() => navigate('/admin', { state: { competitionId } })}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-orange-600 hover:to-orange-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
-              <span className="text-xl">🎛️</span>
+              <SlidersHorizontal size={20} aria-hidden />
               <span>Admin Control Panel</span>
             </button>
 
@@ -681,7 +700,7 @@ function ResultsPage() {
               onClick={() => setShowEditModal(true)}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-purple-600 hover:to-purple-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
-              <span className="text-xl">⚙️</span>
+              <Settings size={20} aria-hidden />
               <span>Edit Competition</span>
             </button>
 
@@ -690,7 +709,7 @@ function ResultsPage() {
               onClick={handlePrintAll}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-blue-600 hover:to-blue-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
-              <span className="text-xl">🖨</span>
+              <Printer size={20} aria-hidden />
               <span>Print Results</span>
             </button>
             
@@ -699,14 +718,15 @@ function ResultsPage() {
               onClick={handleExport}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-green-600 hover:to-green-700 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
-              <span className="text-xl">📊</span>
+              <BarChart3 size={20} aria-hidden />
               <span>Export to Excel</span>
             </button>
 
             {/* Comprehensive Export Section */}
             <div className="w-full border-t-2 border-gray-200 pt-6 mt-6">
-              <h3 className="text-xl font-bold text-gray-700 mb-4 text-center">
-                📦 Complete Results Package
+              <h3 className="text-xl font-bold text-gray-700 mb-4 text-center flex items-center justify-center gap-2">
+                <Package size={22} aria-hidden />
+                Complete Results Package
               </h3>
               <div className="flex flex-wrap items-center justify-center gap-4">
                 <button
@@ -714,7 +734,7 @@ function ResultsPage() {
                   disabled={exporting || !competition}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl shadow-lg hover:from-emerald-600 hover:to-emerald-700 hover:scale-105 hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="text-lg">📊</span>
+                  <BarChart3 size={18} aria-hidden />
                   <span>{exporting ? 'Exporting...' : 'Download Excel (Full Data)'}</span>
                 </button>
 
@@ -723,7 +743,7 @@ function ResultsPage() {
                   disabled={!competition}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:from-indigo-600 hover:to-indigo-700 hover:scale-105 hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="text-lg">📄</span>
+                  <FileText size={18} aria-hidden />
                   <span>Download JSON (For Website)</span>
                 </button>
               </div>
@@ -744,7 +764,7 @@ function ResultsPage() {
                 </>
               ) : (
                 <>
-                  <span className="text-xl">📄</span>
+                  <FileText size={20} aria-hidden />
                   <span>Print All Scorecards</span>
                 </>
               )}
@@ -755,7 +775,7 @@ function ResultsPage() {
               onClick={() => navigate('/setup')}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-white text-lg font-semibold rounded-xl shadow-lg hover:from-cyan-600 hover:to-teal-600 hover:scale-105 hover:shadow-2xl transition-all duration-300"
             >
-              <span className="text-xl">➕</span>
+              <Plus size={20} aria-hidden />
               <span>New Competition</span>
             </button>
           </div>
@@ -765,7 +785,7 @@ function ResultsPage() {
             {/* Search Bar */}
             <div className="max-w-2xl mx-auto mb-6">
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-gray-400">🔍</span>
+                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden />
                 <input
                   type="text"
                   value={searchQuery}
@@ -892,7 +912,7 @@ function ResultsPage() {
                     : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-2 border-amber-200'
                 }`}
               >
-                <span>⭐</span>
+                <Star size={16} aria-hidden />
                 <span>Medal Program View</span>
               </button>
               
@@ -913,7 +933,7 @@ function ResultsPage() {
                     : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-2 border-purple-200'
                 }`}
               >
-                <span>🏅</span>
+                <Award size={16} aria-hidden />
                 <span>Season Leaderboard</span>
               </button>
           </div>
@@ -930,7 +950,7 @@ function ResultsPage() {
               {/* SEASON LEADERBOARD */}
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-8 border-2 border-purple-200 shadow-xl">
                 <h2 className="text-4xl font-black text-purple-800 text-center mb-8 flex items-center justify-center gap-3">
-                  <span>👑</span> SEASON LEADERBOARD - TOP 10
+                  <Crown size={28} aria-hidden /> SEASON LEADERBOARD - TOP 10
                 </h2>
                 
                 {(() => {
@@ -959,7 +979,11 @@ function ResultsPage() {
                             index === 2 ? 'bg-orange-400 text-white' :
                             'bg-purple-100 text-purple-600'
                           }`}>
-                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                            {index <= 2 ? (
+                              <RankIcon rank={index + 1} size={24} />
+                            ) : (
+                              `#${index + 1}`
+                            )}
                           </div>
                           
                           {/* Photo */}
@@ -967,8 +991,8 @@ function ResultsPage() {
                             {entry.photo_url ? (
                               <img src={entry.photo_url} alt={formatEntryName(entry)} className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-full h-full bg-purple-100 flex items-center justify-center text-2xl">
-                                👤
+                              <div className="w-full h-full bg-purple-100 flex items-center justify-center">
+                                <User size={24} className="text-purple-400" aria-hidden />
                               </div>
                             )}
                           </div>
@@ -987,11 +1011,8 @@ function ResultsPage() {
                               {entry.medal_points || 0}
                             </p>
                             <p className="text-xs font-bold text-gray-500 uppercase">Points</p>
-                            <div className="mt-1">
-                              {entry.current_medal_level === 'Gold' && <span className="text-lg">🥇</span>}
-                              {entry.current_medal_level === 'Silver' && <span className="text-lg">🥈</span>}
-                              {entry.current_medal_level === 'Bronze' && <span className="text-lg">🥉</span>}
-                              {entry.current_medal_level === 'None' && <span className="text-lg">⭐</span>}
+                            <div className="mt-1 flex justify-center">
+                              <MedalLevelIcon level={entry.current_medal_level} size={18} />
                             </div>
                           </div>
                         </div>
@@ -1006,7 +1027,7 @@ function ResultsPage() {
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8 text-center md:text-left">
                   <div>
                     <h2 className="text-3xl font-black text-amber-800 flex items-center justify-center md:justify-start gap-3">
-                      <span>🏆</span> THIS COMPETITION - MEDAL PROGRAM RESULTS
+                      <Trophy size={24} aria-hidden /> THIS COMPETITION - MEDAL PROGRAM RESULTS
                     </h2>
                     <p className="text-amber-700 font-semibold mt-2 italic">
                       Top 4 per category combination • Only 1st place earns points
@@ -1021,7 +1042,7 @@ function ResultsPage() {
                     {awardingPoints ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     ) : (
-                      <span>⭐</span>
+                      <Star size={16} aria-hidden />
                     )}
                     <span>Award Points to 1st Place Winners</span>
                   </button>
@@ -1029,17 +1050,17 @@ function ResultsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                   <div className="bg-white/60 p-4 rounded-xl text-center">
-                    <span className="text-2xl mb-1 block">🥉</span>
+                    <MedalLevelIcon level="Bronze" size={28} className="mx-auto mb-1" />
                     <span className="text-xs font-bold text-amber-800 uppercase tracking-widest">Bronze</span>
                     <p className="text-lg font-black text-amber-900">25 Points</p>
                   </div>
                   <div className="bg-white/60 p-4 rounded-xl text-center">
-                    <span className="text-2xl mb-1 block">🥈</span>
+                    <MedalLevelIcon level="Silver" size={28} className="mx-auto mb-1" />
                     <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">Silver</span>
                     <p className="text-lg font-black text-gray-800">35 Points</p>
                   </div>
                   <div className="bg-white/60 p-4 rounded-xl text-center">
-                    <span className="text-2xl mb-1 block">🥇</span>
+                    <MedalLevelIcon level="Gold" size={28} className="mx-auto mb-1" />
                     <span className="text-xs font-bold text-yellow-600 uppercase tracking-widest">Gold</span>
                     <p className="text-lg font-black text-yellow-700">50 Points</p>
                   </div>
@@ -1054,11 +1075,15 @@ function ResultsPage() {
                     {medalProgramResults.map((group) => (
                       <div key={group.key} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border-2 border-amber-100 shadow-md">
                         <h3 className="text-xl font-bold text-amber-900 mb-2 border-b-2 border-amber-100 pb-3 flex items-center gap-2">
-                          <span>✨</span> {cleanDisplayText(group.category, 'Unknown')} - Top 4
+                          <Sparkles size={18} aria-hidden /> {cleanDisplayText(group.category, 'Unknown')} - Top 4
                         </h3>
                         <p className="text-sm text-amber-700 mb-4 flex gap-2 flex-wrap">
-                          <span className="px-2 py-1 bg-amber-50 rounded">📅 {cleanDisplayText(group.ageDivision, 'No Division')}</span>
-                          <span className="px-2 py-1 bg-amber-50 rounded">⭐ {cleanDisplayText(group.abilityLevel, 'Unknown')}</span>
+                          <span className="px-2 py-1 bg-amber-50 rounded inline-flex items-center gap-1">
+                            <Calendar size={14} aria-hidden /> {cleanDisplayText(group.ageDivision, 'No Division')}
+                          </span>
+                          <span className="px-2 py-1 bg-amber-50 rounded inline-flex items-center gap-1">
+                            <Star size={14} aria-hidden /> {cleanDisplayText(group.abilityLevel, 'Unknown')}
+                          </span>
                         </p>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1076,8 +1101,8 @@ function ResultsPage() {
 
                               {/* 1st Place Winner Badge */}
                               {entry.categoryRank === 1 && (
-                                <div className="absolute -top-2 -right-2 text-2xl animate-pulse">
-                                  🏆
+                                <div className="absolute -top-2 -right-2 animate-pulse">
+                                  <Trophy size={24} className="text-yellow-500" aria-hidden />
                                 </div>
                               )}
 
@@ -1086,8 +1111,8 @@ function ResultsPage() {
                                   {entry.photo_url ? (
                                     <img src={entry.photo_url} alt={formatEntryName(entry)} className="w-full h-full object-cover" />
                                   ) : (
-                                    <div className="w-full h-full bg-amber-50 flex items-center justify-center text-2xl text-amber-200">
-                                      👤
+                                    <div className="w-full h-full bg-amber-50 flex items-center justify-center">
+                                      <User size={24} className="text-amber-200" aria-hidden />
                                     </div>
                                   )}
                                 </div>
@@ -1136,7 +1161,7 @@ function ResultsPage() {
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  <span>🏆</span>
+                  <Trophy size={20} aria-hidden />
                   <span>By Category Combination</span>
                 </button>
                 <button
@@ -1147,7 +1172,7 @@ function ResultsPage() {
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  <span>🔍</span>
+                  <Search size={20} aria-hidden />
                   <span>Custom Filter</span>
                 </button>
               </div>
@@ -1163,8 +1188,9 @@ function ResultsPage() {
           {selectedFilter !== 'medal' && viewMode === 'grouped' && top4Overall.length > 0 && (
             <div className="bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50 rounded-3xl shadow-2xl p-8 mb-12 border-4 border-yellow-400">
               <div className="text-center mb-8">
-                <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 mb-2">
-                  🏆 TOP 4 HIGHEST OVERALL SCORES
+                <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 mb-2 flex items-center justify-center gap-3">
+                  <Trophy size={36} aria-hidden />
+                  TOP 4 HIGHEST OVERALL SCORES
                 </h2>
                 <p className="text-lg text-gray-700 font-semibold">
                   Entire Competition - All Categories, All Divisions
@@ -1185,7 +1211,7 @@ function ResultsPage() {
                     'border-orange-500',
                     'border-teal-500'
                   ];
-                  const medals = ['🥇', '🥈', '🥉', '🏅'];
+                  const rankIcons = [1, 2, 3, 4];
                   const labels = ['1st Overall', '2nd Overall', '3rd Overall', '4th Overall'];
                   
                   return (
@@ -1194,7 +1220,9 @@ function ResultsPage() {
                       className={`bg-white rounded-2xl shadow-xl overflow-hidden border-4 ${borderColors[index]} transform hover:scale-105 transition-all duration-300`}
                     >
                       <div className={`bg-gradient-to-r ${rankColors[index]} p-4 text-center`}>
-                        <div className="text-5xl mb-2">{medals[index]}</div>
+                        <div className="mb-2 flex justify-center">
+                          <RankIcon rank={rankIcons[index]} size={40} />
+                        </div>
                         <div className="text-white font-black text-lg">{labels[index]}</div>
                       </div>
                       
@@ -1204,8 +1232,8 @@ function ResultsPage() {
                             {entry.photo_url ? (
                               <img src={entry.photo_url} alt={formatEntryName(entry)} className="w-full h-full object-cover" />
                             ) : (
-                              <div className="w-full h-full bg-gray-200 flex items-center justify-center text-3xl">
-                                {entry.dance_type && entry.dance_type.includes('Solo') ? '👤' : '👥'}
+                              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                                <DivisionTypeIcon divisionType={entry.dance_type} size={28} className="text-gray-400" />
                               </div>
                             )}
                           </div>
@@ -1227,9 +1255,15 @@ function ResultsPage() {
                         </div>
                         
                         <div className="text-xs text-gray-500 space-y-1">
-                          <div>📂 {getCategoryName(entry.category_id)}</div>
-                          <div>🎂 {getAgeDivisionName(entry.age_division_id) || 'N/A'}</div>
-                          <div>⭐ {entry.ability_level}</div>
+                          <div className="flex items-center gap-1">
+                            <Folder size={12} aria-hidden /> {getCategoryName(entry.category_id)}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Cake size={12} aria-hidden /> {getAgeDivisionName(entry.age_division_id) || 'N/A'}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Star size={12} aria-hidden /> {entry.ability_level}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1243,7 +1277,7 @@ function ResultsPage() {
           {selectedFilter !== 'medal' && viewMode === 'grouped' && (
             Object.keys(groupedRankings).length === 0 ? (
               <div className="bg-white rounded-3xl shadow-lg p-20 text-center">
-                <div className="text-6xl mb-6">🏆</div>
+                <Trophy size={56} className="mx-auto mb-6 text-amber-500" aria-hidden />
                 <h3 className="text-3xl font-bold text-gray-800 mb-3">No Results Yet</h3>
                 <p className="text-gray-600">Results will appear here once judges complete scoring.</p>
               </div>
@@ -1256,18 +1290,19 @@ function ResultsPage() {
                     <div key={key} className="bg-white rounded-3xl shadow-2xl overflow-hidden border-2 border-gray-200">
                       {/* Group Header */}
                       <div className="bg-gradient-to-r from-teal-600 via-cyan-500 to-teal-600 p-8">
-                        <h2 className="text-3xl font-extrabold text-white mb-3 drop-shadow-lg">
-                          🏆 {cleanDisplayText(group.category, 'Unknown')}
+                        <h2 className="text-3xl font-extrabold text-white mb-3 drop-shadow-lg flex items-center gap-3">
+                          <Trophy size={28} aria-hidden />
+                          {cleanDisplayText(group.category, 'Unknown')}
                         </h2>
                         <div className="flex flex-wrap gap-3 mb-3">
-                          <span className="px-4 py-2 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
-                            📅 {cleanDisplayText(group.ageDivision, 'No Division')}
+                          <span className="px-4 py-2 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white inline-flex items-center gap-1.5">
+                            <Calendar size={14} aria-hidden /> {cleanDisplayText(group.ageDivision, 'No Division')}
                           </span>
-                          <span className="px-4 py-2 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
-                            ⭐ {cleanDisplayText(group.abilityLevel, 'Unknown')}
+                          <span className="px-4 py-2 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white inline-flex items-center gap-1.5">
+                            <Star size={14} aria-hidden /> {cleanDisplayText(group.abilityLevel, 'Unknown')}
                           </span>
-                          <span className="px-4 py-2 bg-yellow-400/90 backdrop-blur rounded-full text-sm font-black text-gray-800 border-2 border-yellow-500">
-                            {getDivisionTypeEmoji(group.divisionType)} {getDivisionTypeDisplayName(group.divisionType)}
+                          <span className="px-4 py-2 bg-yellow-400/90 backdrop-blur rounded-full text-sm font-black text-gray-800 border-2 border-yellow-500 inline-flex items-center gap-1.5">
+                            <DivisionTypeIcon divisionType={group.divisionType} size={14} className="text-gray-800" /> {getDivisionTypeDisplayName(group.divisionType)}
                           </span>
                         </div>
                         <p className="text-white/90 text-lg font-semibold">
@@ -1300,8 +1335,8 @@ function ResultsPage() {
                                     </span>
                                   </div>
                                   {entry.categoryRank <= 3 && (
-                                    <span className="absolute -top-1 -right-1 text-2xl">
-                                      {getMedalEmoji(entry.categoryRank)}
+                                    <span className="absolute -top-1 -right-1">
+                                      <RankIcon rank={entry.categoryRank} size={24} />
                                     </span>
                                   )}
                                 </div>
@@ -1317,7 +1352,7 @@ function ResultsPage() {
                                     />
                                   ) : (
                                     <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                                      <span className="text-3xl text-gray-400">👤</span>
+                                      <User size={28} className="text-gray-400" aria-hidden />
                                     </div>
                                   )}
                                 </div>
@@ -1332,8 +1367,8 @@ function ResultsPage() {
                                       Age {entry.age}
                                     </span>
                                     {entry.is_medal_program && (
-                                      <span className="px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-xs font-bold">
-                                        ⭐ MEDAL PROGRAM
+                                      <span className="px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-xs font-bold inline-flex items-center gap-1">
+                                        <Star size={12} aria-hidden /> MEDAL PROGRAM
                                       </span>
                                     )}
                                   </div>
@@ -1415,7 +1450,7 @@ function ResultsPage() {
                                     disabled={generatingPdf}
                                     className="mt-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all flex items-center gap-2 mx-auto"
                                   >
-                                    <span>🖨</span>
+                                    <Printer size={18} aria-hidden />
                                     <span>Print Score Sheet</span>
                                   </button>
                                 </div>
@@ -1435,7 +1470,7 @@ function ResultsPage() {
           {selectedFilter !== 'medal' && viewMode === 'filtered' && (
             filteredResults.length === 0 ? (
             <div className="bg-white rounded-3xl shadow-lg p-20 text-center">
-              <div className="text-6xl mb-6">🏆</div>
+              <Trophy size={56} className="mx-auto mb-6 text-amber-500" aria-hidden />
               <h3 className="text-3xl font-bold text-gray-800 mb-3">No Results Yet</h3>
               <p className="text-gray-600">Results will appear here once judges complete scoring.</p>
         </div>
@@ -1464,8 +1499,8 @@ function ResultsPage() {
                           </span>
                         </div>
                         {entry.rank <= 3 && (
-                          <span className="absolute -top-2 -right-2 text-3xl">
-                            {getMedalEmoji(entry.rank)}
+                          <span className="absolute -top-2 -right-2">
+                            <RankIcon rank={entry.rank} size={28} />
                           </span>
                         )}
                       </div>
@@ -1481,7 +1516,7 @@ function ResultsPage() {
                           />
                         ) : (
                           <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                            <span className="text-4xl text-gray-400">👤</span>
+                            <User size={36} className="text-gray-400" aria-hidden />
                           </div>
                         )}
                       </div>
@@ -1494,8 +1529,8 @@ function ResultsPage() {
                           </h3>
                           {entry.is_medal_program && (
                             <div className="flex items-center gap-2">
-                              <span className="bg-yellow-400 text-yellow-900 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter border border-yellow-200 shadow-sm">
-                                ⭐ MEDAL PROGRAM
+                              <span className="bg-yellow-400 text-yellow-900 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter border border-yellow-200 shadow-sm inline-flex items-center gap-1">
+                                <Star size={10} aria-hidden /> MEDAL PROGRAM
                               </span>
                               <MedalBadge medalLevel={entry.current_medal_level} size="sm" />
                               <span className="text-white/90 text-xs font-bold font-mono">
@@ -1509,16 +1544,16 @@ function ResultsPage() {
                             {categoryName}
                           </span>
                           {ageDivisionName && (
-                            <span className="px-4 py-1.5 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white">
-                              🎂 {ageDivisionName}
+                            <span className="px-4 py-1.5 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white inline-flex items-center gap-1.5">
+                              <Cake size={14} aria-hidden /> {ageDivisionName}
                             </span>
                           )}
-                          <span className="px-4 py-1.5 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white border border-white/20">
-                            ⭐ {entry.ability_level}
+                          <span className="px-4 py-1.5 bg-white/30 backdrop-blur rounded-full text-sm font-bold text-white border border-white/20 inline-flex items-center gap-1.5">
+                            <Star size={14} aria-hidden /> {entry.ability_level}
                           </span>
                           {entry.is_medal_program && (
-                            <span className="px-4 py-1.5 bg-yellow-400/20 backdrop-blur rounded-full text-[10px] font-black text-yellow-200 border border-yellow-400/30 uppercase tracking-widest">
-                              🏆 {getMedalProgress(entry.medal_points)}
+                            <span className="px-4 py-1.5 bg-yellow-400/20 backdrop-blur rounded-full text-[10px] font-black text-yellow-200 border border-yellow-400/30 uppercase tracking-widest inline-flex items-center gap-1.5">
+                              <Trophy size={12} aria-hidden /> {getMedalProgress(entry.medal_points)}
                             </span>
                           )}
                         </div>
@@ -1569,7 +1604,7 @@ function ResultsPage() {
                           {(cleanDisplayText(entry.studio_name, '') || cleanDisplayText(entry.teacher_name, '')) && (
                             <div className="mb-6 p-5 bg-white rounded-xl border-2 border-teal-200 shadow-sm">
                               <h4 className="text-lg font-bold text-teal-600 mb-3 flex items-center gap-2">
-                                <span>🏫</span>
+                                <School size={18} aria-hidden />
                                 <span>Studio & Teacher Information</span>
                               </h4>
                               <div className="space-y-2">
@@ -1605,7 +1640,7 @@ function ResultsPage() {
                               <div className="grid gap-3 mb-4">
                                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                                    <span>🎯</span> Technique
+                                    <Target size={16} aria-hidden /> Technique
                                   </span>
                                   <span className={`text-xl font-bold ${getScoreColor(score.technique)}`}>
                                     {score.technique} / 25
@@ -1613,7 +1648,7 @@ function ResultsPage() {
                             </div>
                                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                                    <span>✨</span> Creativity
+                                    <Sparkles size={16} aria-hidden /> Creativity
                                   </span>
                                   <span className={`text-xl font-bold ${getScoreColor(score.creativity)}`}>
                                     {score.creativity} / 25
@@ -1621,7 +1656,7 @@ function ResultsPage() {
                             </div>
                                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                                    <span>🎭</span> Presentation
+                                    <Drama size={16} aria-hidden /> Presentation
                                   </span>
                                   <span className={`text-xl font-bold ${getScoreColor(score.presentation)}`}>
                                     {score.presentation} / 25
@@ -1629,7 +1664,7 @@ function ResultsPage() {
                             </div>
                                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                                    <span>👗</span> Appearance
+                                    <Shirt size={16} aria-hidden /> Appearance
                                   </span>
                                   <span className={`text-xl font-bold ${getScoreColor(score.appearance)}`}>
                                     {score.appearance} / 25
@@ -1647,7 +1682,7 @@ function ResultsPage() {
                           {score.notes && (
                                 <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <span>📝</span>
+                                    <ClipboardList size={16} aria-hidden />
                                     <span className="text-sm font-bold text-yellow-800 uppercase tracking-wider">
                                       Judge Notes
                                     </span>
@@ -1690,7 +1725,7 @@ function ResultsPage() {
                           </>
                         ) : (
                           <>
-                            <span>🖨</span>
+                            <Printer size={18} aria-hidden />
                             <span>Print Score Sheet</span>
                           </>
                         )}
@@ -1709,8 +1744,9 @@ function ResultsPage() {
               
               {/* Info Section */}
               <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border-2 border-teal-200">
-                <h3 className="text-lg font-bold text-teal-800 mb-3">
-                  💡 How the Season Leaderboard Works
+                <h3 className="text-lg font-bold text-teal-800 mb-3 flex items-center gap-2">
+                  <Lightbulb size={20} aria-hidden />
+                  How the Season Leaderboard Works
                 </h3>
                 <ul className="space-y-2 text-sm text-gray-700">
                   <li className="flex items-start gap-2">
@@ -1752,7 +1788,10 @@ function ResultsPage() {
                       Awarding Points...
                     </>
                   ) : (
-                    '🏆 Award Medal Points for This Competition'
+                    <>
+                      <Trophy size={18} className="inline mr-2" aria-hidden />
+                      Award Medal Points for This Competition
+                    </>
                   )}
                 </button>
               </div>
@@ -1763,8 +1802,9 @@ function ResultsPage() {
           {specialCategoryResults.length > 0 && (
             <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl shadow-2xl p-8 mb-12 border-4 border-gray-300">
               <div className="text-center mb-8">
-                <h2 className="text-4xl font-black text-gray-700 mb-3">
-                  🎭 Special Categories
+                <h2 className="text-4xl font-black text-gray-700 mb-3 flex items-center justify-center gap-3">
+                  <Drama size={36} aria-hidden />
+                  Special Categories
                 </h2>
                 <p className="text-lg text-gray-600 font-semibold bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 inline-block">
                   Category Awards Eligible - Excluded Only from Overall/High Score Awards
@@ -1793,8 +1833,8 @@ function ResultsPage() {
                               effect="blur"
                             />
                           ) : (
-                            <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl">
-                              {entry.dance_type && entry.dance_type.includes('Solo') ? '👤' : '👥'}
+                            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                              <DivisionTypeIcon divisionType={entry.dance_type} size={24} className="text-gray-400" />
                             </div>
                           )}
                         </div>
@@ -1809,12 +1849,12 @@ function ResultsPage() {
                               {categoryName}
                             </span>
                             {ageDivisionName && (
-                              <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700">
-                                🎂 {ageDivisionName}
+                              <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700 inline-flex items-center gap-1">
+                                <Cake size={14} aria-hidden /> {ageDivisionName}
                               </span>
                             )}
-                            <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700">
-                              ⭐ {entry.ability_level}
+                            <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700 inline-flex items-center gap-1">
+                              <Star size={14} aria-hidden /> {entry.ability_level}
                             </span>
                             <span className="px-3 py-1 bg-gray-200 rounded-full text-sm font-semibold text-gray-700">
                               {getDivisionTypeDisplayName(entry.dance_type)}
@@ -1825,8 +1865,9 @@ function ResultsPage() {
                         {/* Special placement + average score */}
                         <div className="text-center">
                           {entry.rank && (
-                            <div className="mb-2 px-4 py-2 bg-yellow-100 border-2 border-yellow-400 rounded-xl text-yellow-800 font-black">
-                              🏆 {getPlacementLabel(entry.rank)}
+                            <div className="mb-2 px-4 py-2 bg-yellow-100 border-2 border-yellow-400 rounded-xl text-yellow-800 font-black inline-flex items-center gap-2">
+                              <RankIcon rank={entry.rank} size={18} />
+                              {getPlacementLabel(entry.rank)}
                             </div>
                           )}
                           <div className="text-3xl font-black text-gray-700">

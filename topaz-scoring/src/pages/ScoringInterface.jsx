@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import {
+  AlertTriangle,
+  Check,
+  Circle,
+  Drama,
+  PersonStanding,
+  SlidersHorizontal,
+  Users,
+  X,
+} from 'lucide-react';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import Layout from '../components/Layout';
@@ -561,7 +571,7 @@ function ScoringInterface() {
       <Layout overlayOpacity="bg-white/80">
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center max-w-md">
-            <div className="text-6xl mb-4">⚠️</div>
+            <AlertTriangle size={56} className="mx-auto mb-4 text-amber-500" aria-hidden />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Missing Competition Data</h2>
             <p className="text-gray-600 mb-4">
               Competition information could not be loaded. This can happen if you opened this page directly or refreshed.
@@ -606,7 +616,7 @@ function ScoringInterface() {
       <Layout overlayOpacity="bg-white/80">
         <div className="flex-1 flex items-center justify-center p-4">
           <EmptyState
-            icon="🎭"
+            icon={<Drama size={56} className="text-gray-400" aria-hidden />}
             title="No Entries to Score"
             description="No entries match the current filters. Try adjusting your category or age division filters."
             action={{
@@ -669,7 +679,7 @@ function ScoringInterface() {
           {/* Admin Filter Notice */}
           <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 mb-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🎛️</span>
+              <SlidersHorizontal size={24} aria-hidden />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-blue-800">
                   Filters are controlled by Admin
@@ -701,7 +711,7 @@ function ScoringInterface() {
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   aria-label="Clear search"
                 >
-                  ✕
+                  <X size={18} aria-hidden />
                 </button>
               )}
             </div>
@@ -744,8 +754,12 @@ function ScoringInterface() {
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">
-                      {scoredEntries.has(entry.id) ? '✓' : '○'}
+                    <span className="text-lg flex items-center">
+                      {scoredEntries.has(entry.id) ? (
+                        <Check size={18} aria-hidden />
+                      ) : (
+                        <Circle size={14} className="opacity-60" aria-hidden />
+                      )}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold truncate">
@@ -785,7 +799,13 @@ function ScoringInterface() {
                         : 'bg-gray-100 text-gray-800'
                     }`}
                   >
-                    <span className="mr-2">{scoredEntries.has(entry.id) ? '✓' : '○'}</span>
+                    <span className="mr-2 inline-flex items-center">
+                      {scoredEntries.has(entry.id) ? (
+                        <Check size={16} aria-hidden />
+                      ) : (
+                        <Circle size={12} className="opacity-60" aria-hidden />
+                      )}
+                    </span>
                     {getScoringSidebarLine(entry)}
                   </button>
                 ))}
@@ -807,14 +827,22 @@ function ScoringInterface() {
                       effect="blur"
                       className="w-32 h-32 sm:w-40 sm:h-40 object-cover rounded-lg border-2 border-gray-300"
                       placeholder={
-                        <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gray-200 rounded-lg flex items-center justify-center text-5xl animate-pulse">
-                          {isNonSoloDivision(currentEntry) ? '👥' : '💃'}
+                        <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gray-200 rounded-lg flex items-center justify-center animate-pulse">
+                          {isNonSoloDivision(currentEntry) ? (
+                            <Users size={40} className="text-gray-400" aria-hidden />
+                          ) : (
+                            <PersonStanding size={40} className="text-gray-400" aria-hidden />
+                          )}
                         </div>
                       }
                     />
                   ) : (
-                    <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gray-200 rounded-lg flex items-center justify-center text-5xl">
-                      {isNonSoloDivision(currentEntry) ? '👥' : '💃'}
+                    <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gray-200 rounded-lg flex items-center justify-center">
+                      {isNonSoloDivision(currentEntry) ? (
+                        <Users size={40} className="text-gray-400" aria-hidden />
+                      ) : (
+                        <PersonStanding size={40} className="text-gray-400" aria-hidden />
+                      )}
                     </div>
                   )}
                 </div>
