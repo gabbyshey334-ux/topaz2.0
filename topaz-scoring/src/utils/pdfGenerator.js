@@ -58,6 +58,29 @@ const loadImageAsBase64 = (url) => {
 };
 
 /**
+ * Draw a full-width labeled field with wrapping (avoids side-by-side collisions).
+ * Returns the new y position after the field.
+ */
+const drawWrappedField = (doc, label, value, x, y, maxWidth, lineHeight = 5) => {
+  const text = `${label}: ${value || 'N/A'}`;
+  const lines = doc.splitTextToSize(text, maxWidth);
+  doc.text(lines, x, y);
+  return y + lines.length * lineHeight;
+};
+
+/**
+ * Truncate text to fit a single-line column width.
+ */
+const fitTextToWidth = (doc, text, maxWidth) => {
+  if (!text || doc.getTextWidth(text) <= maxWidth) return text || '';
+  let truncated = text;
+  while (truncated.length > 3 && doc.getTextWidth(`${truncated}...`) > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return `${truncated}...`;
+};
+
+/**
  * Generate a professional championship-style score sheet PDF
  * MANUAL TABLE IMPLEMENTATION - NO AUTOTABLE DEPENDENCY
  */
@@ -163,7 +186,8 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     const hasPhoto = !!entry.photo_url && !skipPhoto;
     
     // Calculate dynamic height for entry info box
-    let entryInfoHeight = 35; // Base height
+    // Category/Age/Ability/Division are stacked (not side-by-side) to prevent overlap
+    let entryInfoHeight = 50; // Base height (includes stacked meta fields)
     if (hasPhoto) entryInfoHeight += 45; // Photo space (40x40 + 5 margin)
     if (isGroup && hasGroupMembers) {
       entryInfoHeight += 8 + (entry.group_members.length * 6); // Group members list
@@ -171,6 +195,11 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     if (entry.studio_name || entry.teacher_name) {
       entryInfoHeight += 12; // Studio/Teacher space
     }
+    // Extra room for long wrapped category / division names
+    const metaMaxWidth = pageWidth - 40;
+    const categoryLines = doc.splitTextToSize(`Category: ${category?.name || 'N/A'}`, metaMaxWidth).length;
+    const divisionLines = doc.splitTextToSize(`Division Type: ${entry.dance_type || 'N/A'}`, metaMaxWidth).length;
+    entryInfoHeight += Math.max(0, categoryLines - 1) * 5 + Math.max(0, divisionLines - 1) * 5;
     
     doc.setFillColor(...lightGray);
     doc.roundedRect(14, yPos, pageWidth - 28, entryInfoHeight, 3, 3, 'F');
@@ -245,14 +274,12 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       yPos += 3; // Extra space
     }
     
-    // Category details
-    doc.text(`Category: ${category?.name || 'N/A'}`, 18, yPos);
-    doc.text(`Age Division: ${ageDivision?.name || 'N/A'}`, 100, yPos);
-    yPos += 6;
-    
-    doc.text(`Ability Level: ${entry.ability_level || 'N/A'}`, 18, yPos);
-    doc.text(`Division Type: ${entry.dance_type || 'N/A'}`, 100, yPos);
-    yPos += 6;
+    // Category details — stacked full-width to avoid long names overlapping
+    const fieldMaxWidth = pageWidth - 40;
+    yPos = drawWrappedField(doc, 'Category', category?.name, 18, yPos, fieldMaxWidth, 5) + 1;
+    yPos = drawWrappedField(doc, 'Age Division', ageDivision?.name, 18, yPos, fieldMaxWidth, 5) + 1;
+    yPos = drawWrappedField(doc, 'Ability Level', entry.ability_level, 18, yPos, fieldMaxWidth, 5) + 1;
+    yPos = drawWrappedField(doc, 'Division Type', entry.dance_type, 18, yPos, fieldMaxWidth, 5) + 1;
     
     // Basic medal program indicator (kept for entry info section)
     if (entry.is_medal_program) {
@@ -291,11 +318,14 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     
-    const colWidths = [25, 30, 30, 35, 30, 30];
+    // Wider Judge column so "AVERAGE" does not collide with Technique values
+    const colWidths = [38, 27, 27, 33, 27, 28];
     const colPositions = [18];
     for (let i = 1; i < colWidths.length; i++) {
       colPositions.push(colPositions[i - 1] + colWidths[i - 1]);
     }
+    // Right-align numeric cells at the right edge of each score column
+    const scoreRightEdges = colWidths.map((w, i) => colPositions[i] + w - 2);
     
     doc.text('Judge', colPositions[0], yPos + 6);
     doc.text('Technique', colPositions[1], yPos + 6);
@@ -319,19 +349,23 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
         doc.rect(14, yPos - 3, pageWidth - 28, 7, 'F');
       }
       
-      // Judge name
+      // Judge name (truncated to Judge column width)
       const judgeName = competition?.judge_names?.[score.judge_number - 1];
-      const judgeLabel = judgeName || `Judge ${score.judge_number}`;
       doc.setFont('helvetica', 'bold');
+      const judgeLabel = fitTextToWidth(
+        doc,
+        judgeName || `Judge ${score.judge_number}`,
+        colWidths[0] - 4
+      );
       doc.text(judgeLabel, colPositions[0], yPos + 4);
       
-      // Scores
+      // Scores — right-aligned within each column
       doc.setFont('helvetica', 'normal');
-      doc.text(score.technique?.toFixed(2) || '0.00', colPositions[1], yPos + 4, { align: 'right' });
-      doc.text(score.creativity?.toFixed(2) || '0.00', colPositions[2], yPos + 4, { align: 'right' });
-      doc.text(score.presentation?.toFixed(2) || '0.00', colPositions[3], yPos + 4, { align: 'right' });
-      doc.text(score.appearance?.toFixed(2) || '0.00', colPositions[4], yPos + 4, { align: 'right' });
-      doc.text(score.total_score?.toFixed(2) || '0.00', colPositions[5], yPos + 4, { align: 'right' });
+      doc.text(score.technique?.toFixed(2) || '0.00', scoreRightEdges[1], yPos + 4, { align: 'right' });
+      doc.text(score.creativity?.toFixed(2) || '0.00', scoreRightEdges[2], yPos + 4, { align: 'right' });
+      doc.text(score.presentation?.toFixed(2) || '0.00', scoreRightEdges[3], yPos + 4, { align: 'right' });
+      doc.text(score.appearance?.toFixed(2) || '0.00', scoreRightEdges[4], yPos + 4, { align: 'right' });
+      doc.text(score.total_score?.toFixed(2) || '0.00', scoreRightEdges[5], yPos + 4, { align: 'right' });
       
       // Row separator
       doc.setDrawColor(200, 200, 200);
@@ -354,32 +388,79 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.roundedRect(14, yPos - 3, pageWidth - 28, 8, 2, 2, 'F');
     
     doc.setTextColor(255, 255, 255);
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
     doc.text('AVERAGE', colPositions[0], yPos + 4);
-    doc.text(avgTechnique.toFixed(2), colPositions[1], yPos + 4, { align: 'right' });
-    doc.text(avgCreativity.toFixed(2), colPositions[2], yPos + 4, { align: 'right' });
-    doc.text(avgPresentation.toFixed(2), colPositions[3], yPos + 4, { align: 'right' });
-    doc.text(avgAppearance.toFixed(2), colPositions[4], yPos + 4, { align: 'right' });
-    doc.text(avgTotal.toFixed(2), colPositions[5], yPos + 4, { align: 'right' });
+    doc.text(avgTechnique.toFixed(2), scoreRightEdges[1], yPos + 4, { align: 'right' });
+    doc.text(avgCreativity.toFixed(2), scoreRightEdges[2], yPos + 4, { align: 'right' });
+    doc.text(avgPresentation.toFixed(2), scoreRightEdges[3], yPos + 4, { align: 'right' });
+    doc.text(avgAppearance.toFixed(2), scoreRightEdges[4], yPos + 4, { align: 'right' });
+    doc.text(avgTotal.toFixed(2), scoreRightEdges[5], yPos + 4, { align: 'right' });
     
-    yPos += 15;
-      
-      // =============================================================================
+    yPos += 12;
+
+    // =============================================================================
+    // JUDGES' COMMENTS
+    // =============================================================================
+    const scoresWithNotes = entryScores.filter(s => s.notes && String(s.notes).trim());
+    const ensureSpace = (needed) => {
+      if (yPos + needed > pageHeight - 25) {
+        doc.addPage();
+        yPos = 20;
+      }
+    };
+
+    if (scoresWithNotes.length > 0) {
+      console.log('💬 Adding judges comments...');
+      ensureSpace(20);
+
+      doc.setFillColor(...tealColor);
+      doc.roundedRect(14, yPos, pageWidth - 28, 8, 2, 2, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text("JUDGES' COMMENTS", 18, yPos + 5.5);
+      yPos += 12;
+
+      const commentMaxWidth = pageWidth - 40;
+      scoresWithNotes.forEach((score) => {
+        const judgeName = competition?.judge_names?.[score.judge_number - 1];
+        const judgeLabel = judgeName || `Judge ${score.judge_number}`;
+        const noteLines = doc.splitTextToSize(String(score.notes).trim(), commentMaxWidth);
+        ensureSpace(10 + noteLines.length * 4.5);
+
+        doc.setTextColor(...darkGray);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(judgeLabel, 18, yPos);
+        yPos += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(75, 85, 99);
+        doc.text(noteLines, 18, yPos);
+        yPos += noteLines.length * 4.5 + 4;
+      });
+
+      yPos += 4;
+    }
+
+    // =============================================================================
     // TOTAL SCORE SUMMARY
-      // =============================================================================
+    // =============================================================================
     console.log('🏆 Adding total score summary...');
-    
+    ensureSpace(30);
+
     doc.setFillColor(...lightGray);
     doc.roundedRect(14, yPos, pageWidth - 28, 15, 3, 3, 'F');
-        yPos += 8;
-        
+    yPos += 8;
+
     doc.setTextColor(...darkGray);
     doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
+    doc.setFont('helvetica', 'bold');
     doc.text('TOTAL SCORE', pageWidth / 2, yPos, { align: 'center' });
-        yPos += 8;
-        
+    yPos += 8;
+
     doc.setFontSize(24);
     doc.setTextColor(...tealColor);
     doc.text(`${avgTotal.toFixed(2)} / 100`, pageWidth / 2, yPos, { align: 'center' });
@@ -390,6 +471,7 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     // =============================================================================
     if (entry.is_medal_program) {
       console.log('🏅 Adding medal program status...');
+      ensureSpace(50);
       
       // Helper function to get next medal info
       const getNextMedalInfo = (currentPoints) => {
