@@ -94,6 +94,11 @@ const fitTextToWidth = (doc, text, maxWidth) => {
   return `${truncated}...`;
 };
 
+/** Center text within a table column. */
+const drawCenteredInColumn = (doc, text, colX, colW, y) => {
+  doc.text(String(text), colX + colW / 2, y, { align: 'center' });
+};
+
 /**
  * Generate a professional championship-style score sheet PDF.
  * Layout is intentionally compact so a typical entry (≤4 judges) fits on one A4 page.
@@ -226,7 +231,14 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     const fieldMaxWidth = contentW - 6;
     doc.setFontSize(8.5);
 
-    let entryInnerH = 5 + 5 + 4.5; // title + entry#/name
+    const lineH = 3.8;
+    const fieldGap = 0.8;
+    const nameLines = doc.splitTextToSize(
+      `Name: ${entry.competitor_name || 'N/A'}`,
+      fieldMaxWidth,
+    );
+
+    let entryInnerH = 5 + 5 + lineH + nameLines.length * lineH; // title + entry# + name
     let photoData = null;
     const photoSize = 28;
     if (hasPhoto) {
@@ -245,10 +257,10 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
         return `${name || 'Unknown'}${age != null ? ` (${age})` : ''}`;
       });
       memberLines = doc.splitTextToSize(memberBits.join('  ·  '), contentW - 8);
-      entryInnerH += 3.5 + memberLines.length * 3.5 + 1;
+      entryInnerH += 3.5 + memberLines.length * lineH + 1;
     }
-    if (entry.studio_name) entryInnerH += 3.5;
-    if (entry.teacher_name) entryInnerH += 3.5;
+    if (entry.studio_name) entryInnerH += lineH;
+    if (entry.teacher_name) entryInnerH += lineH;
 
     const countFieldLines = (label, value) =>
       doc.splitTextToSize(`${label}: ${value || 'N/A'}`, fieldMaxWidth).length;
@@ -257,9 +269,11 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
         countFieldLines('Age Division', ageDivision?.name) +
         countFieldLines('Ability Level', entry.ability_level) +
         countFieldLines('Division Type', entry.dance_type)) *
-        3.5 +
+        lineH +
+      fieldGap * 4 +
       2;
-    if (entry.is_medal_program) entryInnerH += 5;
+    // Extra clearance so the Medal Program chip sits below the last meta line
+    if (entry.is_medal_program) entryInnerH += 8;
     entryInnerH += 3; // bottom padding
 
     const entryBoxTop = yPos;
@@ -273,11 +287,13 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.text('Entry Information', marginX + 3, yPos);
     yPos += 5;
 
+    // Stack entry # and name so long names never collide with Entry #
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
     doc.text(`Entry #: ${entry.entry_number}`, marginX + 3, yPos);
-    doc.text(`Name: ${entry.competitor_name || 'N/A'}`, marginX + 55, yPos);
-    yPos += 4.5;
+    yPos += lineH;
+    doc.text(nameLines, marginX + 3, yPos);
+    yPos += nameLines.length * lineH + 0.5;
 
     if (photoData) {
       doc.addImage(
@@ -298,35 +314,38 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       yPos += 3.5;
       doc.setFont('helvetica', 'normal');
       doc.text(memberLines, marginX + 3, yPos);
-      yPos += memberLines.length * 3.5 + 1;
+      yPos += memberLines.length * lineH + 1;
     }
 
     if (entry.studio_name) {
       doc.text(`Studio: ${entry.studio_name}`, marginX + 3, yPos);
-      yPos += 3.5;
+      yPos += lineH;
     }
     if (entry.teacher_name) {
       doc.text(`Teacher/Choreographer: ${entry.teacher_name}`, marginX + 3, yPos);
-      yPos += 3.5;
+      yPos += lineH;
     }
 
-    yPos = drawWrappedField(doc, 'Category', category?.name, marginX + 3, yPos, fieldMaxWidth, 3.5) + 0.5;
-    yPos = drawWrappedField(doc, 'Age Division', ageDivision?.name, marginX + 3, yPos, fieldMaxWidth, 3.5) + 0.5;
-    yPos = drawWrappedField(doc, 'Ability Level', entry.ability_level, marginX + 3, yPos, fieldMaxWidth, 3.5) + 0.5;
-    yPos = drawWrappedField(doc, 'Division Type', entry.dance_type, marginX + 3, yPos, fieldMaxWidth, 3.5) + 0.5;
+    // Full-width stacked fields — never two labels on the same baseline
+    yPos = drawWrappedField(doc, 'Category', category?.name, marginX + 3, yPos, fieldMaxWidth, lineH) + fieldGap;
+    yPos = drawWrappedField(doc, 'Age Division', ageDivision?.name, marginX + 3, yPos, fieldMaxWidth, lineH) + fieldGap;
+    yPos = drawWrappedField(doc, 'Ability Level', entry.ability_level, marginX + 3, yPos, fieldMaxWidth, lineH) + fieldGap;
+    yPos = drawWrappedField(doc, 'Division Type', entry.dance_type, marginX + 3, yPos, fieldMaxWidth, lineH) + fieldGap;
 
     if (entry.is_medal_program) {
+      // Drop the chip a little below the last field so it doesn't crowd the text
+      yPos += 2.5;
       doc.setFillColor(...tealColor);
-      doc.roundedRect(marginX + 3, yPos - 2.5, 32, 4.5, 1.5, 1.5, 'F');
+      doc.roundedRect(marginX + 3, yPos - 2.8, 34, 5, 1.5, 1.5, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
-      doc.text('Medal Program', marginX + 5, yPos + 0.5);
+      doc.text('Medal Program', marginX + 5.5, yPos + 0.6);
       doc.setTextColor(...darkGray);
-      yPos += 5;
+      yPos += 6;
     }
 
-    yPos = entryBoxTop + entryInnerH + 3;
+    yPos = entryBoxTop + entryInnerH + 3.5;
 
     // =============================================================================
     // SCORES TABLE (≤4 judges)
@@ -349,22 +368,25 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.setFillColor(...tealColor);
     doc.roundedRect(marginX, yPos, contentW, 7, 1.5, 1.5, 'F');
 
-    const colWidths = [36, 26, 26, 32, 26, 28];
-    const colPositions = [marginX + 3];
+    // Judge column wide enough for "AVERAGE"; score cols sized to fit contentW with gap
+    // Total: 42+26+26+32+26+28 = 180 ≤ contentW (~186)
+    const colWidths = [42, 26, 26, 32, 26, 28];
+    const colPositions = [marginX + 2];
     for (let i = 1; i < colWidths.length; i++) {
       colPositions.push(colPositions[i - 1] + colWidths[i - 1]);
     }
-    const scoreRightEdges = colWidths.map((w, i) => colPositions[i] + w - 2);
 
+    const headers = ['Judge', 'Technique', 'Creativity', 'Presentation', 'Appearance', 'Total'];
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
-    doc.text('Judge', colPositions[0], yPos + 4.5);
-    doc.text('Technique', colPositions[1], yPos + 4.5);
-    doc.text('Creativity', colPositions[2], yPos + 4.5);
-    doc.text('Presentation', colPositions[3], yPos + 4.5);
-    doc.text('Appearance', colPositions[4], yPos + 4.5);
-    doc.text('Total', colPositions[5], yPos + 4.5);
+    headers.forEach((label, i) => {
+      if (i === 0) {
+        doc.text(label, colPositions[0] + 1, yPos + 4.5);
+      } else {
+        drawCenteredInColumn(doc, label, colPositions[i], colWidths[i], yPos + 4.5);
+      }
+    });
     yPos += 8;
 
     doc.setFontSize(8);
@@ -380,16 +402,21 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       const judgeLabel = fitTextToWidth(
         doc,
         judgeName || `Judge ${score.judge_number}`,
-        colWidths[0] - 3,
+        colWidths[0] - 4,
       );
-      doc.text(judgeLabel, colPositions[0], yPos + 2.5);
+      doc.text(judgeLabel, colPositions[0] + 1, yPos + 2.5);
 
       doc.setFont('helvetica', 'normal');
-      doc.text(Number(score.technique || 0).toFixed(2), scoreRightEdges[1], yPos + 2.5, { align: 'right' });
-      doc.text(Number(score.creativity || 0).toFixed(2), scoreRightEdges[2], yPos + 2.5, { align: 'right' });
-      doc.text(Number(score.presentation || 0).toFixed(2), scoreRightEdges[3], yPos + 2.5, { align: 'right' });
-      doc.text(Number(score.appearance || 0).toFixed(2), scoreRightEdges[4], yPos + 2.5, { align: 'right' });
-      doc.text(Number(score.total_score || 0).toFixed(2), scoreRightEdges[5], yPos + 2.5, { align: 'right' });
+      const values = [
+        Number(score.technique || 0).toFixed(2),
+        Number(score.creativity || 0).toFixed(2),
+        Number(score.presentation || 0).toFixed(2),
+        Number(score.appearance || 0).toFixed(2),
+        Number(score.total_score || 0).toFixed(2),
+      ];
+      values.forEach((val, i) => {
+        drawCenteredInColumn(doc, val, colPositions[i + 1], colWidths[i + 1], yPos + 2.5);
+      });
 
       yPos += rowH;
     });
@@ -409,15 +436,20 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.setFillColor(...cyanColor);
     doc.roundedRect(marginX, yPos - 2, contentW, 7, 1.5, 1.5, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
-    doc.text('AVERAGE', colPositions[0], yPos + 2.5);
-    doc.text(avgTechnique.toFixed(2), scoreRightEdges[1], yPos + 2.5, { align: 'right' });
-    doc.text(avgCreativity.toFixed(2), scoreRightEdges[2], yPos + 2.5, { align: 'right' });
-    doc.text(avgPresentation.toFixed(2), scoreRightEdges[3], yPos + 2.5, { align: 'right' });
-    doc.text(avgAppearance.toFixed(2), scoreRightEdges[4], yPos + 2.5, { align: 'right' });
-    doc.text(avgTotal.toFixed(2), scoreRightEdges[5], yPos + 2.5, { align: 'right' });
-    yPos += 9;
+    // Keep AVERAGE left in Judge col; scores centered under headers (no mash-up)
+    doc.text('AVERAGE', colPositions[0] + 1, yPos + 2.5);
+    [
+      avgTechnique.toFixed(2),
+      avgCreativity.toFixed(2),
+      avgPresentation.toFixed(2),
+      avgAppearance.toFixed(2),
+      avgTotal.toFixed(2),
+    ].forEach((val, i) => {
+      drawCenteredInColumn(doc, val, colPositions[i + 1], colWidths[i + 1], yPos + 2.5);
+    });
+    yPos += 9.5;
 
     // =============================================================================
     // JUDGES' COMMENTS (compact — up to 4)
@@ -468,8 +500,10 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     // =============================================================================
     // TOTAL SCORE
     // =============================================================================
+    const totalBlockH = 14;
+
     doc.setFillColor(...lightGray);
-    doc.roundedRect(marginX, yPos, contentW, 14, 2, 2, 'F');
+    doc.roundedRect(marginX, yPos, contentW, totalBlockH, 2, 2, 'F');
     doc.setTextColor(...darkGray);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
@@ -477,7 +511,7 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.setFontSize(16);
     doc.setTextColor(...tealColor);
     doc.text(`${avgTotal.toFixed(2)} / 100`, pageWidth / 2, yPos + 11.5, { align: 'center' });
-    yPos += 17;
+    yPos += totalBlockH + 3.5;
 
     // =============================================================================
     // MEDAL PROGRAM STATUS (compact)
@@ -494,9 +528,10 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       const currentMedalLevel = entry.current_medal_level || 'None';
       const medalPoints = entry.medal_points || 0;
       const nextMedal = getNextMedalInfo(medalPoints);
+      const boxH = nextMedal ? 18 : 14;
 
       doc.setFillColor(...lightGray);
-      doc.roundedRect(marginX, yPos, contentW, nextMedal ? 18 : 14, 2, 2, 'F');
+      doc.roundedRect(marginX, yPos, contentW, boxH, 2, 2, 'F');
       doc.setTextColor(...darkGray);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
@@ -504,23 +539,23 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
 
       doc.setFontSize(7.5);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Medal Level: ${currentMedalLevel}  ·  Total Points: ${medalPoints}`, marginX + 3, yPos + 9);
+      doc.text(
+        `Medal Level: ${currentMedalLevel}  ·  Total Points: ${medalPoints}`,
+        pageWidth / 2,
+        yPos + 9,
+        { align: 'center' },
+      );
 
       if (nextMedal) {
         doc.setTextColor(...midGray);
-        doc.text(
-          `Progress: ${nextMedal.pointsNeeded} pts to ${nextMedal.level} (${nextMedal.threshold} pts)${
-            nextMedal.level !== 'Gold' ? '  ·  Gold at 50' : ''
-          }`,
-          marginX + 3,
-          yPos + 13.5,
-        );
-        yPos += 20;
+        const progress = `Progress: ${nextMedal.pointsNeeded} pts to ${nextMedal.level} (${nextMedal.threshold} pts)${
+          nextMedal.level !== 'Gold' ? '  ·  Gold at 50' : ''
+        }`;
+        doc.text(progress, pageWidth / 2, yPos + 13.5, { align: 'center' });
       } else {
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...tealColor);
-        doc.text('Gold Medal Achieved!', marginX + 3, yPos + 12);
-        yPos += 16;
+        doc.text('Gold Medal Achieved!', pageWidth / 2, yPos + 12, { align: 'center' });
       }
     }
 
@@ -541,14 +576,15 @@ function entryScoresHint(allScores, entry) {
 }
 
 function drawFooter(doc, pageWidth, pageHeight) {
-  const footerY = pageHeight - 8;
-  doc.setFontSize(7);
+  // Isolated footer band — no divider lines through the text
+  const footerY = pageHeight - 9;
+  doc.setFontSize(6.5);
   doc.setTextColor(150, 150, 150);
   doc.setFont('helvetica', 'normal');
   doc.text('TOPAZ 2.0 Dance Competition  ·  Heritage Since 1972', pageWidth / 2, footerY, {
     align: 'center',
   });
-  doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, footerY + 3.5, {
+  doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, footerY + 3.2, {
     align: 'center',
   });
 }
