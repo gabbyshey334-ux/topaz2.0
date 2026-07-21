@@ -1,18 +1,13 @@
 import { cleanDisplayText } from './entryFilters.js';
+import { calculateAverageFromScores } from './scoreReconciliation.js';
 
 /**
- * Calculate average score from multiple judges
- * @param {Array} scores - Array of score objects with total field
+ * Calculate average score from multiple judges (each judge total is /100).
+ * Uses total_score (not the legacy `total` column name).
+ * @param {Array} scores - Array of score objects
  * @returns {number} - Average score rounded to 2 decimals
  */
-export const calculateAverageScore = (scores) => {
-  if (!scores || scores.length === 0) return 0;
-  
-  const total = scores.reduce((sum, score) => sum + (parseFloat(score.total) || 0), 0);
-  const average = total / scores.length;
-  
-  return Math.round(average * 100) / 100; // Round to 2 decimals
-};
+export const calculateAverageScore = (scores) => calculateAverageFromScores(scores);
 
 /**
  * Calculate total score from four categories

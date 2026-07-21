@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { normalizeGroupMemberRow } from './entryFilters';
+import { calculateAverageFromScores, dedupeScoresByJudge, getScoreRowTotal } from './scoreReconciliation';
 
 /**
  * Check if an entry is a group (duo, trio, or group)
@@ -350,9 +351,15 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     // =============================================================================
     // SCORES TABLE (≤4 judges)
     // =============================================================================
-    const entryScores = allScores
-      .filter((s) => s.entry_id === entry.id)
-      .sort((a, b) => (a.judge_number || 0) - (b.judge_number || 0))
+    // Results passes reconciled entry.scores (may include sibling entry_ids).
+    // generateAllScorecards passes the full competition scores array.
+    const scopedToEntry = allScores.filter((s) => s.entry_id === entry.id);
+    const rawForRoutine =
+      scopedToEntry.length === allScores.length || scopedToEntry.length === 0
+        ? allScores // already routine-scoped (or sibling ids only)
+        : scopedToEntry;
+    const entryScores = dedupeScoresByJudge(rawForRoutine)
+      .sort((a, b) => (Number(a.judge_number) || 0) - (Number(b.judge_number) || 0))
       .slice(0, 4);
 
     if (entryScores.length === 0) {
@@ -412,7 +419,7 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
         Number(score.creativity || 0).toFixed(2),
         Number(score.presentation || 0).toFixed(2),
         Number(score.appearance || 0).toFixed(2),
-        Number(score.total_score || 0).toFixed(2),
+        getScoreRowTotal(score).toFixed(2),
       ];
       values.forEach((val, i) => {
         drawCenteredInColumn(doc, val, colPositions[i + 1], colWidths[i + 1], yPos + 2.5);
@@ -429,8 +436,8 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
       entryScores.reduce((sum, s) => sum + Number(s.presentation || 0), 0) / entryScores.length;
     const avgAppearance =
       entryScores.reduce((sum, s) => sum + Number(s.appearance || 0), 0) / entryScores.length;
-    const avgTotal =
-      entryScores.reduce((sum, s) => sum + Number(s.total_score || 0), 0) / entryScores.length;
+    // Final score = average of judge totals (/100 each), never the sum
+    const avgTotal = calculateAverageFromScores(entryScores);
 
     yPos += 1;
     doc.setFillColor(...cyanColor);
@@ -507,7 +514,7 @@ export const generateScoreSheet = async (entry, allScores, category, ageDivision
     doc.setTextColor(...darkGray);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text('TOTAL SCORE', pageWidth / 2, yPos + 5, { align: 'center' });
+    doc.text('FINAL AVERAGE', pageWidth / 2, yPos + 5, { align: 'center' });
     doc.setFontSize(16);
     doc.setTextColor(...tealColor);
     doc.text(`${avgTotal.toFixed(2)} / 100`, pageWidth / 2, yPos + 11.5, { align: 'center' });

@@ -1,5 +1,6 @@
 /**
  * Total from a scores row (prefer DB total_score).
+ * Always numeric — Postgres decimals can arrive as strings; never concatenate.
  */
 export function getScoreRowTotal(s) {
   if (s == null) return 0;
@@ -11,6 +12,35 @@ export function getScoreRowTotal(s) {
     (parseFloat(s.presentation) || 0) +
     (parseFloat(s.appearance) || 0)
   );
+}
+
+/**
+ * Final entry score = average of each judge's /100 total (NOT the sum).
+ * Two judges at 100 → 100, never 200.
+ */
+export function calculateAverageFromScores(scores) {
+  if (!scores?.length) return 0;
+  const sum = scores.reduce((acc, s) => acc + getScoreRowTotal(s), 0);
+  return Math.round((sum / scores.length) * 100) / 100;
+}
+
+/**
+ * One row per judge_number (numeric key) so duplicates / string-vs-number keys don't double-count.
+ */
+export function dedupeScoresByJudge(scores) {
+  if (!scores?.length) return [];
+  const byJudge = new Map();
+  for (const score of scores) {
+    const judgeKey = Number(score.judge_number);
+    const key = Number.isFinite(judgeKey) ? judgeKey : `unknown-${score.id || byJudge.size}`;
+    const existing = byJudge.get(key);
+    if (!existing || getScoreRowTotal(score) >= getScoreRowTotal(existing)) {
+      byJudge.set(key, score);
+    }
+  }
+  return [...byJudge.entries()]
+    .sort(([a], [b]) => (typeof a === 'number' && typeof b === 'number' ? a - b : 0))
+    .map(([, score]) => score);
 }
 
 /**

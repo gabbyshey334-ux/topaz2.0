@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { normalizeGroupMemberRow } from './entryFilters';
+import { calculateAverageFromScores, dedupeScoresByJudge } from './scoreReconciliation';
 
 /**
  * Export comprehensive competition data to Excel with multiple sheets
@@ -184,10 +185,8 @@ export const exportComprehensiveExcel = async (
     const rankingsData = rankings.map((entry, index) => {
       const category = categories.find(c => c.id === entry.category_id);
       const ageDivision = ageDivisions.find(d => d.id === entry.age_division_id);
-      const entryScores = scores.filter(s => s.entry_id === entry.id);
-      const avgScore = entryScores.length > 0
-        ? entryScores.reduce((sum, s) => sum + s.total_score, 0) / entryScores.length
-        : 0;
+      const entryScores = dedupeScoresByJudge(scores.filter(s => s.entry_id === entry.id));
+      const avgScore = calculateAverageFromScores(entryScores);
       
       return {
         'Rank': index + 1,
@@ -338,17 +337,18 @@ export const exportToJSON = (
         updated_at: score.updated_at
       })),
       rankings: rankings.map((entry, index) => {
-        const entryScores = scores.filter(s => s.entry_id === entry.id);
-        const avgScore = entryScores.length > 0
-          ? entryScores.reduce((sum, s) => sum + s.total_score, 0) / entryScores.length
-          : 0;
+        const entryScores = dedupeScoresByJudge(scores.filter(s => s.entry_id === entry.id));
+        const avgScore =
+          typeof entry.averageScore === 'number'
+            ? entry.averageScore
+            : calculateAverageFromScores(entryScores);
         
         return {
           rank: index + 1,
           entry_id: entry.id,
           entry_number: entry.entry_number,
           competitor_name: entry.competitor_name,
-          average_score: parseFloat(avgScore.toFixed(2)),
+          average_score: avgScore,
           category_id: entry.category_id,
           age_division_id: entry.age_division_id,
           ability_level: entry.ability_level,

@@ -29,7 +29,7 @@ import {
   getDivisionTypeDisplayName
 } from '../utils/calculations';
 import { formatEntryName, groupEntries, cleanDisplayText } from '../utils/entryFilters';
-import { pickReconciledJudgeScore, getScoreRowTotal } from '../utils/scoreReconciliation';
+import { pickReconciledJudgeScore, calculateAverageFromScores } from '../utils/scoreReconciliation';
 import { RankIcon, MedalLevelIcon, DivisionTypeIcon } from '../components/AppIcons';
 import {
   SlidersHorizontal,
@@ -219,7 +219,9 @@ function ResultsPage() {
     for (const row of routineRows) {
       const rowScores = scores.filter((s) => s.entry_id === row.id);
       for (const score of rowScores) {
-        const judge = score.judge_number ?? 'unknown';
+        // Normalize judge key so "1" and 1 never create two buckets (would inflate totals)
+        const judgeNum = Number(score.judge_number);
+        const judge = Number.isFinite(judgeNum) ? judgeNum : `unknown-${score.id}`;
         if (!byJudge.has(judge)) byJudge.set(judge, []);
         byJudge.get(judge).push({ entry: row, score });
       }
@@ -240,12 +242,13 @@ function ResultsPage() {
         return { ...entry, averageScore: 0, judgeCount: 0, hasScores: false, scores: [] };
       }
 
-      const avgScore = entryScores.reduce((sum, s) => sum + getScoreRowTotal(s), 0) / entryScores.length;
+      // Average of judge totals (/100 each) — never sum judges into a combined total
+      const avgScore = calculateAverageFromScores(entryScores);
       const category = categories.find(c => c.id === entry.category_id);
       
       return {
         ...entry,
-        averageScore: parseFloat(avgScore.toFixed(2)),
+        averageScore: avgScore,
         judgeCount: entryScores.length,
         hasScores: true,
         scores: entryScores,
@@ -526,9 +529,7 @@ function ResultsPage() {
   };
 
   const handleExport = () => {
-    const category = selectedCategory ? categories.find(c => c.id === selectedCategory) : null;
-    const ageDivision = selectedAgeDivision ? ageDivisions.find(d => d.id === selectedAgeDivision) : null;
-    exportResultsToExcel(filteredResults, categories, ageDivisions, competition, category, ageDivision);
+    exportResultsToExcel(filteredResults, scores, competition, categories, ageDivisions);
     toast.success('Results exported to Excel!');
   };
 
@@ -1580,7 +1581,7 @@ function ResultsPage() {
                         {/* Average Score */}
                       <div className="bg-gradient-to-r from-cyan-500 to-teal-500 rounded-2xl p-6 text-center mb-6">
                         <div className="text-sm font-bold text-white/80 uppercase tracking-widest mb-2">
-                          Average Score
+                          Average Score ({entry.judgeCount} {entry.judgeCount === 1 ? 'Judge' : 'Judges'})
                         </div>
                         <div className="text-5xl font-black text-white drop-shadow-lg">
                           {entry.averageScore.toFixed(2)}
@@ -1697,7 +1698,7 @@ function ResultsPage() {
                       {/* Overall Average */}
                           <div className="p-8 bg-gradient-to-r from-cyan-600 to-teal-600 rounded-2xl text-center shadow-lg">
                             <div className="text-lg font-bold text-white/80 uppercase tracking-widest mb-3">
-                              Final Average
+                              Final Average ({entry.judgeCount} {entry.judgeCount === 1 ? 'Judge' : 'Judges'})
                             </div>
                             <div className="text-6xl font-black text-white drop-shadow-xl">
                               {entry.averageScore.toFixed(2)} / 100

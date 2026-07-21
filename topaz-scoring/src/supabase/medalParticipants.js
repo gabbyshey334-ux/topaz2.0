@@ -1,4 +1,5 @@
 import { supabase } from './config';
+import { calculateAverageFromScores, dedupeScoresByJudge } from '../utils/scoreReconciliation';
 
 /**
  * Get or create a medal participant by name
@@ -558,15 +559,14 @@ export const awardMedalPointsForCompetition = async (competitionId) => {
     // Calculate average score for each entry
     console.log('\n📊 Step 3: Calculating average scores...');
     const entriesWithScores = entries.map(entry => {
-      const entryScores = allScores.filter(s => s.entry_id === entry.id);
+      const entryScores = dedupeScoresByJudge(allScores.filter(s => s.entry_id === entry.id));
       
       if (entryScores.length === 0) {
         console.log(`   ⚠️ No scores for: ${entry.competitor_name}`);
         return { ...entry, averageScore: 0, hasScores: false };
       }
 
-      const total = entryScores.reduce((sum, score) => sum + (score.total_score || 0), 0);
-      const averageScore = total / entryScores.length;
+      const averageScore = calculateAverageFromScores(entryScores);
       
       console.log(`   📊 "${entry.competitor_name}": ${entryScores.length} judge(s), avg: ${averageScore.toFixed(2)}`);
       

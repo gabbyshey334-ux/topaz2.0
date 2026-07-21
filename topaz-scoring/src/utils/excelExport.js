@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { calculateAverageFromScores, dedupeScoresByJudge } from './scoreReconciliation';
 
 export const exportResultsToExcel = (entries, allScores, competition, categories, ageDivisions) => {
   try {
@@ -67,13 +68,18 @@ export const exportResultsToExcel = (entries, allScores, competition, categories
         }
       }
       
-      // Get all scores for this entry
-      const entryScores = allScores.filter(s => s.entry_id === entry.id);
-      
-      // Calculate average
-      const avgScore = entryScores.length > 0
-        ? entryScores.reduce((sum, s) => sum + s.total_score, 0) / entryScores.length
-        : 0;
+      // Prefer reconciled scores already on the ranked entry; else filter + dedupe by judge
+      const entryScores = dedupeScoresByJudge(
+        entry.scores?.length
+          ? entry.scores
+          : (allScores || []).filter((s) => s.entry_id === entry.id)
+      );
+
+      // Average of judge /100 totals — never the sum across judges
+      const avgScore =
+        typeof entry.averageScore === 'number' && !Number.isNaN(entry.averageScore)
+          ? entry.averageScore
+          : calculateAverageFromScores(entryScores);
       
       // Build row object
       const row = {

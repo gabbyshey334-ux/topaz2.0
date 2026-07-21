@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTotal, validateScore } from './calculations.js';
+import { calculateTotal, validateScore, calculateAverageScore } from './calculations.js';
 
 describe('calculateTotal', () => {
   it('sums four categories to 100', () => {
@@ -12,6 +12,17 @@ describe('calculateTotal', () => {
 
   it('treats empty as zero', () => {
     expect(calculateTotal('', null, undefined, 10)).toBe(10);
+  });
+});
+
+describe('calculateAverageScore', () => {
+  it('uses total_score and averages judges (not sum)', () => {
+    expect(
+      calculateAverageScore([
+        { total_score: 100, judge_number: 1 },
+        { total_score: 100, judge_number: 2 },
+      ])
+    ).toBe(100);
   });
 });
 
